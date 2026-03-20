@@ -4,251 +4,9 @@
       <div>
         <span class="eyebrow">Settings</span>
         <h1 class="mt-[0.15rem] mb-0 text-[clamp(1.55rem,2.4vw,2rem)] font-medium tracking-[-0.04em]">Library Controls</h1>
-        <p class="m-0 text-muted">Run scans, refresh thumbnails, or reset the library index.</p>
+        <p class="m-0 text-muted">Manage access, run scans, or reset the library index.</p>
       </div>
     </header>
-
-    <section class="card grid gap-[1.15rem] p-8" style="background: radial-gradient(circle at top right, rgba(24,119,242,0.14), transparent 42%), linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, #f3f8ff 4%) 0%, var(--surface) 100%);">
-      <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
-        <div>
-          <span class="eyebrow text-accent-strong">Access Protection</span>
-          <h2 class="m-0 mt-[0.2rem] text-[1.18rem]">Admin and viewer access</h2>
-          <p class="m-0 mt-[0.35rem] text-muted">Protect admin actions with an admin password, then optionally issue a separate viewer password for browsing-only sessions.</p>
-        </div>
-        <span
-          class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap"
-          :class="authStore.enabled ? 'text-accent-strong bg-[color-mix(in_srgb,var(--accent-soft)_78%,transparent_22%)]' : 'text-muted bg-surface-alt'"
-        >
-          {{ authStore.enabled ? 'Admin Locked' : 'Open Access' }}
-        </span>
-      </div>
-
-      <p class="m-0 text-muted">
-        {{ authProtectionDescription }}
-      </p>
-
-      <div v-if="authFeedback" class="rounded-[0.95rem] px-4 py-3 text-[0.9rem]" :class="authFeedback.tone === 'error' ? 'border border-[rgba(214,48,49,0.24)] text-[#c0392b] bg-[rgba(214,48,49,0.08)]' : 'border border-[rgba(24,119,242,0.2)] text-accent-strong bg-[rgba(24,119,242,0.08)]'">
-        {{ authFeedback.message }}
-      </div>
-
-      <section v-if="!authStore.enabled" class="grid gap-[1rem]">
-        <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-          <label class="grid gap-[0.45rem]">
-            <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Admin password</span>
-            <input
-              v-model="enablePassword"
-              class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
-              type="password"
-              autocomplete="new-password"
-              placeholder="Minimum 8 characters"
-              :disabled="authStore.loading"
-            />
-          </label>
-          <label class="grid gap-[0.45rem]">
-            <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Confirm password</span>
-            <input
-              v-model="enablePasswordConfirmation"
-              class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
-              type="password"
-              autocomplete="new-password"
-              placeholder="Repeat the password"
-              :disabled="authStore.loading"
-            />
-          </label>
-        </div>
-
-        <div class="flex items-center gap-4 max-sm:flex-col max-sm:items-start">
-          <button class="btn-primary min-w-[13rem]" type="button" :disabled="authStore.loading" @click="enableAccessProtection">
-            {{ authStore.loading ? 'Enabling...' : 'Enable Admin Password' }}
-          </button>
-          <p class="m-0 text-muted">The admin password is stored as a one-way hash and unlocks this browser with a signed session cookie.</p>
-        </div>
-      </section>
-
-      <section v-else class="grid gap-[1rem]">
-        <div class="grid gap-[0.9rem] rounded-[1.05rem] border border-[color-mix(in_srgb,var(--border)_78%,var(--accent)_22%)] p-5">
-          <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
-            <div>
-              <h3 class="m-0 text-[1rem]">Change admin password</h3>
-              <p class="m-0 mt-[0.25rem] text-muted">Update the admin password and invalidate older sessions.</p>
-            </div>
-            <button
-              class="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] border border-[rgba(24,119,242,0.2)] bg-[rgba(24,119,242,0.08)] px-4 text-[0.9rem] font-semibold text-accent-strong transition-colors duration-180 hover:bg-[rgba(24,119,242,0.16)] disabled:cursor-wait disabled:opacity-60"
-              type="button"
-              :aria-expanded="showChangePasswordForm"
-              :disabled="authStore.loading"
-              @click="toggleChangePasswordForm"
-            >
-              {{ showChangePasswordForm ? 'Hide Form' : 'Change Password' }}
-            </button>
-          </div>
-
-          <template v-if="showChangePasswordForm">
-            <div class="grid grid-cols-3 gap-4 max-lg:grid-cols-1">
-              <label class="grid gap-[0.45rem]">
-                <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Current password</span>
-                <input
-                  v-model="currentPassword"
-                  class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
-                  type="password"
-                  autocomplete="current-password"
-                  :disabled="authStore.loading"
-                />
-              </label>
-              <label class="grid gap-[0.45rem]">
-                <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">New password</span>
-                <input
-                  v-model="nextPassword"
-                  class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
-                  type="password"
-                  autocomplete="new-password"
-                  :disabled="authStore.loading"
-                />
-              </label>
-              <label class="grid gap-[0.45rem]">
-                <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Confirm new password</span>
-                <input
-                  v-model="nextPasswordConfirmation"
-                  class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
-                  type="password"
-                  autocomplete="new-password"
-                  :disabled="authStore.loading"
-                />
-              </label>
-            </div>
-
-            <div class="flex items-center gap-4 max-sm:flex-col max-sm:items-start">
-              <button class="btn-primary min-w-[11.5rem]" type="button" :disabled="authStore.loading" @click="changeAccessPassword">
-                {{ authStore.loading ? 'Updating...' : 'Change Admin Password' }}
-              </button>
-              <p class="m-0 text-muted">Use at least 8 characters. Changing the password signs out any older sessions.</p>
-            </div>
-          </template>
-        </div>
-
-        <div class="grid gap-[0.9rem] rounded-[1.05rem] border border-[rgba(214,48,49,0.16)] p-5">
-          <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
-            <div>
-              <h3 class="m-0 text-[1rem]">Disable admin password</h3>
-              <p class="m-0 mt-[0.25rem] text-muted">Turn the admin password back off for this Foldergram instance.</p>
-            </div>
-            <button
-              class="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] border border-[rgba(214,48,49,0.24)] bg-[rgba(214,48,49,0.08)] px-4 text-[0.9rem] font-semibold text-[#c0392b] transition-colors duration-180 hover:bg-[rgba(214,48,49,0.16)] disabled:cursor-wait disabled:opacity-60"
-              type="button"
-              :aria-expanded="showDisablePasswordForm"
-              :disabled="authStore.loading"
-              @click="toggleDisablePasswordForm"
-            >
-              {{ showDisablePasswordForm ? 'Hide Form' : 'Disable Access' }}
-            </button>
-          </div>
-
-          <template v-if="showDisablePasswordForm">
-            <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 items-end max-lg:grid-cols-1">
-              <label class="grid gap-[0.45rem]">
-                <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Current password</span>
-                <input
-                  v-model="disablePassword"
-                  class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
-                  type="password"
-                  autocomplete="current-password"
-                  :disabled="authStore.loading"
-                />
-              </label>
-              <button class="btn-primary min-w-[10.5rem] bg-[#d93025] hover:bg-[#c5281c]" type="button" :disabled="authStore.loading" @click="disableAccessProtection">
-                {{ authStore.loading ? 'Disabling...' : 'Disable Admin Password' }}
-              </button>
-              <button class="inline-flex min-h-12 items-center justify-center rounded-[0.95rem] border border-border bg-transparent px-4 text-[0.92rem] font-semibold text-text transition-colors duration-180 hover:bg-surface-alt disabled:cursor-wait disabled:opacity-60" type="button" :disabled="authStore.loading" @click="signOut">
-                Sign Out
-              </button>
-            </div>
-          </template>
-        </div>
-
-        <div class="grid gap-[0.9rem] rounded-[1.05rem] border border-[color-mix(in_srgb,var(--border)_78%,var(--accent)_22%)] p-5">
-          <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
-            <div>
-              <h3 class="m-0 text-[1rem]">Viewer access</h3>
-              <p class="m-0 mt-[0.25rem] text-muted">Issue a browsing-only password for viewer sessions or open the library for anonymous public viewing with local browser favorites.</p>
-            </div>
-            <span
-              class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap"
-              :class="viewerAccessStatusTone"
-            >
-              {{ viewerAccessStatusLabel }}
-            </span>
-          </div>
-
-          <div
-            class="rounded-[0.95rem] border px-4 py-3"
-            :class="viewerAccessActive ? 'border-[rgba(24,119,242,0.18)] bg-[rgba(24,119,242,0.06)]' : 'border-border bg-[color-mix(in_srgb,var(--surface-alt)_82%,transparent_18%)]'"
-          >
-            <p class="m-0 text-[0.92rem] font-semibold text-text">{{ viewerAccessSummaryTitle }}</p>
-            <p class="m-0 mt-[0.3rem] text-[0.88rem] text-muted">{{ viewerAccessSummary }}</p>
-          </div>
-
-          <div class="grid gap-[0.7rem]">
-            <label class="flex items-start gap-3 rounded-[0.9rem] border border-border px-4 py-3 cursor-pointer">
-              <input v-model="viewerAccessMode" class="mt-[0.2rem]" type="radio" value="off" :disabled="authStore.loading" />
-              <span class="grid gap-[0.15rem]">
-                <span class="text-[0.92rem] font-semibold text-text">Admin only</span>
-                <span class="text-[0.84rem] text-muted">Only the admin password can unlock the app.</span>
-              </span>
-            </label>
-            <label class="flex items-start gap-3 rounded-[0.9rem] border border-border px-4 py-3 cursor-pointer">
-              <input v-model="viewerAccessMode" class="mt-[0.2rem]" type="radio" value="password" :disabled="authStore.loading" />
-              <span class="grid gap-[0.15rem]">
-                <span class="text-[0.92rem] font-semibold text-text">Viewer password</span>
-                <span class="text-[0.84rem] text-muted">Allow a separate viewer login that can browse and use shared likes without seeing admin controls.</span>
-              </span>
-            </label>
-            <label class="flex items-start gap-3 rounded-[0.9rem] border border-border px-4 py-3 cursor-pointer">
-              <input v-model="viewerAccessMode" class="mt-[0.2rem]" type="radio" value="public" :disabled="authStore.loading" />
-              <span class="grid gap-[0.15rem]">
-                <span class="text-[0.92rem] font-semibold text-text">Public</span>
-                <span class="text-[0.84rem] text-muted">Allow anonymous browsing with browser-local favorites while keeping admin unlock available from More.</span>
-              </span>
-            </label>
-          </div>
-
-          <div v-if="viewerAccessMode === 'password'" class="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-            <label class="grid gap-[0.45rem]">
-              <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Viewer password</span>
-              <input
-                v-model="viewerPassword"
-                class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
-                type="password"
-                autocomplete="new-password"
-                :placeholder="viewerAccessEnabled ? 'Enter a new viewer password' : 'Minimum 8 characters'"
-                :disabled="authStore.loading"
-              />
-            </label>
-            <label class="grid gap-[0.45rem]">
-              <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Confirm viewer password</span>
-              <input
-                v-model="viewerPasswordConfirmation"
-                class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
-                type="password"
-                autocomplete="new-password"
-                :placeholder="viewerAccessEnabled ? 'Repeat the new viewer password' : 'Repeat the viewer password'"
-                :disabled="authStore.loading"
-              />
-            </label>
-          </div>
-
-          <div class="flex items-center gap-4 max-sm:flex-col max-sm:items-start">
-            <button class="btn-primary min-w-[11.5rem]" type="button" :disabled="authStore.loading" @click="saveViewerAccess">
-              {{ authStore.loading ? 'Saving...' : viewerAccessButtonLabel }}
-            </button>
-            <p class="m-0 text-muted">{{ viewerAccessDescription }}</p>
-          </div>
-
-          <div v-if="viewerFeedback" class="rounded-[0.95rem] px-4 py-3 text-[0.9rem]" :class="viewerFeedback.tone === 'error' ? 'border border-[rgba(214,48,49,0.24)] text-[#c0392b] bg-[rgba(214,48,49,0.08)]' : 'border border-[rgba(24,119,242,0.2)] text-accent-strong bg-[rgba(24,119,242,0.08)]'">
-            {{ viewerFeedback.message }}
-          </div>
-        </div>
-      </section>
-    </section>
 
     <section
       v-if="showScanErrorNotice"
@@ -271,11 +29,11 @@
         </button>
       </div>
 
-      <div class="flex items-center gap-4 max-sm:flex-col max-sm:items-start">
+      <div class="flex items-center gap-4 max-sm:flex-col-reverse max-sm:items-stretch">
+        <p class="m-0 text-muted">Run a new library scan to retry failed media and fill in any missing thumbnails or previews.</p>
         <button class="btn-primary min-w-[11.5rem]" type="button" :disabled="scanActionDisabled" @click="runManualScan">
           {{ scanButtonLabel }}
         </button>
-        <p class="m-0 text-muted">Run a new library scan to retry failed media and fill in any missing thumbnails or previews.</p>
       </div>
     </section>
 
@@ -297,158 +55,453 @@
       </button>
     </section>
 
-    <section class="grid grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.95fr)] gap-6 items-start max-md:grid-cols-1">
-      <!-- Left: Scan controls -->
-      <div class="flex flex-col gap-[1.15rem]">
-        <section class="card grid gap-[1.15rem] p-8" style="background: radial-gradient(circle at top right, rgba(0,149,246,0.15), transparent 40%), linear-gradient(180deg, var(--surface) 0%, color-mix(in srgb, var(--surface) 90%, var(--accent) 10%) 100%);">
-          <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
-            <div>
-              <h2 class="m-0 mb-[0.18rem] text-[1.1rem]">Scan Library</h2>
-              <p class="m-0 text-muted">Run a scan after adding folders or when you want to refresh indexed media.</p>
-            </div>
-            <span
-              class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap"
-              :class="{
-                'text-muted bg-surface-alt': statusTone === 'idle',
-                'text-accent-strong bg-[color-mix(in_srgb,var(--accent-soft)_78%,transparent_22%)]': statusTone === 'active',
-                'text-[#b76e00] bg-[rgba(242,164,30,0.14)]': statusTone === 'warning',
-                'text-[#c0392b] bg-[rgba(214,48,49,0.12)]': statusTone === 'danger',
-              }"
-            >{{ statusLabel }}</span>
-          </div>
-
-          <div class="flex items-center gap-4 max-sm:flex-col max-sm:items-start">
-            <button
-              class="btn-primary min-w-[11.5rem]"
-              type="button"
-              :disabled="scanActionDisabled"
-              @click="runManualScan"
-            >
-              {{ scanButtonLabel }}
-            </button>
-            <p class="m-0 text-muted">{{ scanActionNote }}</p>
-          </div>
-
-          <p v-if="scanError" class="m-0 px-4 py-[0.85rem] border border-[rgba(214,48,49,0.24)] rounded-[0.9rem] text-[#c0392b] bg-[rgba(214,48,49,0.08)]">{{ scanError }}</p>
-        </section>
-
-        <section
-          class="card grid gap-[1rem] p-8"
-          :class="highlightRebuildAction ? 'ring-2 ring-[color-mix(in_srgb,var(--accent)_45%,transparent_55%)]' : ''"
-          :style="rebuildCardStyle"
+    <div class="flex flex-col md:flex-row gap-8 items-start mt-[0.5rem]">
+      <!-- Navigation Sidebar -->
+      <nav class="flex flex-col gap-2 w-full md:w-[16rem] shrink-0 sticky top-[6.5rem]">
+        <button
+          @click="currentCategory = 'library'"
+          class="flex items-start gap-3 px-4 py-[0.85rem] rounded-[0.85rem] border-0 text-left transition-colors duration-150 cursor-pointer"
+          :class="currentCategory === 'library' ? 'bg-surface-alt font-bold text-text' : 'bg-transparent text-muted hover:bg-surface-hover hover:text-text'"
         >
-          <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
-            <div>
-              <h2 class="m-0 mb-[0.18rem] text-[1.1rem]">Rebuild Library</h2>
-              <p class="m-0 text-muted">Refresh thumbnails or reset the library index from the current gallery root.</p>
-            </div>
-            <span
-              class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap"
-              :class="appStore.isLibraryRebuildRequired ? 'text-[#9f6a00] bg-[rgba(210,161,51,0.14)]' : 'text-muted bg-surface-alt'"
-            >
-              {{ appStore.isLibraryRebuildRequired ? 'Recommended' : 'Optional' }}
-            </span>
-          </div>
+          <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'library' ? 'i-fluent-folder-sync-20-filled' : 'i-fluent-folder-sync-20-regular'" aria-hidden="true"></span>
+          <span class="flex flex-col gap-[0.1rem]">
+            <span>Scan & Library</span>
+            <span class="text-[0.75rem] font-normal text-muted">Index media & build thumbnails</span>
+          </span>
+        </button>
+        <button
+          @click="currentCategory = 'access'"
+          class="flex items-start gap-3 px-4 py-[0.85rem] rounded-[0.85rem] border-0 text-left transition-colors duration-150 cursor-pointer"
+          :class="currentCategory === 'access' ? 'bg-surface-alt font-bold text-text' : 'bg-transparent text-muted hover:bg-surface-hover hover:text-text'"
+        >
+          <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'access' ? 'i-fluent-lock-shield-20-filled' : 'i-fluent-lock-shield-20-regular'" aria-hidden="true"></span>
+          <span class="flex flex-col gap-[0.1rem]">
+            <span>Security & Access</span>
+            <span class="text-[0.75rem] font-normal text-muted">Password locks & viewer roles</span>
+          </span>
+        </button>
+        <button
+          @click="currentCategory = 'status'"
+          class="flex items-start gap-3 px-4 py-[0.85rem] rounded-[0.85rem] border-0 text-left transition-colors duration-150 cursor-pointer"
+          :class="currentCategory === 'status' ? 'bg-surface-alt font-bold text-text' : 'bg-transparent text-muted hover:bg-surface-hover hover:text-text'"
+        >
+          <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'status' ? 'i-fluent-data-usage-20-filled' : 'i-fluent-data-usage-20-regular'" aria-hidden="true"></span>
+          <span class="flex flex-col gap-[0.1rem]">
+            <span>System Status</span>
+            <span class="text-[0.75rem] font-normal text-muted">Storage overview & scan history</span>
+          </span>
+        </button>
+      </nav>
 
-          <dl class="grid gap-[0.8rem] m-0">
-            <div class="px-4 py-[0.9rem] rounded-[0.9rem]" style="background: color-mix(in srgb, var(--surface-alt) 92%, var(--accent) 8%)">
-              <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Current gallery root</dt>
-              <dd class="m-0 text-[0.92rem] font-semibold break-all">{{ adminStats?.libraryIndex.currentGalleryRoot ?? 'Unavailable' }}</dd>
-            </div>
-            <div v-if="adminStats?.libraryIndex.previousGalleryRoot" class="px-4 py-[0.9rem] rounded-[0.9rem]" style="background: color-mix(in srgb, var(--surface-alt) 92%, #d2a133 8%)">
-              <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Previous gallery root</dt>
-              <dd class="m-0 text-[0.92rem] font-semibold break-all">{{ adminStats.libraryIndex.previousGalleryRoot }}</dd>
-            </div>
-          </dl>
-
-          <div class="grid gap-[1rem]">
-            <section class="grid gap-[0.7rem]">
-              <div class="flex items-center gap-4 max-sm:flex-col max-sm:items-start">
-                <button class="btn-primary min-w-[13rem]" type="button" :disabled="thumbnailRebuildActionDisabled" @click="confirmThumbnailRebuildOpen = true">
-                  {{ thumbnailRebuildButtonLabel }}
-                </button>
-                <p class="m-0 text-muted">
-                  Rebuild feed and profile thumbnails plus video posters from indexed media only.
-                </p>
+      <!-- Content Area -->
+      <div class="flex-1 w-full min-w-0 flex flex-col gap-[1.15rem]">
+        
+        <!-- CATEGORY: ACCESS -->
+        <template v-if="currentCategory === 'access'">
+          <section class="card grid gap-[1.15rem] p-8">
+            <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
+              <div>
+                <h2 class="m-0 text-[1.18rem]">Admin and viewer access</h2>
+                <p class="m-0 mt-[0.35rem] text-muted">Protect admin actions with an admin password, then optionally issue a separate viewer password for browsing-only sessions.</p>
               </div>
-              <p class="m-0 text-muted">{{ thumbnailRebuildActionNote }}</p>
-              <p v-if="thumbnailRebuildError" class="m-0 px-4 py-[0.85rem] border border-[rgba(214,48,49,0.24)] rounded-[0.9rem] text-[#c0392b] bg-[rgba(214,48,49,0.08)]">{{ thumbnailRebuildError }}</p>
+              <span
+                class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap"
+                :class="authStore.enabled ? 'text-accent-strong bg-[color-mix(in_srgb,var(--accent-soft)_78%,transparent_22%)]' : 'text-muted bg-surface-alt'"
+              >
+                {{ authStore.enabled ? 'Admin Locked' : 'Open Access' }}
+              </span>
+            </div>
+
+            <p class="m-0 text-muted">
+              {{ authProtectionDescription }}
+            </p>
+
+            <div v-if="authFeedback" class="rounded-[0.95rem] px-4 py-3 text-[0.9rem]" :class="authFeedback.tone === 'error' ? 'border border-[rgba(214,48,49,0.24)] text-[#c0392b] bg-[rgba(214,48,49,0.08)]' : 'border border-[rgba(24,119,242,0.2)] text-accent-strong bg-[rgba(24,119,242,0.08)]'">
+              {{ authFeedback.message }}
+            </div>
+
+            <section v-if="!authStore.enabled" class="grid gap-[1rem]">
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+                <label class="grid gap-[0.45rem]">
+                  <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Admin password</span>
+                  <input
+                    v-model="enablePassword"
+                    class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder="Minimum 8 characters"
+                    :disabled="authStore.loading"
+                  />
+                </label>
+                <label class="grid gap-[0.45rem]">
+                  <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Confirm password</span>
+                  <input
+                    v-model="enablePasswordConfirmation"
+                    class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder="Repeat the password"
+                    :disabled="authStore.loading"
+                  />
+                </label>
+              </div>
+
+              <div class="flex flex-col md:flex-row items-center gap-4 max-sm:items-stretch">
+                <p class="m-0 flex-1 text-muted">The admin password is stored as a one-way hash and unlocks this browser with a signed session cookie.</p>
+                <button class="btn-primary min-w-[13rem]" type="button" :disabled="authStore.loading" @click="enableAccessProtection">
+                  {{ authStore.loading ? 'Enabling...' : 'Enable Admin Password' }}
+                </button>
+              </div>
             </section>
 
-            <section class="grid gap-[0.7rem]">
-              <div class="flex items-center gap-4 max-sm:flex-col max-sm:items-start">
-                <button class="btn-primary min-w-[13rem]" type="button" :disabled="rebuildActionDisabled" @click="confirmRebuildOpen = true">
+            <section v-else class="grid gap-[1rem]">
+              <!-- Change Password -->
+              <div class="grid gap-[0.9rem] rounded-[1.05rem] border border-border p-5">
+                <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
+                  <div>
+                    <h3 class="m-0 text-[1rem]">Change admin password</h3>
+                    <p class="m-0 mt-[0.25rem] text-muted">Update the admin password and invalidate older sessions.</p>
+                  </div>
+                  <button
+                    class="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] border border-[rgba(24,119,242,0.2)] bg-[rgba(24,119,242,0.08)] px-4 text-[0.9rem] font-semibold text-accent-strong transition-colors duration-180 hover:bg-[rgba(24,119,242,0.16)] disabled:cursor-wait disabled:opacity-60 max-sm:w-full"
+                    type="button"
+                    :aria-expanded="showChangePasswordForm"
+                    :disabled="authStore.loading"
+                    @click="toggleChangePasswordForm"
+                  >
+                    {{ showChangePasswordForm ? 'Hide Form' : 'Change Password' }}
+                  </button>
+                </div>
+
+                <template v-if="showChangePasswordForm">
+                  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <label class="grid gap-[0.45rem]">
+                      <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Current password</span>
+                      <input
+                        v-model="currentPassword"
+                        class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                        type="password"
+                        autocomplete="current-password"
+                        :disabled="authStore.loading"
+                      />
+                    </label>
+                    <label class="grid gap-[0.45rem]">
+                      <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">New password</span>
+                      <input
+                        v-model="nextPassword"
+                        class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                        type="password"
+                        autocomplete="new-password"
+                        :disabled="authStore.loading"
+                      />
+                    </label>
+                    <label class="grid gap-[0.45rem]">
+                      <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Confirm new password</span>
+                      <input
+                        v-model="nextPasswordConfirmation"
+                        class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                        type="password"
+                        autocomplete="new-password"
+                        :disabled="authStore.loading"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="flex flex-col md:flex-row items-center gap-4 max-sm:items-stretch">
+                    <p class="m-0 flex-1 text-muted">Use at least 8 characters. Changing the password signs out any older sessions.</p>
+                    <button class="btn-primary min-w-[13rem]" type="button" :disabled="authStore.loading" @click="changeAccessPassword">
+                      {{ authStore.loading ? 'Updating...' : 'Change Admin Password' }}
+                    </button>
+                  </div>
+                </template>
+              </div>
+              
+              <!-- Viewer Access -->
+              <div class="grid gap-[0.9rem] rounded-[1.05rem] border border-border p-5">
+                <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
+                  <div>
+                    <h3 class="m-0 text-[1rem]">Viewer access</h3>
+                    <p class="m-0 mt-[0.25rem] text-muted">Issue a browsing-only password for viewer sessions or open the library for anonymous public viewing.</p>
+                  </div>
+                  <span
+                    class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap"
+                    :class="viewerAccessStatusTone"
+                  >
+                    {{ viewerAccessStatusLabel }}
+                  </span>
+                </div>
+
+                <div
+                  class="rounded-[0.95rem] border px-4 py-3"
+                  :class="viewerAccessActive ? 'border-[rgba(24,119,242,0.18)] bg-[rgba(24,119,242,0.06)]' : 'border-border bg-[color-mix(in_srgb,var(--surface-alt)_82%,transparent_18%)]'"
+                >
+                  <p class="m-0 text-[0.92rem] font-semibold text-text">{{ viewerAccessSummaryTitle }}</p>
+                  <p class="m-0 mt-[0.3rem] text-[0.88rem] text-muted">{{ viewerAccessSummary }}</p>
+                </div>
+
+                <div class="grid gap-[0.7rem] mt-2">
+                  <label class="flex items-start gap-3 rounded-[0.9rem] border border-border px-4 py-3 cursor-pointer">
+                    <input v-model="viewerAccessMode" class="mt-[0.2rem]" type="radio" value="off" :disabled="authStore.loading" />
+                    <span class="grid gap-[0.15rem]">
+                      <span class="text-[0.92rem] font-semibold text-text">Admin only</span>
+                      <span class="text-[0.84rem] text-muted">Only the admin password can unlock the app.</span>
+                    </span>
+                  </label>
+                  <label class="flex items-start gap-3 rounded-[0.9rem] border border-border px-4 py-3 cursor-pointer">
+                    <input v-model="viewerAccessMode" class="mt-[0.2rem]" type="radio" value="password" :disabled="authStore.loading" />
+                    <span class="grid gap-[0.15rem]">
+                      <span class="text-[0.92rem] font-semibold text-text">Viewer password</span>
+                      <span class="text-[0.84rem] text-muted">Allow a separate viewer login that can browse and use shared likes without seeing admin controls.</span>
+                    </span>
+                  </label>
+                  <label class="flex items-start gap-3 rounded-[0.9rem] border border-border px-4 py-3 cursor-pointer">
+                    <input v-model="viewerAccessMode" class="mt-[0.2rem]" type="radio" value="public" :disabled="authStore.loading" />
+                    <span class="grid gap-[0.15rem]">
+                      <span class="text-[0.92rem] font-semibold text-text">Public</span>
+                      <span class="text-[0.84rem] text-muted">Allow anonymous browsing with browser-local favorites while keeping admin unlock available from More.</span>
+                    </span>
+                  </label>
+                </div>
+
+                <div v-if="viewerAccessMode === 'password'" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  <label class="grid gap-[0.45rem]">
+                    <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Viewer password</span>
+                    <input
+                      v-model="viewerPassword"
+                      class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                      type="password"
+                      autocomplete="new-password"
+                      :placeholder="viewerAccessEnabled ? 'Enter a new viewer password' : 'Minimum 8 characters'"
+                      :disabled="authStore.loading"
+                    />
+                  </label>
+                  <label class="grid gap-[0.45rem]">
+                    <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Confirm viewer password</span>
+                    <input
+                      v-model="viewerPasswordConfirmation"
+                      class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                      type="password"
+                      autocomplete="new-password"
+                      :placeholder="viewerAccessEnabled ? 'Repeat the new viewer password' : 'Repeat the viewer password'"
+                      :disabled="authStore.loading"
+                    />
+                  </label>
+                </div>
+
+                <div class="flex flex-col md:flex-row items-center gap-4 max-sm:items-stretch mt-3">
+                  <p class="m-0 flex-1 text-muted">{{ viewerAccessDescription }}</p>
+                  <button class="btn-primary min-w-[13rem]" type="button" :disabled="authStore.loading" @click="saveViewerAccess">
+                    {{ authStore.loading ? 'Saving...' : viewerAccessButtonLabel }}
+                  </button>
+                </div>
+
+                <div v-if="viewerFeedback" class="rounded-[0.95rem] px-4 py-3 text-[0.9rem] mt-2" :class="viewerFeedback.tone === 'error' ? 'border border-[rgba(214,48,49,0.24)] text-[#c0392b] bg-[rgba(214,48,49,0.08)]' : 'border border-[rgba(24,119,242,0.2)] text-accent-strong bg-[rgba(24,119,242,0.08)]'">
+                  {{ viewerFeedback.message }}
+                </div>
+              </div>
+              
+            </section>
+          </section>
+
+          <!-- Danger Zone -->
+          <div v-if="authStore.enabled" class="border border-[rgba(214,48,49,0.3)] rounded-[1.05rem] overflow-hidden">
+            <div class="bg-[rgba(214,48,49,0.04)] px-6 py-4 border-b border-[rgba(214,48,49,0.1)]">
+              <h3 class="m-0 text-[1rem] text-[#c0392b] font-bold">Danger Zone</h3>
+            </div>
+            <div class="p-6 grid gap-[0.9rem] bg-surface">
+              <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
+                <div>
+                  <h3 class="m-0 text-[1rem]">Disable admin password</h3>
+                  <p class="m-0 mt-[0.25rem] text-muted">Turn the admin password back off for this Foldergram instance.</p>
+                </div>
+                <button
+                  class="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] border border-[rgba(214,48,49,0.24)] bg-[rgba(214,48,49,0.08)] px-4 text-[0.9rem] font-semibold text-[#c0392b] transition-colors duration-180 hover:bg-[rgba(214,48,49,0.16)] disabled:cursor-wait disabled:opacity-60 max-sm:w-full"
+                  type="button"
+                  :aria-expanded="showDisablePasswordForm"
+                  :disabled="authStore.loading"
+                  @click="toggleDisablePasswordForm"
+                >
+                  {{ showDisablePasswordForm ? 'Hide Form' : 'Disable Access' }}
+                </button>
+              </div>
+
+              <template v-if="showDisablePasswordForm">
+                <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 items-end max-lg:grid-cols-1 mt-2">
+                  <label class="grid gap-[0.45rem]">
+                    <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Current password</span>
+                    <input
+                      v-model="disablePassword"
+                      class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                      type="password"
+                      autocomplete="current-password"
+                      :disabled="authStore.loading"
+                    />
+                  </label>
+                  <button class="btn-primary min-w-[13rem] bg-[#d93025] hover:bg-[#c5281c] border-transparent text-white" type="button" :disabled="authStore.loading" @click="disableAccessProtection">
+                    {{ authStore.loading ? 'Disabling...' : 'Disable Admin Password' }}
+                  </button>
+                  <button class="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] border border-border bg-transparent px-4 text-[0.92rem] font-semibold text-text transition-colors duration-180 hover:bg-surface-alt disabled:cursor-wait disabled:opacity-60" type="button" :disabled="authStore.loading" @click="signOut">
+                    Sign Out
+                  </button>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- CATEGORY: LIBRARY -->
+        <template v-if="currentCategory === 'library'">
+          <section class="card grid gap-[1.15rem] p-8">
+            <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
+              <div>
+                <h2 class="m-0 text-[1.18rem]">Scan Library</h2>
+                <p class="m-0 mt-[0.35rem] text-muted">Run a scan after adding folders or when you want to refresh indexed media.</p>
+              </div>
+              <span
+                class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap"
+                :class="{
+                  'text-muted bg-surface-alt': statusTone === 'idle',
+                  'text-accent-strong bg-[color-mix(in_srgb,var(--accent-soft)_78%,transparent_22%)]': statusTone === 'active',
+                  'text-[#b76e00] bg-[rgba(242,164,30,0.14)]': statusTone === 'warning',
+                  'text-[#c0392b] bg-[rgba(214,48,49,0.12)]': statusTone === 'danger',
+                }"
+              >{{ statusLabel }}</span>
+            </div>
+
+            <div class="flex flex-col md:flex-row items-center gap-4 max-sm:items-stretch mt-4">
+              <p class="m-0 flex-1 text-muted">{{ scanActionNote }}</p>
+              <button
+                class="btn-primary min-w-[13rem]"
+                type="button"
+                :disabled="scanActionDisabled"
+                @click="runManualScan"
+              >
+                {{ scanButtonLabel }}
+              </button>
+            </div>
+
+            <p v-if="scanError" class="m-0 px-4 py-[0.85rem] border border-[rgba(214,48,49,0.24)] rounded-[0.9rem] text-[#c0392b] bg-[rgba(214,48,49,0.08)]">{{ scanError }}</p>
+          </section>
+
+          <section class="card grid gap-[1.15rem] p-8">
+             <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
+              <div>
+                <h2 class="m-0 text-[1.18rem]">Regenerate Thumbnails</h2>
+                <p class="m-0 mt-[0.35rem] text-muted">Rebuild feed and profile thumbnails plus video posters from indexed media only. Original files are not affected.</p>
+              </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row items-center gap-4 max-sm:items-stretch mt-4">
+              <p class="m-0 flex-1 text-muted">{{ thumbnailRebuildActionNote }}</p>
+              <button class="btn-primary min-w-[13rem]" type="button" :disabled="thumbnailRebuildActionDisabled" @click="confirmThumbnailRebuildOpen = true">
+                {{ thumbnailRebuildButtonLabel }}
+              </button>
+            </div>
+            
+            <p v-if="thumbnailRebuildError" class="m-0 px-4 py-[0.85rem] border border-[rgba(214,48,49,0.24)] rounded-[0.9rem] text-[#c0392b] bg-[rgba(214,48,49,0.08)]">{{ thumbnailRebuildError }}</p>
+          </section>
+
+          <!-- Danger Zone -->
+          <div class="border border-[rgba(214,48,49,0.3)] rounded-[1.05rem] overflow-hidden" :class="highlightRebuildAction ? 'ring-2 ring-[color-mix(in_srgb,var(--accent)_45%,transparent_55%)]' : ''">
+            <div class="bg-[rgba(214,48,49,0.04)] px-6 py-4 border-b border-[rgba(214,48,49,0.1)] flex items-center justify-between">
+              <h3 class="m-0 text-[1rem] text-[#c0392b] font-bold">Danger Zone</h3>
+              <span
+                v-if="appStore.isLibraryRebuildRequired"
+                class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap text-[#9f6a00] bg-[rgba(210,161,51,0.14)]"
+              >
+                Recommended
+              </span>
+            </div>
+            <div class="p-6 grid gap-[1.15rem] bg-surface">
+              <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
+                <div>
+                  <h3 class="m-0 text-[1rem]">Rebuild Library Index</h3>
+                  <p class="m-0 mt-[0.25rem] text-muted">Reset the library index, reuse matching cached media, and generate only missing derivatives from the current gallery root.</p>
+                </div>
+              </div>
+
+              <dl class="grid gap-[0.8rem] m-0 mb-2">
+                <div class="px-4 py-[0.85rem] rounded-[0.85rem] border border-border bg-surface-alt">
+                  <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Current gallery root</dt>
+                  <dd class="m-0 text-[0.92rem] font-semibold break-all">{{ adminStats?.libraryIndex.currentGalleryRoot ?? 'Unavailable' }}</dd>
+                </div>
+                <div v-if="adminStats?.libraryIndex.previousGalleryRoot" class="px-4 py-[0.85rem] rounded-[0.85rem] border border-[#d2a133] bg-[rgba(210,161,51,0.04)]">
+                  <dt class="m-0 mb-[0.25rem] text-[#b76e00] text-[0.72rem] font-bold tracking-[0.08em] uppercase">Previous gallery root</dt>
+                  <dd class="m-0 text-[0.92rem] font-semibold break-all">{{ adminStats.libraryIndex.previousGalleryRoot }}</dd>
+                </div>
+              </dl>
+
+              <div class="flex flex-col md:flex-row items-center gap-4 max-sm:items-stretch">
+                <p class="m-0 flex-1 text-muted">{{ rebuildActionNote }}</p>
+                <button class="btn-primary min-w-[13rem] bg-[#d93025] hover:bg-[#c5281c] border-transparent text-white" type="button" :disabled="rebuildActionDisabled" @click="confirmRebuildOpen = true">
                   {{ rebuildButtonLabel }}
                 </button>
-                <p class="m-0 text-muted">
-                  Reset the library index, reuse matching cached media, and generate only missing derivatives from the current gallery root.
-                </p>
               </div>
-              <p class="m-0 text-muted">{{ rebuildActionNote }}</p>
               <p v-if="rebuildError" class="m-0 px-4 py-[0.85rem] border border-[rgba(214,48,49,0.24)] rounded-[0.9rem] text-[#c0392b] bg-[rgba(214,48,49,0.08)]">{{ rebuildError }}</p>
-            </section>
+            </div>
           </div>
-        </section>
+        </template>
+
+        <!-- CATEGORY: STATUS -->
+        <template v-if="currentCategory === 'status'">
+          <section class="card grid gap-[1.15rem] p-8">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h2 class="m-0 text-[1.18rem]">Library Status</h2>
+                <p class="m-0 mt-[0.35rem] text-muted">Current storage and index state.</p>
+              </div>
+            </div>
+            <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 m-0 mt-4">
+              <div class="flex flex-col gap-1 py-3 border-b border-border">
+                <dt class="m-0 text-muted text-[0.76rem] font-bold tracking-[0.08em] uppercase">Storage</dt>
+                <dd class="m-0 text-[1.45rem] font-medium tracking-tight" :class="appStore.isLibraryUnavailable ? 'text-[#c0392b]' : 'text-text'">{{ storageLabel }}</dd>
+              </div>
+              <div class="flex flex-col gap-1 py-3 border-b border-border">
+                <dt class="m-0 text-muted text-[0.76rem] font-bold tracking-[0.08em] uppercase">Folders</dt>
+                <dd class="m-0 text-[1.45rem] font-medium tracking-tight">{{ formatCount(appStore.stats?.folders ?? 0) }}</dd>
+              </div>
+              <div class="flex flex-col gap-1 py-3 border-b border-border md:border-b-0">
+                <dt class="m-0 text-muted text-[0.76rem] font-bold tracking-[0.08em] uppercase">Indexed posts</dt>
+                <dd class="m-0 text-[1.45rem] font-medium tracking-tight">{{ formatCount(appStore.stats?.indexedImages ?? 0) }}</dd>
+              </div>
+              <div class="flex flex-col gap-1 py-3 border-b-0">
+                <dt class="m-0 text-muted text-[0.76rem] font-bold tracking-[0.08em] uppercase">Indexed videos</dt>
+                <dd class="m-0 text-[1.45rem] font-medium tracking-tight">{{ formatCount(appStore.stats?.indexedVideos ?? 0) }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="card grid gap-[1.15rem] p-8">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h2 class="m-0 text-[1.18rem]">Last Scan</h2>
+                <p class="m-0 mt-[0.35rem] text-muted">Most recent completed run tracked by the app.</p>
+              </div>
+            </div>
+            <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 m-0 mt-4">
+              <div class="flex flex-col gap-1 py-3 border-b border-border">
+                <dt class="m-0 text-muted text-[0.76rem] font-bold tracking-[0.08em] uppercase">Status</dt>
+                <dd class="m-0 text-[1.2rem] font-medium tracking-tight capitalize">{{ lastScanStatus }}</dd>
+              </div>
+              <div class="flex flex-col gap-1 py-3 border-b border-border">
+                <dt class="m-0 text-muted text-[0.76rem] font-bold tracking-[0.08em] uppercase">Finished</dt>
+                <dd class="m-0 text-[1.2rem] font-medium tracking-tight">{{ lastScanFinishedAt }}</dd>
+              </div>
+              <div class="flex flex-col gap-1 py-3 border-b border-border md:border-b-0">
+                <dt class="m-0 text-muted text-[0.76rem] font-bold tracking-[0.08em] uppercase">Files scanned</dt>
+                <dd class="m-0 text-[1.45rem] font-medium tracking-tight">{{ formatCount(lastCompletedScan?.scanned_files ?? 0) }}</dd>
+              </div>
+              <div class="flex flex-col gap-1 py-3 border-b-0">
+                <dt class="m-0 text-muted text-[0.76rem] font-bold tracking-[0.08em] uppercase">Changes</dt>
+                <dd class="m-0 text-[1rem] font-medium leading-relaxed whitespace-pre-line">{{ lastScanChangeSummary }}</dd>
+              </div>
+            </dl>
+          </section>
+        </template>
       </div>
+    </div>
 
-      <!-- Right: Status cards -->
-      <aside class="flex flex-col gap-[1.15rem]">
-        <section class="card grid gap-[1.15rem] p-8">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h2 class="m-0 mb-[0.18rem] text-[1.1rem]">Library Status</h2>
-              <p class="m-0 text-muted">Current storage and index state.</p>
-            </div>
-          </div>
-          <dl class="grid grid-cols-2 gap-[0.8rem] m-0">
-            <div class="px-4 py-[0.9rem] rounded-[0.9rem]" style="background: color-mix(in srgb, var(--surface-alt) 90%, var(--accent) 10%)">
-              <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Storage</dt>
-              <dd class="m-0 text-base font-bold">{{ storageLabel }}</dd>
-            </div>
-            <div class="px-4 py-[0.9rem] rounded-[0.9rem]" style="background: color-mix(in srgb, var(--surface-alt) 90%, var(--accent) 10%)">
-              <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Folders</dt>
-              <dd class="m-0 text-base font-bold">{{ formatCount(appStore.stats?.folders ?? 0) }}</dd>
-            </div>
-            <div class="px-4 py-[0.9rem] rounded-[0.9rem]" style="background: color-mix(in srgb, var(--surface-alt) 90%, var(--accent) 10%)">
-              <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Indexed posts</dt>
-              <dd class="m-0 text-base font-bold">{{ formatCount(appStore.stats?.indexedImages ?? 0) }}</dd>
-            </div>
-            <div class="px-4 py-[0.9rem] rounded-[0.9rem]" style="background: color-mix(in srgb, var(--surface-alt) 90%, var(--accent) 10%)">
-              <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Indexed videos</dt>
-              <dd class="m-0 text-base font-bold">{{ formatCount(appStore.stats?.indexedVideos ?? 0) }}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section class="card grid gap-[1.15rem] p-8">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h2 class="m-0 mb-[0.18rem] text-[1.1rem]">Last Scan</h2>
-              <p class="m-0 text-muted">Most recent completed run tracked by the app.</p>
-            </div>
-          </div>
-          <dl class="grid grid-cols-2 gap-[0.8rem] m-0">
-            <div class="px-4 py-[0.9rem] rounded-[0.9rem]" style="background: color-mix(in srgb, var(--surface-alt) 90%, var(--accent) 10%)">
-              <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Status</dt>
-              <dd class="m-0 text-base font-bold">{{ lastScanStatus }}</dd>
-            </div>
-            <div class="px-4 py-[0.9rem] rounded-[0.9rem]" style="background: color-mix(in srgb, var(--surface-alt) 90%, var(--accent) 10%)">
-              <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Finished</dt>
-              <dd class="m-0 text-base font-bold">{{ lastScanFinishedAt }}</dd>
-            </div>
-            <div class="px-4 py-[0.9rem] rounded-[0.9rem]" style="background: color-mix(in srgb, var(--surface-alt) 90%, var(--accent) 10%)">
-              <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Files scanned</dt>
-              <dd class="m-0 text-base font-bold">{{ formatCount(lastCompletedScan?.scanned_files ?? 0) }}</dd>
-            </div>
-            <div class="px-4 py-[0.9rem] rounded-[0.9rem]" style="background: color-mix(in srgb, var(--surface-alt) 90%, var(--accent) 10%)">
-              <dt class="m-0 mb-[0.25rem] text-muted text-[0.72rem] font-bold tracking-[0.08em] uppercase">Changes</dt>
-              <dd class="m-0 text-base font-bold whitespace-pre-line">{{ lastScanChangeSummary }}</dd>
-            </div>
-          </dl>
-        </section>
-      </aside>
-    </section>
-
+    <!-- Dialogs -->
     <ConfirmDialog
       v-if="confirmRebuildOpen"
       title="Rebuild the current library index?"
@@ -471,8 +524,7 @@
     />
   </section>
 </template>
-
-<script setup lang="ts">
+\n<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
@@ -495,6 +547,7 @@ const likesStore = useLikesStore();
 const momentsStore = useMomentsStore();
 const viewerStore = useViewerStore();
 const route = useRoute();
+const currentCategory = ref<'library' | 'access' | 'status'>('library');
 const scanError = ref<string | null>(null);
 const rebuildError = ref<string | null>(null);
 const thumbnailRebuildError = ref<string | null>(null);

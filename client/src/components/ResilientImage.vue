@@ -3,6 +3,8 @@
     v-if="resolvedSrc"
     :src="resolvedSrc"
     :alt="alt"
+    :width="width"
+    :height="height"
     :loading="loading"
     :data-loaded="loaded ? 'true' : 'false'"
     @load="handleLoad"
@@ -17,6 +19,8 @@ const props = withDefaults(
   defineProps<{
     src: string | null;
     alt: string;
+    width?: number;
+    height?: number;
     loading?: 'lazy' | 'eager';
     retryWhile?: boolean;
     maxRetries?: number;

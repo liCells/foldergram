@@ -7,13 +7,13 @@
     <!-- Close button (modal only) -->
     <button
       v-if="isModal"
-      class="fixed top-[5px] right-[5px] z-55 inline-flex items-center justify-center w-[2.35rem] h-[2.35rem] p-0 border-0 text-white bg-transparent cursor-pointer"
+      class="fixed top-[0.6rem] right-[0.6rem] z-55 inline-flex items-center justify-center w-[3rem] h-[3rem] p-0 border-0 text-white/85 bg-transparent cursor-pointer transition-opacity duration-150 hover:text-white"
       type="button"
       aria-label="Close post"
       @click="$emit('close')"
     >
       <svg
-        class="w-[1.2rem] h-[1.2rem]"
+        class="w-8 h-8"
         viewBox="0 0 24 24"
         role="presentation"
       >
@@ -125,9 +125,10 @@
         <video
           v-if="image.mediaType === 'video'"
           ref="videoElement"
-          class="w-full h-full object-contain"
           :src="image.previewUrl"
           :poster="image.thumbnailUrl"
+          :width="image.width"
+          :height="image.height"
           controls
           loop
           playsinline
@@ -139,9 +140,10 @@
           v-else
           :src="image.previewUrl"
           :alt="image.filename"
+          :width="image.width"
+          :height="image.height"
           loading="eager"
           :retry-while="appStore.isScanning"
-          class="h-full w-full object-contain"
         />
       </div>
 
@@ -470,9 +472,7 @@
       return
     }
 
-    const modalWidth =
-      cardWrapperElement.value?.clientWidth ?? window.innerWidth
-    const nextCollapsible = modalWidth <= MODAL_SIDEBAR_COLLAPSE_BREAKPOINT
+    const nextCollapsible = window.innerWidth <= MODAL_SIDEBAR_COLLAPSE_BREAKPOINT
     const wasCollapsible = isSidebarCollapsible.value
 
     isSidebarCollapsible.value = nextCollapsible
