@@ -135,11 +135,11 @@
         <div
           v-for="(folder, i) in filteredFolders"
           :key="folder.id"
-          class="group flex items-center gap-4 px-5 py-[0.75rem] transition-colors duration-150 hover:bg-surface-hover"
+          class="group flex items-center gap-4 px-5 py-[0.75rem] transition-colors duration-150 hover:bg-surface-hover max-sm:items-start"
           :class="i > 0 ? 'border-t border-border' : ''"
         >
           <RouterLink
-            class="flex items-center gap-4 flex-1 min-w-0"
+            class="flex items-center gap-4 flex-1 min-w-0 max-sm:items-start"
             :to="{ name: 'folder', params: { slug: folder.slug } }"
           >
             <Avatar
@@ -149,21 +149,30 @@
             />
 
             <div class="flex-1 min-w-0">
-              <p class="m-0 text-[0.9rem] font-semibold truncate">
+              <p class="m-0 text-[0.9rem] font-semibold leading-[1.25] break-words sm:truncate">
                 {{ folder.name }}
               </p>
               <p class="m-0 text-muted text-[0.76rem] truncate">
                 {{ folder.breadcrumb ?? "Top-level source folder" }}
               </p>
               <p
-                class="m-0 text-muted text-[0.74rem] truncate font-mono opacity-70"
+                class="m-0 hidden text-muted text-[0.74rem] truncate font-mono opacity-70 sm:block"
               >
                 {{ folder.folderPath }}
               </p>
+              <div class="mt-1 grid gap-[0.1rem] sm:hidden">
+                <span class="text-[0.74rem] font-semibold text-text">
+                  {{ formatCount(folder.imageCount) }} posts ·
+                  {{ formatCount(folder.videoCount) }} reels
+                </span>
+                <span class="text-[0.72rem] text-muted">
+                  {{ formatLatestDate(folder.latestImageMtimeMs) }}
+                </span>
+              </div>
             </div>
           </RouterLink>
 
-          <div class="flex items-center gap-3 shrink-0 text-right">
+          <div class="hidden items-center gap-3 shrink-0 text-right sm:flex">
             <div class="grid gap-[0.15rem] justify-items-end">
               <span
                 class="text-[0.82rem] font-semibold text-text tabular-nums"
@@ -181,7 +190,7 @@
           </div>
 
           <button
-            class="inline-flex items-center justify-center w-8 h-8 p-0 border-0 text-muted bg-transparent cursor-pointer rounded-full hover:bg-surface-alt transition-colors duration-150 shrink-0"
+            class="inline-flex items-center justify-center w-8 h-8 p-0 border-0 text-muted bg-transparent cursor-pointer rounded-full hover:bg-surface-alt transition-colors duration-150 shrink-0 max-sm:mt-[0.1rem]"
             type="button"
             aria-label="More options"
             @click.prevent="openMenu(folder)"
