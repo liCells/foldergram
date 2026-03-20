@@ -5,9 +5,9 @@ import { promisify } from 'node:util';
 
 import sharp from 'sharp';
 
-import type { MediaType, PlaybackStrategy } from '../types/models.js';
+import type { ImageExifData, MediaType, PlaybackStrategy } from '../types/models.js';
 import { appConfig } from '../config/env.js';
-import { extractTakenAt, normalizeTakenAtValue } from '../utils/exif-utils.js';
+import { extractImageExif, normalizeTakenAtValue } from '../utils/exif-utils.js';
 import {
   PREVIEW_MAX_WIDTH,
   THUMBNAIL_SIZE,
@@ -50,6 +50,7 @@ export interface MediaMetadata {
   width: number;
   height: number;
   takenAt: number | null;
+  exif?: ImageExifData | null;
   durationMs: number | null;
   mediaType: MediaType;
   playbackStrategy: PlaybackStrategy;
@@ -123,15 +124,16 @@ async function removeFileIfPresent(filePath: string): Promise<void> {
 }
 
 async function readImageMetadata(sourcePath: string): Promise<MediaMetadata> {
-  const [metadata, takenAt] = await Promise.all([
+  const [metadata, imageExif] = await Promise.all([
     sharp(sourcePath, { animated: false }).metadata(),
-    extractTakenAt(sourcePath)
+    extractImageExif(sourcePath)
   ]);
 
   return {
     width: metadata.width ?? THUMBNAIL_SIZE,
     height: metadata.height ?? THUMBNAIL_SIZE,
-    takenAt,
+    takenAt: imageExif.takenAt,
+    exif: imageExif.exif,
     durationMs: null,
     mediaType: 'image',
     playbackStrategy: 'preview',
@@ -188,6 +190,7 @@ async function readVideoMetadata(sourcePath: string, options: ReadMediaMetadataO
     width,
     height: videoStream?.height ?? THUMBNAIL_SIZE,
     takenAt,
+    exif: null,
     durationMs,
     mediaType: 'video',
     playbackStrategy: await resolveVideoPlaybackStrategy(sourcePath, payload, playbackWidth, options.fileSize),

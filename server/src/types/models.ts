@@ -2,6 +2,20 @@ export type MediaType = 'image' | 'video';
 export type TakenAtSource = 'exif' | 'mtime' | 'first_seen' | 'sort_timestamp';
 export type PlaybackStrategy = 'preview' | 'original';
 
+export interface ImageExifData {
+  cameraMake?: string;
+  cameraModel?: string;
+  lensModel?: string;
+  fNumber?: number;
+  exposureTimeSeconds?: number;
+  iso?: number;
+  focalLengthMm?: number;
+  focalLength35mmMm?: number;
+  latitude?: number;
+  longitude?: number;
+  altitudeMeters?: number;
+}
+
 export interface FolderRecord {
   id: number;
   slug: string;
@@ -38,6 +52,7 @@ export interface ImageRecord {
   sort_timestamp: number;
   taken_at: number | null;
   taken_at_source: TakenAtSource | null;
+  exif_json: string | null;
   thumbnail_path: string;
   preview_path: string;
   playback_strategy: PlaybackStrategy | null;
@@ -102,6 +117,7 @@ export interface ImageDetail extends FeedImage {
   relativePath: string;
   mimeType: string;
   fileSize: number;
+  exif: ImageExifData | null;
   originalUrl: string;
   nextImageId: number | null;
   previousImageId: number | null;

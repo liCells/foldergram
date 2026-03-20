@@ -67,6 +67,10 @@ class DatabaseManager {
       this.database.exec('ALTER TABLE images ADD COLUMN taken_at_source TEXT NULL');
     }
 
+    if (this.tableExists('images') && !this.tableHasColumn('images', 'exif_json')) {
+      this.database.exec('ALTER TABLE images ADD COLUMN exif_json TEXT NULL');
+    }
+
     if (this.tableExists('images') && !this.tableHasColumn('images', 'playback_strategy')) {
       this.database.exec("ALTER TABLE images ADD COLUMN playback_strategy TEXT NULL");
     }

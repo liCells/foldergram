@@ -32,6 +32,20 @@ export interface FolderSummary {
   avatarUrl: string | null;
 }
 
+export interface ImageExifData {
+  cameraMake?: string;
+  cameraModel?: string;
+  lensModel?: string;
+  fNumber?: number;
+  exposureTimeSeconds?: number;
+  iso?: number;
+  focalLengthMm?: number;
+  focalLength35mmMm?: number;
+  latitude?: number;
+  longitude?: number;
+  altitudeMeters?: number;
+}
+
 export interface PaginatedFeed {
   mode?: FeedMode;
   items: FeedItem[];
@@ -78,6 +92,7 @@ export interface ImageDetail extends FeedItem {
   relativePath: string;
   mimeType: string;
   fileSize: number;
+  exif: ImageExifData | null;
   originalUrl: string;
   nextImageId: number | null;
   previousImageId: number | null;

@@ -80,6 +80,7 @@ export interface UpsertImageInput {
   sortTimestamp: number;
   takenAt: number;
   takenAtSource: TakenAtSource;
+  exifJson: string | null;
   thumbnailPath: string;
   previewPath: string;
   playbackStrategy?: PlaybackStrategy | null;
@@ -102,6 +103,7 @@ export interface RefreshIndexedImageInput {
   mtimeMs: number;
   takenAt: number;
   takenAtSource: TakenAtSource;
+  exifJson: string | null;
   thumbnailPath: string;
   previewPath: string;
   playbackStrategy?: PlaybackStrategy | null;
@@ -253,10 +255,10 @@ export const imageRepository = {
       `
       INSERT INTO images (
         folder_id, filename, extension, relative_path, absolute_path, file_size, width, height,
-        media_type, mime_type, duration_ms, is_animated, checksum_or_fingerprint, mtime_ms, first_seen_at, sort_timestamp, taken_at, taken_at_source,
+        media_type, mime_type, duration_ms, is_animated, checksum_or_fingerprint, mtime_ms, first_seen_at, sort_timestamp, taken_at, taken_at_source, exif_json,
         thumbnail_path, preview_path, playback_strategy, is_deleted, is_trashed, trashed_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NULL, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NULL, ?)
       ON CONFLICT(relative_path) DO UPDATE SET
         folder_id = excluded.folder_id,
         filename = excluded.filename,
@@ -273,6 +275,7 @@ export const imageRepository = {
         mtime_ms = excluded.mtime_ms,
         taken_at = excluded.taken_at,
         taken_at_source = excluded.taken_at_source,
+        exif_json = excluded.exif_json,
         thumbnail_path = excluded.thumbnail_path,
         preview_path = excluded.preview_path,
         playback_strategy = excluded.playback_strategy,
@@ -298,6 +301,7 @@ export const imageRepository = {
       input.sortTimestamp,
       input.takenAt,
       input.takenAtSource,
+      input.exifJson,
       input.thumbnailPath,
       input.previewPath,
       input.playbackStrategy ?? 'preview',
@@ -327,6 +331,7 @@ export const imageRepository = {
         mtime_ms = ?,
         taken_at = ?,
         taken_at_source = ?,
+        exif_json = ?,
         thumbnail_path = ?,
         preview_path = ?,
         playback_strategy = ?,
@@ -350,6 +355,7 @@ export const imageRepository = {
       input.mtimeMs,
       input.takenAt,
       input.takenAtSource,
+      input.exifJson,
       input.thumbnailPath,
       input.previewPath,
       input.playbackStrategy ?? 'preview',
@@ -706,6 +712,7 @@ export const imageRepository = {
         images.thumbnail_path AS thumbnailUrl,
         images.preview_path AS previewUrl,
         images.playback_strategy AS playbackStrategy,
+        images.exif_json AS exifJson,
         images.absolute_path AS originalUrl,
         images.sort_timestamp AS sortTimestamp,
         images.taken_at AS takenAt
@@ -713,7 +720,7 @@ export const imageRepository = {
       INNER JOIN folders ON folders.id = images.folder_id
       WHERE images.id = ? AND ${VISIBLE_IMAGE_WHERE_SQL}
       `
-    ).get(id) as (Omit<ImageDetail, 'nextImageId' | 'previousImageId'> & { originalUrl: string }) | undefined;
+    ).get(id) as (Omit<ImageDetail, 'nextImageId' | 'previousImageId' | 'exif'> & { originalUrl: string; exifJson: string | null }) | undefined;
 
     if (!detail || (mediaType && detail.mediaType !== mediaType)) {
       return undefined;
@@ -750,6 +757,7 @@ export const imageRepository = {
 
     return {
       ...detail,
+      exif: null,
       nextImageId: next?.id ?? null,
       previousImageId: previous?.id ?? null
     };

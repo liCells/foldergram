@@ -208,6 +208,7 @@ describe.sequential('gallery folder deletion', () => {
         sortTimestamp: mtimeMs,
         takenAt: mtimeMs,
         takenAtSource: 'mtime',
+        exifJson: mediaType === 'image' ? '{}' : null,
         thumbnailPath: thumbnailRelativePath,
         previewPath: previewRelativePath
       });

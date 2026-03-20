@@ -10,6 +10,7 @@ import {
 import { appConfig } from '../config/env.js';
 import { appSettingsRepository, folderRepository, folderScanStateRepository, imageRepository, likeRepository, scanRunRepository } from '../db/repositories.js';
 import type { FeedImage, ImageDetail, FolderSummaryRecord, MediaType, PlaybackStrategy, TrashImage } from '../types/models.js';
+import { deserializeImageExifData } from '../utils/exif-utils.js';
 import { buildMonthDayKey, countFeedBursts, diversifyFeedCandidates, groupFeedBursts, listMonthDayKeysAroundDate } from '../utils/feed-utils.js';
 import { shouldPreferMomentRail, type FeedRailKind } from '../utils/feed-rail-utils.js';
 import { countSupportedRootMediaFiles } from '../utils/gallery-root-utils.js';
@@ -54,7 +55,7 @@ const HIGHLIGHT_FEED_OVERLAP_WINDOW = 18;
 const RAIL_COVER_CANDIDATE_LIMIT = 12;
 
 type IndexedFeedImage = FeedImage & { playbackStrategy?: PlaybackStrategy | null };
-type IndexedImageDetail = ImageDetail & { playbackStrategy?: PlaybackStrategy | null };
+type IndexedImageDetail = ImageDetail & { playbackStrategy?: PlaybackStrategy | null; exifJson?: string | null };
 type IndexedTrashImage = TrashImage & { playbackStrategy?: PlaybackStrategy | null };
 type ScanSummaryRecord = ReturnType<typeof scanRunRepository.latestCompleted>;
 
@@ -181,10 +182,11 @@ function mapFeedImage(image: IndexedFeedImage, thumbnailVersion = getThumbnailAs
 }
 
 function mapImageDetail(image: IndexedImageDetail, thumbnailVersion = getThumbnailAssetVersion()): ImageDetail {
-  const { playbackStrategy, ...rest } = image;
+  const { playbackStrategy, exifJson, ...rest } = image;
   return {
     ...rest,
     isAnimated: Boolean(rest.isAnimated),
+    exif: deserializeImageExifData(exifJson),
     folderBreadcrumb: getPathBreadcrumb(rest.folderPath),
     thumbnailUrl: toPublicMediaUrl('/thumbnails', rest.thumbnailUrl, thumbnailVersion),
     previewUrl: buildPreviewUrl({

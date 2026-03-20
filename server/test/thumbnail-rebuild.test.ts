@@ -277,6 +277,7 @@ describe.sequential('thumbnail-only rebuild', () => {
         sortTimestamp: mtimeMs,
         takenAt: mtimeMs,
         takenAtSource: 'mtime',
+        exifJson: mediaType === 'image' ? '{}' : null,
         thumbnailPath: thumbnailRelativePath,
         previewPath: previewRelativePath
       });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeTakenAtValue, resolveTakenAt } from '../src/utils/exif-utils.js';
+import { deserializeImageExifData, normalizeTakenAtValue, resolveTakenAt, serializeImageExifData } from '../src/utils/exif-utils.js';
 
 describe('EXIF timestamp helpers', () => {
   it('normalizes Date, ISO string, and numeric values', () => {
@@ -80,5 +80,41 @@ describe('EXIF timestamp helpers', () => {
       takenAt: 1_710_028_800_000,
       source: 'first_seen'
     });
+  });
+
+  it('serializes and deserializes curated EXIF payloads', () => {
+    const serialized = serializeImageExifData({
+      cameraMake: 'Apple',
+      cameraModel: 'iPhone 15 Pro',
+      lensModel: '  ',
+      fNumber: 1.78,
+      exposureTimeSeconds: 1 / 120,
+      iso: 80,
+      focalLengthMm: Number.NaN,
+      focalLength35mmMm: 24,
+      latitude: 37.7749,
+      longitude: -122.4194,
+      altitudeMeters: 15.2
+    });
+
+    expect(serialized).not.toBeNull();
+    expect(deserializeImageExifData(serialized)).toEqual({
+      cameraMake: 'Apple',
+      cameraModel: 'iPhone 15 Pro',
+      fNumber: 1.78,
+      exposureTimeSeconds: 1 / 120,
+      iso: 80,
+      focalLength35mmMm: 24,
+      latitude: 37.7749,
+      longitude: -122.4194,
+      altitudeMeters: 15.2
+    });
+  });
+
+  it('treats empty or invalid EXIF payloads as absent data', () => {
+    expect(serializeImageExifData(null)).toBeNull();
+    expect(serializeImageExifData(null, { storeEmptyObject: true })).toBe('{}');
+    expect(deserializeImageExifData('{}')).toBeNull();
+    expect(deserializeImageExifData('not-json')).toBeNull();
   });
 });

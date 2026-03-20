@@ -31,7 +31,7 @@ import {
   getThumbnailRelativePath,
   isSupportedMediaFile
 } from '../utils/image-utils.js';
-import { resolveTakenAt } from '../utils/exif-utils.js';
+import { resolveTakenAt, serializeImageExifData } from '../utils/exif-utils.js';
 import {
   getFolderDisplayInfo,
   getRelativeGalleryPath,
@@ -1386,6 +1386,7 @@ class ScannerService {
     const needsMediaBackfill = existing?.media_type !== mediaType || (mediaType === 'video' && existing?.duration_ms === null);
     const needsPlaybackStrategyBackfill = mediaType === 'video' && existing?.playback_strategy === null;
     const needsAnimatedBackfill = mediaType === 'image' && existing?.is_animated === null;
+    const needsExifBackfill = mediaType === 'image' && existing?.exif_json === null;
 
     if (existing && existing.checksum_or_fingerprint === fingerprint) {
       const refreshedIndexedRow = shouldRefreshUnchangedImage({
@@ -1401,8 +1402,9 @@ class ScannerService {
       let metadataHeight = existing.height;
       let metadataPlaybackStrategy = existing.playback_strategy ?? 'preview';
       let metadataIsAnimated = existing.is_animated === 1;
+      let metadataExifJson = existing.exif_json;
 
-      if (needsTakenAtBackfill || needsMediaBackfill || needsPlaybackStrategyBackfill || needsAnimatedBackfill) {
+      if (needsTakenAtBackfill || needsMediaBackfill || needsPlaybackStrategyBackfill || needsAnimatedBackfill || needsExifBackfill) {
         const metadata = await readMediaMetadata(file.absolutePath, mediaType, {
           fileSize: file.stats.size
         });
@@ -1412,9 +1414,14 @@ class ScannerService {
         metadataHeight = metadata.height;
         metadataPlaybackStrategy = metadata.playbackStrategy;
         metadataIsAnimated = metadata.isAnimated;
+        metadataExifJson = mediaType === 'image'
+          ? serializeImageExifData(metadata.exif ?? null, {
+              storeEmptyObject: true
+            })
+          : null;
       }
 
-      if (refreshedIndexedRow || needsTakenAtBackfill || needsMediaBackfill || needsPlaybackStrategyBackfill || needsAnimatedBackfill) {
+      if (refreshedIndexedRow || needsTakenAtBackfill || needsMediaBackfill || needsPlaybackStrategyBackfill || needsAnimatedBackfill || needsExifBackfill) {
         const resolvedTakenAt = resolveTakenAt({
           exifTakenAt: metadataTakenAt,
           existingTakenAt: existing.taken_at,
@@ -1444,6 +1451,7 @@ class ScannerService {
           mtimeMs: file.stats.mtimeMs,
           takenAt: resolvedTakenAt.takenAt,
           takenAtSource: resolvedTakenAt.source,
+          exifJson: mediaType === 'image' ? (metadataExifJson ?? '{}') : null,
           thumbnailPath: existing.thumbnail_path || thumbnailRelativePath,
           previewPath: existing.preview_path || previewRelativePath,
           playbackStrategy: metadataPlaybackStrategy
@@ -1509,6 +1517,11 @@ class ScannerService {
       sortTimestamp,
       takenAt: resolvedTakenAt.takenAt,
       takenAtSource: resolvedTakenAt.source,
+      exifJson: mediaType === 'image'
+        ? serializeImageExifData(metadata.exif ?? null, {
+            storeEmptyObject: true
+          })
+        : null,
       thumbnailPath: thumbnailRelativePath,
       previewPath: previewRelativePath,
       playbackStrategy: metadata.playbackStrategy

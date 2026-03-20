@@ -126,6 +126,7 @@ describe.sequential('highlight rail selection', () => {
         sortTimestamp: capturedAt,
         takenAt: capturedAt,
         takenAtSource: 'mtime',
+        exifJson: '{}',
         thumbnailPath: thumbnailRelativePath,
         previewPath: previewRelativePath
       });
