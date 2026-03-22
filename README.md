@@ -97,6 +97,21 @@ docker compose up -d
 
 In Docker, Foldergram runs in production mode and the app inside the container listens on `4141`. If you need a different host port, change the left side of `4141:4141` in [`docker-compose.yml`](docker-compose.yml).
 
+For the default Docker Compose setup, the container uses the image's built-in
+production defaults plus the mounted `./data/...` volumes. The source-install
+`.env` file is not read inside the container unless you wire that in yourself.
+
+The shipped Compose file includes `IMAGE_DETAIL_SOURCE: preview` and
+`DERIVATIVE_MODE: eager`.
+
+If you want lazy derivatives or original-backed image detail pages in Docker,
+edit those values in `docker-compose.yml` before starting the container.
+
+For an optional read-only public demo in Docker, add `PUBLIC_DEMO_MODE: "1"`
+under the Compose `environment:` block. If the browser-visible origin differs
+from the upstream Node host, also set `CSRF_TRUSTED_ORIGINS` to that public
+origin.
+
 ### If You Already Cloned This Repository
 
 The repository includes:
@@ -209,6 +224,10 @@ data/
 | `NODE_ENV`                    | `development`       | Runtime mode.                                                             |
 
 The shipped `.env.example` only includes the `DEV_*` port values. Docker uses the fixed internal container port `4141`, and other production runtimes continue to use `SERVER_PORT`, which defaults to `4141` in the Docker image.
+
+For the default Docker Compose setup, runtime variables are defined in
+[`docker-compose.yml`](docker-compose.yml). The source-install `.env` file is
+not read directly by the container.
 
 ### Detail Media and Derivative Timing
 

@@ -4,12 +4,12 @@ services:
     ports:
       - "4141:4141"
     environment:
-      NODE_ENV: production
-      DATA_ROOT: /app/data
-      GALLERY_ROOT: /app/data/gallery
-      DB_DIR: /app/data/db
-      THUMBNAILS_DIR: /app/data/thumbnails
-      PREVIEWS_DIR: /app/data/previews
+      IMAGE_DETAIL_SOURCE: preview
+      DERIVATIVE_MODE: eager
+      # Optional: enable read-only public demo behavior.
+      # PUBLIC_DEMO_MODE: "1"
+      # Optional when the browser-visible origin differs from the upstream Node host.
+      # CSRF_TRUSTED_ORIGINS: https://foldergram.example.com
     volumes:
       - ./data/gallery:/app/data/gallery
       - ./data/db:/app/data/db

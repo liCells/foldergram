@@ -89,6 +89,21 @@ The default Compose file uses the GHCR image and exposes `4141:4141`. If you
 need a different host port, edit the left side of that mapping in
 `docker-compose.yml`.
 
+In the default Docker Compose setup, the container uses the image's built-in
+production defaults plus the mounted `./data/...` volumes. The source-install
+`.env` file is not read directly inside the container.
+
+The shipped Compose file includes `IMAGE_DETAIL_SOURCE: preview` and
+`DERIVATIVE_MODE: eager`.
+
+If you want lazy derivatives or original-backed image detail pages, edit those
+values in `docker-compose.yml` before starting the container.
+
+For an optional read-only public demo in Docker, add `PUBLIC_DEMO_MODE: "1"`
+under the Compose `environment:` block. If the browser-visible origin differs
+from the upstream Node host, also set `CSRF_TRUSTED_ORIGINS` to that public
+origin.
+
 If the app will be reachable from other devices on your network, enable the
 admin password from the Settings page after first startup. You can then keep
 the app admin-only, add a separate viewer password, or switch to public browse

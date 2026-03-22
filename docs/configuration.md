@@ -5,8 +5,13 @@ description: Environment variables, path rules, and scan concurrency controls in
 
 # Configuration
 
-Foldergram reads `.env` from the repository root and validates it in
-`server/src/config/env.ts`.
+For source installs, Foldergram reads `.env` from the repository root and
+validates it in `server/src/config/env.ts`.
+
+In the default Docker Compose setup, the container uses the image's built-in
+production defaults plus the mounted `./data/...` volumes. The source-install
+`.env` file is not read directly inside the container unless you wire that in
+yourself.
 
 ## Environment variables
 

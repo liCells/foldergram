@@ -59,6 +59,18 @@ The included compose file:
 - uses internal container paths under `/app/data`
 - relies on the image's bundled `ffmpeg`
 
+For the default Docker Compose setup, the container uses the image's built-in
+production defaults plus the mounted `./data/...` volumes. The source-install
+`.env` file is not read directly inside the container.
+
+The shipped Compose file sets `IMAGE_DETAIL_SOURCE=preview` and
+`DERIVATIVE_MODE=eager`.
+
+For an optional read-only public demo in Docker, add
+`PUBLIC_DEMO_MODE="1"` under the Compose `environment:` block. If the
+browser-visible origin differs from the upstream Node host, also set
+`CSRF_TRUSTED_ORIGINS` to that public origin.
+
 If you cloned the repo and want to build locally instead, use:
 
 ```bash
@@ -72,8 +84,8 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 
 On first run, the server performs a startup scan when there is no existing index.
 
-If you want the lowest upfront derivative work for a large library, set these
-before startup:
+If you want the lowest upfront derivative work for a large library in Docker,
+edit `docker-compose.yml` before startup:
 
 ```env
 IMAGE_DETAIL_SOURCE=original
