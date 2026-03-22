@@ -72,9 +72,24 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 
 On first run, the server performs a startup scan when there is no existing index.
 
+If you want the lowest upfront derivative work for a large library, set these
+before startup:
+
+```env
+IMAGE_DETAIL_SOURCE=original
+DERIVATIVE_MODE=lazy
+```
+
+That combination keeps image detail pages on originals and generates missing
+thumbnails or previews only when they are first requested.
+
 If you plan to expose Foldergram on a homelab or LAN, open Settings after the
 first load and enable the admin password. From there, you can keep admin-only
 access, add a separate viewer password, or switch to public browse mode.
+
+Until you enable password protection, Foldergram starts without an auth gate,
+so Settings and the library-maintenance controls are available immediately to
+whoever can reach the app.
 
 ## Optional: run from source for development
 
@@ -125,6 +140,7 @@ pnpm build:docs
 - Feed, folder pages, likes, explore, and moments read from SQLite, not directly from disk.
 - Thumbnails are generated under `data/thumbnails`.
 - Previews are generated under `data/previews`.
-- Settings exposes admin/viewer access controls, manual scan, thumbnail rebuild, and full library rebuild actions.
+- In the default unprotected state, Settings is available immediately.
+- After access protection is enabled, only admin sessions can open Settings or run scan and rebuild actions. Viewer and public sessions stay browse-only.
 
 If nothing appears, start with [Troubleshooting](/troubleshooting).

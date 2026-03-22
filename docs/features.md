@@ -15,6 +15,7 @@ It includes:
 
 - three feed modes: Recent, Rediscover, and Random
 - a top rail that can show Moments or Highlights
+- an active home-feed video player that promotes one visible video card at a time and gives that card play, mute, and fullscreen controls
 - a startup scan state when the first index is still being built
 - a rebuild notice when the configured gallery root changed
 - desktop recommendations for folders based on recency, likes, and recent navigation
@@ -87,7 +88,9 @@ Behavior depends on how the route is opened:
 
 The detail view includes:
 
-- preview media
+- image detail media sourced from either generated previews or originals, depending on `IMAGE_DETAIL_SOURCE`
+- video detail playback that defaults to the generated preview source
+- an optional `HD` toggle for compatible higher-resolution MP4 originals
 - previous and next navigation within the same folder and active media filter
 - folder link and breadcrumb context
 - size, dimensions, MIME type, and duration metadata
@@ -134,7 +137,7 @@ It exposes:
 - last completed scan details
 - manual scan
 - thumbnail-only rebuild
-- full library rebuild
+- library-index rebuild
 
 ### Access protection
 
@@ -164,7 +167,7 @@ Current non-admin behavior:
 | --- | --- |
 | Scan Library | Runs a normal scan against the current gallery root. |
 | Regenerate Thumbnails | Clears generated thumbnails and video poster images, then rebuilds them from indexed media only. |
-| Rebuild Library | Clears indexed folders, posts, likes, folder scan state, and scan history, then rescans the active gallery root and reuses matching cached derivatives when possible. |
+| Rebuild Library Index | Clears indexed folders, posts, likes, folder scan state, and scan history, then rescans the active gallery root and reuses matching cached derivatives when possible. In lazy derivative mode it does not pre-generate missing thumbnails or previews. |
 
 ## Theme and local UI preferences
 

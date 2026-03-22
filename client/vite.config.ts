@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 import UnoCSS from 'unocss/vite';
 import vue from '@vitejs/plugin-vue';
+import { vite as vidstack } from 'vidstack/plugins';
 
 const appPackage = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf-8')
@@ -58,7 +59,19 @@ export default defineConfig(async ({ command, mode }) => {
     define: {
       __APP_VERSION__: JSON.stringify(appPackage.version)
     },
-    plugins: [UnoCSS(), vue()],
+    plugins: [
+      UnoCSS(),
+      vidstack({
+        include: /src\/components\//
+      }),
+      vue({
+        template: {
+          compilerOptions: {
+            isCustomElement: tag => tag.startsWith('media-')
+          }
+        }
+      })
+    ],
     server: {
       host: devHost,
       port: resolvedDevClientPort,

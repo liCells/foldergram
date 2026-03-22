@@ -30,7 +30,7 @@ html {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   color: transparent;
-  padding: 2px 6px;
+  padding: 2px 0;
   border-radius: 4px;
   animation: gradient-shift 6s ease infinite;
   background-size: 200% 200%;

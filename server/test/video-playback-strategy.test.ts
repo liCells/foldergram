@@ -66,7 +66,7 @@ describe.sequential('video playback strategy mapping', () => {
     ]);
   });
 
-  it('reuses original URLs for compatible MP4 videos and only counts generated previews', async () => {
+  it('uses generated previews by default for videos while preserving original playback eligibility', async () => {
     const folder = folderRepository.upsert({
       slug: 'clips',
       name: 'Clips',
@@ -82,15 +82,23 @@ describe.sequential('video playback strategy mapping', () => {
     const feedItems = new Map(galleryService.getFeed(1, 10, 'recent').items.map((item) => [item.id, item]));
 
     expect(feedItems.get(image.id)?.previewUrl).toBe('/previews/clips/photo-1.webp');
-    expect(feedItems.get(compatibleVideo.id)?.previewUrl).toBe(`/api/originals/${compatibleVideo.id}`);
+    expect(feedItems.get(compatibleVideo.id)?.previewUrl).toBe('/previews/clips/reel-1.mp4');
     expect(feedItems.get(transcodedVideo.id)?.previewUrl).toBe('/previews/clips/reel-2.mp4');
 
     const compatibleVideoDetail = galleryService.getImageDetail(compatibleVideo.id, 'video');
-    expect(compatibleVideoDetail?.previewUrl).toBe(`/api/originals/${compatibleVideo.id}`);
+    expect(compatibleVideoDetail?.previewUrl).toBe('/previews/clips/reel-1.mp4');
     expect(compatibleVideoDetail?.originalUrl).toBe(`/api/originals/${compatibleVideo.id}`);
+    expect(compatibleVideoDetail?.playbackStrategy).toBe('original');
+
+    await fs.mkdir(path.join(appConfig.previewsDir, 'clips'), { recursive: true });
+    await Promise.all([
+      fs.writeFile(path.join(appConfig.previewsDir, 'clips', 'photo-1.webp'), 'preview-image'),
+      fs.writeFile(path.join(appConfig.previewsDir, 'clips', 'reel-1.mp4'), 'preview-video-hd'),
+      fs.writeFile(path.join(appConfig.previewsDir, 'clips', 'reel-2.mp4'), 'preview-video-transcoded')
+    ]);
 
     const stats = galleryService.getStats();
-    expect(stats.previewCount).toBe(2);
+    expect(stats.previewCount).toBe(3);
   });
 
   it('reports the latest completed scan in stats even when a newer run is still in progress', () => {

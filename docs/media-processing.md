@@ -6,7 +6,9 @@ description: Supported formats, derivative generation rules, and video playback 
 # Media Processing
 
 Foldergram generates derivatives so feed and detail views can stay fast without
-touching original files at request time.
+touching original files on every request. Depending on configuration, those
+derivatives are either created during scans or lazily on first request and then
+cached on disk.
 
 ## Supported formats
 
@@ -34,6 +36,18 @@ These values are defined in `server/src/utils/image-utils.ts`.
 | --- | --- | --- |
 | `THUMBNAIL_SIZE` | `640` | Feed cards, folder grids, avatars, and video posters |
 | `PREVIEW_MAX_WIDTH` | `1500` | Detail-view previews and transcodes |
+
+## Derivative timing
+
+`DERIVATIVE_MODE` controls when missing derivatives are created:
+
+| Mode | Behavior |
+| --- | --- |
+| `eager` | Scans queue derivative generation during indexing. |
+| `lazy` | Scans index metadata only. Missing thumbnails and previews are generated when `/thumbnails/...` or `/previews/...` is first requested. |
+
+Lazy mode still writes the generated files to the configured derivative
+directories, so subsequent requests use the cached file on disk.
 
 ## Derivative mapping
 
@@ -67,6 +81,18 @@ Images are processed with Sharp.
 - resized to width `1500` without enlargement
 - encoded as WebP with `quality: 86`
 
+## Image detail source
+
+`IMAGE_DETAIL_SOURCE` affects image detail pages only:
+
+| Value | Behavior |
+| --- | --- |
+| `preview` | `/image/:id` uses the generated preview asset. |
+| `original` | `/image/:id` uses `/api/originals/:id` for images. |
+
+This setting does not change feed cards, folder grids, avatars, or any video
+playback behavior.
+
 ## Video metadata
 
 Videos are probed with `ffprobe`.
@@ -94,26 +120,27 @@ When a video needs a derived preview, Foldergram transcodes it with `ffmpeg` to:
 - AAC audio when audio is present
 - `yuv420p`
 - `+faststart`
-- maximum width `1500`
+- landscape-equivalent output up to `1280x720`
+- portrait and square output that keeps the short edge at or below `720`
+- even-numbered output dimensions for encoder compatibility
 
 ## Direct-original video playback
 
-Foldergram can skip preview generation and stream the original video file
-directly when all of these are true:
+Foldergram can mark the original video as eligible for direct playback in the
+detail player when all of these are true:
 
 - the file extension is `.mp4`
 - the container is compatible with MP4
 - the video codec is H.264
 - the pixel format is `yuv420p`
 - the audio codec is AAC, or there is no audio track
-- file size is `<= 24 MiB`
-- width is `<= 1500`
 
 When that happens:
 
 - `playbackStrategy` is set to `original`
-- the preview file is removed if it exists
-- the client receives `previewUrl` pointing at `/api/originals/:id`
+- generated previews still remain the default playback source
+- the detail player can expose an `HD` switch when the original is compatible and higher resolution than the generated preview
+- feed cards and other list surfaces continue to use generated preview media
 
 ## GIF handling
 
@@ -142,7 +169,8 @@ The thumbnail rebuild action:
 - recreates it
 - rebuilds thumbnails and video poster images for currently indexed media
 
-It does not regenerate previews.
+It does not regenerate previews. In lazy mode it acts as a thumbnail and poster
+prewarm only; preview generation still happens on demand.
 
 ## Why derivatives are mirrored by relative path
 

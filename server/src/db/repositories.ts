@@ -791,12 +791,18 @@ export const imageRepository = {
     return Number(
       (
         database
-          .prepare(
-            `SELECT COUNT(*) AS count FROM images WHERE ${VISIBLE_IMAGE_WHERE_UNSCOPED_SQL} AND (media_type = 'image' OR COALESCE(playback_strategy, 'preview') = 'preview')`
-          )
+          .prepare(`SELECT COUNT(*) AS count FROM images WHERE ${VISIBLE_IMAGE_WHERE_UNSCOPED_SQL} AND preview_path IS NOT NULL`)
           .get() as { count: number }
       ).count
     );
+  },
+
+  getByThumbnailPath(thumbnailPath: string): ImageRecord | undefined {
+    return database.prepare('SELECT * FROM images WHERE thumbnail_path = ? AND is_deleted = 0 LIMIT 1').get(thumbnailPath) as ImageRecord | undefined;
+  },
+
+  getByPreviewPath(previewPath: string): ImageRecord | undefined {
+    return database.prepare('SELECT * FROM images WHERE preview_path = ? AND is_deleted = 0 LIMIT 1').get(previewPath) as ImageRecord | undefined;
   }
 };
 

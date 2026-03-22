@@ -70,19 +70,71 @@
       class="relative block overflow-hidden rounded-[0.5rem] border border-border bg-surface-alt"
       :style="{ aspectRatio: mediaAspectRatio }"
     >
-      <video
-        ref="homeVideoElement"
-        class="block h-full w-full bg-black object-cover"
-        :src="item.previewUrl"
-        :poster="item.thumbnailUrl"
-        :controls="isActiveVideo"
-        loop
-        playsinline
+      <media-player
+        ref="homePlayerElement"
+        class="feed-card__player"
+        :src.prop="homeVideoSource"
+        :title.prop="item.filename"
+        :playsInline.prop="true"
+        :muted.prop="appStore.videoMuted"
+        :loop.prop="true"
+        load="visible"
         preload="metadata"
-        @loadedmetadata="syncHomeVideoPlayback"
-        @play="handleHomeVideoPlay"
-        @volumechange="handleHomeVideoVolumeChange"
-      />
+      >
+        <media-provider />
+        <media-poster
+          :src.prop="item.thumbnailUrl"
+          :alt.prop="item.filename"
+        />
+        <media-controls
+          v-if="isActiveVideo"
+          class="feed-card__player-controls"
+        >
+          <media-controls-group class="feed-card__player-controls-group">
+            <media-play-button
+              class="feed-card__player-control"
+              aria-label="Toggle playback"
+            >
+              <span
+                class="feed-card__player-control-icon feed-card__player-play-icon feed-card__player-play-icon--play i-fluent-play-16-filled"
+                aria-hidden="true"
+              />
+              <span
+                class="feed-card__player-control-icon feed-card__player-play-icon feed-card__player-play-icon--pause i-fluent-pause-16-filled"
+                aria-hidden="true"
+              />
+            </media-play-button>
+            <media-mute-button
+              class="feed-card__player-control"
+              aria-label="Toggle sound"
+            >
+              <span
+                class="feed-card__player-control-icon feed-card__player-mute-icon feed-card__player-mute-icon--on i-fluent-speaker-2-16-regular"
+                aria-hidden="true"
+              />
+              <span
+                class="feed-card__player-control-icon feed-card__player-mute-icon feed-card__player-mute-icon--off i-fluent-speaker-mute-16-regular"
+                aria-hidden="true"
+              />
+            </media-mute-button>
+          </media-controls-group>
+          <media-controls-group class="feed-card__player-controls-group">
+            <media-fullscreen-button
+              class="feed-card__player-control"
+              aria-label="Toggle fullscreen"
+            >
+              <span
+                class="feed-card__player-control-icon feed-card__player-fullscreen-icon feed-card__player-fullscreen-icon--enter i-fluent-full-screen-maximize-16-regular"
+                aria-hidden="true"
+              />
+              <span
+                class="feed-card__player-control-icon feed-card__player-fullscreen-icon feed-card__player-fullscreen-icon--exit i-fluent-full-screen-minimize-16-regular"
+                aria-hidden="true"
+              />
+            </media-fullscreen-button>
+          </media-controls-group>
+        </media-controls>
+      </media-player>
       <div
         class="absolute inset-x-0 top-0 flex items-center justify-between gap-3 px-4 py-3 text-white pointer-events-none bg-[linear-gradient(180deg,rgba(10,14,24,0.82)_0%,rgba(10,14,24,0)_100%)]"
       >
@@ -267,8 +319,12 @@
 </template>
 
 <script setup lang="ts">
+import 'vidstack/bundle';
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
+import type { PlayerSrc } from 'vidstack';
+import type { MediaPlayerElement } from 'vidstack/elements';
 
 import { deleteImage, trashImage } from '../api/gallery';
 import { useAppStore } from '../stores/app';
@@ -323,12 +379,13 @@ const confirmDeleteOpen = ref(false);
 const deleteOriginalFromDisk = ref(false);
 const deleteError = ref<string | null>(null);
 const homeVideoTarget = ref<HTMLElement | null>(null);
-const homeVideoElement = ref<HTMLVideoElement | null>(null);
+const homePlayerElement = ref<MediaPlayerElement | null>(null);
 const lastHomeImageTapAt = ref(0);
 
 let homeImageTapResetTimer: ReturnType<typeof setTimeout> | null = null;
 let homeVideoObserver: IntersectionObserver | null = null;
 let homeVideoMuteSyncToken = 0;
+let removeHomePlayerEventListeners: (() => void) | null = null;
 
 const imageRoute = computed(() => `/image/${props.item.id}`);
 const isHomeContext = computed(() => props.context === 'home');
@@ -350,6 +407,10 @@ const formattedDate = computed(() =>
 const formattedDuration = computed(() => formatMediaDuration(props.item.durationMs));
 const mediaAspectRatio = computed(() => resolveFeedAspectRatio(props.item.width, props.item.height));
 const homeImageSrc = computed(() => (props.item.isAnimated ? props.item.previewUrl : props.item.thumbnailUrl));
+const homeVideoSource = computed<PlayerSrc>(() => ({
+  src: props.item.previewUrl,
+  type: 'video/mp4'
+}));
 const deleteDialogMessage = computed(() =>
   deleteOriginalFromDisk.value
     ? 'This will permanently delete the post from the app and remove original media from disk.'
@@ -459,9 +520,9 @@ function startHomeVideoObserver() {
   homeVideoObserver.observe(homeVideoTarget.value);
 }
 
-function syncHomeVideoMuted(video: HTMLVideoElement, muted: boolean) {
+function syncHomeVideoMuted(player: MediaPlayerElement, muted: boolean) {
   const token = ++homeVideoMuteSyncToken;
-  video.muted = muted;
+  player.muted = muted;
 
   requestAnimationFrame(() => {
     if (homeVideoMuteSyncToken === token) {
@@ -475,21 +536,23 @@ async function syncHomeVideoPlayback() {
     return;
   }
 
-  const video = homeVideoElement.value;
-  if (!video) {
+  const player = homePlayerElement.value;
+  if (!player) {
     return;
   }
 
   if (!props.isActiveVideo) {
-    video.pause();
-    syncHomeVideoMuted(video, appStore.videoMuted);
+    void player.pause().catch(() => {
+      // Ignore pause rejections before the provider is ready.
+    });
+    syncHomeVideoMuted(player, appStore.videoMuted);
     return;
   }
 
-  syncHomeVideoMuted(video, appStore.videoMuted);
+  syncHomeVideoMuted(player, appStore.videoMuted);
 
   try {
-    await video.play();
+    await player.play();
     return;
   } catch {
     if (appStore.videoMuted) {
@@ -498,10 +561,10 @@ async function syncHomeVideoPlayback() {
     }
   }
 
-  syncHomeVideoMuted(video, true);
+  syncHomeVideoMuted(player, true);
 
   try {
-    await video.play();
+    await player.play();
   } catch {
     // Ignore autoplay rejections and leave manual controls available when focused.
   }
@@ -509,18 +572,55 @@ async function syncHomeVideoPlayback() {
 
 function handleHomeVideoPlay() {
   if (!props.isActiveVideo) {
-    homeVideoElement.value?.pause();
+    void homePlayerElement.value?.pause().catch(() => {
+      // Ignore pause rejections before the provider is ready.
+    });
   }
 }
 
 function handleHomeVideoVolumeChange() {
-  const video = homeVideoElement.value;
-  if (!video || homeVideoMuteSyncToken !== 0) {
+  const player = homePlayerElement.value;
+  if (!player || homeVideoMuteSyncToken !== 0) {
     return;
   }
 
-  if (video.muted !== appStore.videoMuted) {
-    appStore.setVideoMuted(video.muted);
+  if (player.muted !== appStore.videoMuted) {
+    appStore.setVideoMuted(player.muted);
+  }
+}
+
+function bindHomePlayerEventListeners(player: MediaPlayerElement | null) {
+  removeHomePlayerEventListeners?.();
+  removeHomePlayerEventListeners = null;
+
+  if (!player) {
+    return;
+  }
+
+  const handleReady = () => {
+    void syncHomeVideoPlayback();
+  };
+  const handleVolume = () => {
+    handleHomeVideoVolumeChange();
+  };
+  const handlePlay = () => {
+    handleHomeVideoPlay();
+  };
+
+  player.addEventListener('loaded-metadata', handleReady);
+  player.addEventListener('can-play', handleReady);
+  player.addEventListener('volume-change', handleVolume);
+  player.addEventListener('play', handlePlay);
+
+  removeHomePlayerEventListeners = () => {
+    player.removeEventListener('loaded-metadata', handleReady);
+    player.removeEventListener('can-play', handleReady);
+    player.removeEventListener('volume-change', handleVolume);
+    player.removeEventListener('play', handlePlay);
+  };
+
+  if (player.hasAttribute('data-can-play')) {
+    void syncHomeVideoPlayback();
   }
 }
 
@@ -590,14 +690,18 @@ watch(
 watch(
   () => appStore.videoMuted,
   (videoMuted) => {
-    const video = homeVideoElement.value;
-    if (!video) {
+    const player = homePlayerElement.value;
+    if (!player) {
       return;
     }
 
-    syncHomeVideoMuted(video, videoMuted);
+    syncHomeVideoMuted(player, videoMuted);
   }
 );
+
+watch(homePlayerElement, (player) => {
+  bindHomePlayerEventListeners(player);
+});
 
 watch(
   () => props.context,
@@ -609,7 +713,9 @@ watch(
     }
 
     stopHomeVideoObserver();
-    homeVideoElement.value?.pause();
+    void homePlayerElement.value?.pause().catch(() => {
+      // Ignore pause rejections before the provider is ready.
+    });
   }
 );
 
@@ -621,6 +727,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearHomeImageTapResetTimer();
   stopHomeVideoObserver();
-  homeVideoElement.value?.pause();
+  removeHomePlayerEventListeners?.();
+  removeHomePlayerEventListeners = null;
+  void homePlayerElement.value?.pause().catch(() => {
+    // Ignore pause rejections before the provider is ready.
+  });
 });
 </script>

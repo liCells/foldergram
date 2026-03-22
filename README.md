@@ -24,7 +24,7 @@
 
 Foldergram is a self-hosted web application that turns your local folders into a beautiful, instagram-style feed and profile. It turns your local folder to app folders (profiles), and serves a lightning-fast Progressive Web App (PWA).
 
-Foldergram indexes supported media from a configured `GALLERY_ROOT`, stores metadata in SQLite, generates thumbnails and previews, and serves a fast feed-style web app for local browsing. The current app includes Home, Explore, Library, Likes, Moments or Highlights, App Folder pages, post detail views, delete actions, scan controls, and rebuild tools.
+Foldergram indexes supported media from a configured `GALLERY_ROOT`, stores metadata in SQLite, generates thumbnails and previews, and serves a fast feed-style web app for local browsing. Derivatives can be generated during scans or lazily on first request, and image detail pages can be configured to use generated previews or originals. The current app includes Home, Explore, Library, Likes, Moments or Highlights, App Folder pages, post detail views, delete actions, scan controls, and rebuild tools.
 
 ## Features
 
@@ -34,9 +34,9 @@ Foldergram indexes supported media from a configured `GALLERY_ROOT`, stores meta
 - Library browsing with App Folder search, sorting, and delete actions.
 - App Folder pages with a posts grid and a `Reels` tab when videos exist.
 - Shared likes in SQLite for signed-in admin/viewer sessions, plus browser-local favorites in public mode.
-- Image and video support with generated derivatives for fast browsing.
+- Image and video support with configurable eager or lazy derivative generation for fast browsing.
 - Optional role-based local access with admin, viewer, and public browse modes.
-- Settings actions for manual scan, thumbnail rebuild, and full library rebuild.
+- Settings actions for manual scan, thumbnail rebuild, and library-index rebuild.
 - A web app manifest plus production service worker registration.
 - A debounced filesystem watcher in development mode only.
 - No multi-user accounts, cloud sync, uploads, comments, messaging, notifications, or remote APIs.
@@ -200,6 +200,8 @@ data/
 | `DB_DIR`                      | `./data/db`         | SQLite database directory.                                                |
 | `THUMBNAILS_DIR`              | `./data/thumbnails` | Generated thumbnail output directory.                                     |
 | `PREVIEWS_DIR`                | `./data/previews`   | Generated preview output directory.                                       |
+| `IMAGE_DETAIL_SOURCE`         | `preview`           | For image detail pages, use generated previews or stream originals.       |
+| `DERIVATIVE_MODE`             | `eager`             | Generate derivatives during scans or lazily on first request.             |
 | `SCAN_DISCOVERY_CONCURRENCY`  | `4`                 | Folder discovery concurrency.                                             |
 | `SCAN_DERIVATIVE_CONCURRENCY` | `4`                 | Derivative generation concurrency.                                        |
 | `PUBLIC_DEMO_MODE`            | `0`                 | When enabled, all API mutations become read-only and return `403`.        |
@@ -207,6 +209,20 @@ data/
 | `NODE_ENV`                    | `development`       | Runtime mode.                                                             |
 
 The shipped `.env.example` only includes the `DEV_*` port values. Docker uses the fixed internal container port `4141`, and other production runtimes continue to use `SERVER_PORT`, which defaults to `4141` in the Docker image.
+
+### Detail Media and Derivative Timing
+
+- `IMAGE_DETAIL_SOURCE=preview` keeps image detail pages on generated previews.
+- `IMAGE_DETAIL_SOURCE=original` makes image detail pages stream `/api/originals/:id`.
+- `DERIVATIVE_MODE=eager` generates thumbnails and previews during scans.
+- `DERIVATIVE_MODE=lazy` indexes metadata during scans, then generates missing files the first time `/thumbnails/...` or `/previews/...` is requested and caches them on disk.
+
+These flags are independent:
+
+- feed cards, folder grids, avatars, and other list surfaces still use generated derivatives
+- `IMAGE_DETAIL_SOURCE` affects images only; videos still default to preview playback
+- `Rebuild Library Index` refreshes the SQLite-backed index; in lazy mode it does not pre-generate missing derivatives
+- `Regenerate Thumbnails` remains a manual thumbnail and video-poster rebuild only; it does not rebuild previews
 
 ### Access Protection
 

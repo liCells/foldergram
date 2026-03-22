@@ -8,30 +8,21 @@ import { requireApiAuthentication, requireMediaAuthentication } from './middlewa
 import { requireTrustedMutationRequest } from './middleware/csrf-protection.js';
 import { blockPublicDemoMutations } from './middleware/public-demo-mode.js';
 import { apiRouter } from './routes/api.js';
-import { authService } from './services/auth-service.js';
-
-function createProtectedStaticOptions() {
-  return {
-    fallthrough: false,
-    setHeaders(response: { setHeader(name: string, value: string): void }) {
-      if (authService.isEnabled()) {
-        response.setHeader('Cache-Control', 'private, no-store');
-        response.setHeader('Vary', 'Cookie');
-        return;
-      }
-
-      response.setHeader('Cache-Control', 'public, max-age=604800, immutable');
-    }
-  };
-}
+import { lazyThumbnailsRouter, lazyPreviewsRouter } from './routes/lazy-derivatives.js';
+import { createProtectedStaticOptions } from './utils/media-response.js';
 
 export function createApp() {
   const app = express();
 
   app.use(express.json());
 
-  app.use('/thumbnails', requireMediaAuthentication, express.static(appConfig.thumbnailsDir, createProtectedStaticOptions()));
-  app.use('/previews', requireMediaAuthentication, express.static(appConfig.previewsDir, createProtectedStaticOptions()));
+  if (appConfig.derivativeMode === 'lazy') {
+    app.use('/thumbnails', requireMediaAuthentication, lazyThumbnailsRouter);
+    app.use('/previews', requireMediaAuthentication, lazyPreviewsRouter);
+  } else {
+    app.use('/thumbnails', requireMediaAuthentication, express.static(appConfig.thumbnailsDir, createProtectedStaticOptions()));
+    app.use('/previews', requireMediaAuthentication, express.static(appConfig.previewsDir, createProtectedStaticOptions()));
+  }
 
   app.use('/api', blockPublicDemoMutations, requireTrustedMutationRequest, requireApiAuthentication, apiRouter);
 
@@ -45,7 +36,12 @@ export function createApp() {
     }
   }
 
-  app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
+  app.use((error: unknown, _request: express.Request, response: express.Response, next: express.NextFunction) => {
+    if (response.headersSent) {
+      next(error);
+      return;
+    }
+
     const message = error instanceof Error ? error.message : 'Unexpected server error';
     response.status(400).json({ message });
   });

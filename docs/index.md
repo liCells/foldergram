@@ -25,9 +25,9 @@ features:
   - title: Fast feed-style browsing
     details: Runtime reads come from SQLite and generated derivatives instead of filesystem walks during every request.
   - title: Photos and videos
-    details: Foldergram indexes supported image and video formats, generates thumbnails, and creates previews or direct-playback links when videos already fit the playback budget.
+    details: Foldergram indexes supported image and video formats, generates thumbnails, creates previews eagerly or lazily, and can expose compatible original MP4 playback in the detail player.
   - title: Honest scope
-    details: The current app includes feed browsing, explore, library, likes and favorites, moments, settings, optional admin/viewer/public access control, and local maintenance controls without cloud sync or social features.
+    details: The current app includes feed browsing, explore, library, likes and favorites, moments, optional admin/viewer/public access control, and admin-only maintenance controls without cloud sync or social features.
 ---
 
 ## Foldergram at a Glance
@@ -36,7 +36,7 @@ features:
 
 <div class="cs-feature">
 <h3>What ships today</h3>
-<p>The current repository includes Home, Explore, Library, Likes and Favorites, Moments, Settings, folder pages, a post detail view and modal flow, shared SQLite likes, browser-local favorites in public mode, delete actions, optional admin/viewer/public access control, manual scans, full library rebuilds, and thumbnail-only rebuilds.</p>
+<p>The current repository includes Home, Explore, Library, Likes and Favorites, Moments, Settings, folder pages, a post detail view and modal flow, shared SQLite likes, browser-local favorites in public mode, delete actions, optional admin/viewer/public access control, and local scan/rebuild tooling.</p>
 </div>
 
 <div class="cs-feature">
@@ -45,13 +45,13 @@ features:
 </div>
 
 <div class="cs-feature">
-<h3>Supported formats</h3>
-<p>Images: <code>.jpg</code>, <code>.jpeg</code>, <code>.png</code>, <code>.webp</code>, <code>.gif</code>. Videos: <code>.mp4</code>, <code>.mov</code>, <code>.m4v</code>, <code>.webm</code>, <code>.mkv</code>.</p>
+<h3>Formats and storage</h3>
+<p>Foldergram indexes images like <code>.jpg</code>, <code>.png</code>, <code>.webp</code>, and <code>.gif</code>, plus videos like <code>.mp4</code>, <code>.mov</code>, <code>.m4v</code>, <code>.webm</code>, and <code>.mkv</code>. Originals stay in the gallery root, SQLite stores indexed metadata, thumbnails are written under <code>thumbnails/</code>, and previews under <code>previews/</code>.</p>
 </div>
 
 <div class="cs-feature">
-<h3>Storage model</h3>
-<p>Originals remain in the gallery root. SQLite stores indexed metadata. Thumbnails are generated under <code>thumbnails/</code> and previews under <code>previews/</code>.</p>
+<h3>Access modes</h3>
+<p>Foldergram starts without a password gate by default. Settings can enable admin-only access, a separate viewer password, or anonymous public browsing. Once protection is enabled, only admins can open Settings or use Trash, scans, rebuilds, and delete actions.</p>
 </div>
 
 </div>
@@ -72,7 +72,7 @@ features:
 
 <div class="cs-feature">
 <h3>3. Generate derivatives</h3>
-<p>Create `640px` thumbnails and up to `1500px` previews, with direct-original playback for already compatible MP4 files.</p>
+<p>Create `640px` thumbnails, up to `1500px` image previews, and 720p-class video previews. Derivatives can be generated during scans or lazily on first request.</p>
 </div>
 
 <div class="cs-feature">
@@ -87,7 +87,7 @@ features:
 
 <div class="cs-feature">
 <h3>6. Maintain the library locally</h3>
-<p>Settings includes optional admin/viewer/public access control plus manual scan, thumbnail rebuild, and full library rebuild actions so you can protect access and refresh the index without touching the source files by hand.</p>
+<p>Admins can enable access protection and run manual scans, thumbnail rebuilds, and library-index rebuilds from Settings. If protection is still off, those controls are available immediately to whoever can reach the app.</p>
 </div>
 
 </div>

@@ -103,7 +103,7 @@ If needed:
 
 ## Likes disappeared after a rebuild
 
-That is expected for a full library rebuild. The rebuild resets the indexed
+That is expected for `Rebuild Library Index`. The rebuild resets the indexed
 library tables, including `likes`.
 
 Thumbnail-only rebuilds do not clear likes.

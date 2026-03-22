@@ -56,14 +56,14 @@ describe.sequential('video derivative strategy', () => {
     ]);
   });
 
-  it('skips preview transcoding for browser-safe MP4 originals and removes stale preview files', async () => {
+  it('keeps preview transcoding for large high-resolution browser-safe MP4 originals while preserving original playback eligibility', async () => {
     execFileAsyncMock.mockImplementation(createExecFileAsyncMock({
       format: {
         duration: '4.0',
         format_name: 'mov,mp4,m4a,3gp,3g2,mj2'
       },
       streams: [
-        { codec_type: 'video', codec_name: 'h264', width: 1080, height: 1920, pix_fmt: 'yuv420p' },
+        { codec_type: 'video', codec_name: 'h264', width: 2160, height: 3840, pix_fmt: 'yuv420p' },
         { codec_type: 'audio', codec_name: 'aac' }
       ]
     }));
@@ -73,19 +73,18 @@ describe.sequential('video derivative strategy', () => {
 
     await fs.mkdir(path.dirname(sourcePath), { recursive: true });
     await fs.mkdir(path.dirname(stalePreviewPath), { recursive: true });
-    await fs.writeFile(sourcePath, Buffer.alloc(1024 * 1024));
-    await fs.writeFile(stalePreviewPath, 'stale-preview');
+    await fs.writeFile(sourcePath, Buffer.alloc(32 * 1024 * 1024));
 
     const result = await generateDerivatives(sourcePath, 'clips/reel-1.mp4');
 
     expect(result.playbackStrategy).toBe('original');
-    expect(result.generatedPreview).toBe(false);
-    await expect(fs.stat(stalePreviewPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(result.generatedPreview).toBe(true);
 
     const ffmpegCalls = execFileAsyncMock.mock.calls.filter(([command]) => command === 'ffmpeg');
-    expect(ffmpegCalls).toHaveLength(1);
+    expect(ffmpegCalls).toHaveLength(2);
     expect(ffmpegCalls[0]?.[1]).toContain('libwebp');
-    expect(ffmpegCalls[0]?.[1]).not.toContain('libx264');
+    expect(ffmpegCalls[1]?.[1]).toContain('libx264');
+    expect(ffmpegCalls[1]?.[1]).toContain(expectedVideoScaleFilter());
   });
 
   it('keeps preview transcoding for incompatible MP4 files', async () => {
@@ -114,8 +113,13 @@ describe.sequential('video derivative strategy', () => {
     expect(ffmpegCalls).toHaveLength(2);
     expect(ffmpegCalls[0]?.[1]).toContain('libwebp');
     expect(ffmpegCalls[1]?.[1]).toContain('libx264');
+    expect(ffmpegCalls[1]?.[1]).toContain(expectedVideoScaleFilter());
   });
 });
+
+function expectedVideoScaleFilter(): string {
+  return "scale='trunc(if(gt(iw,ih),min(1280,iw),min(720,iw))/2)*2':'trunc(if(gt(iw,ih),min(1280,iw)*ih/iw,min(720,iw)*ih/iw)/2)*2':flags=lanczos";
+}
 
 function createExecFileAsyncMock(payload: unknown) {
   return async (command: string) => {

@@ -258,6 +258,276 @@ img[data-loaded="true"] {
   transform: translateY(-1px);
 }
 
+.viewer__video-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(var(--viewer-media-intrinsic-width, 100%), 100%);
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: var(--viewer-media-aspect-ratio);
+  background: #000;
+  overflow: hidden;
+}
+
+.viewer__player {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: inherit;
+  color: #fff;
+  background: #000;
+}
+
+.viewer__player[data-view-type="video"] {
+  aspect-ratio: inherit;
+}
+
+.viewer__player media-provider,
+.viewer__player media-poster,
+.viewer__player video,
+.viewer__player img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.viewer__player video,
+.viewer__player img {
+  object-fit: contain;
+}
+
+.viewer__player-controls {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.7rem 0.7rem;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.55) 58%,
+      rgba(0, 0, 0, 0.82) 100%
+    );
+}
+
+.viewer__player-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.viewer__player-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.94);
+  cursor: pointer;
+  transition:
+    color 0.18s ease,
+    opacity 0.18s ease,
+    transform 0.15s ease;
+}
+
+.viewer__player-control:hover {
+  color: #fff;
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.viewer__player-control--active {
+  color: rgba(103, 199, 255, 0.98);
+}
+
+.viewer__player-control--active:hover {
+  color: rgba(132, 210, 255, 1);
+}
+
+.viewer__player-control-icon {
+  position: absolute;
+  inset: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: auto;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.viewer__player-play-icon--pause,
+.viewer__player-mute-icon--off,
+.viewer__player-fullscreen-icon--exit {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.viewer__player media-play-button:not([data-paused]) .viewer__player-play-icon--play,
+.viewer__player media-mute-button[data-muted] .viewer__player-mute-icon--on,
+.viewer__player media-fullscreen-button[data-fullscreen] .viewer__player-fullscreen-icon--enter {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.viewer__player media-play-button:not([data-paused]) .viewer__player-play-icon--pause,
+.viewer__player media-mute-button[data-muted] .viewer__player-mute-icon--off,
+.viewer__player media-fullscreen-button[data-fullscreen] .viewer__player-fullscreen-icon--exit {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.viewer__player media-controls,
+.viewer__player media-controls-group,
+.viewer__player media-play-button,
+.viewer__player media-mute-button,
+.viewer__player media-fullscreen-button {
+  box-sizing: border-box;
+}
+
+.feed-card__player {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: #fff;
+  background: #000;
+}
+
+.feed-card__player[data-view-type="video"] {
+  aspect-ratio: inherit;
+}
+
+.feed-card__player media-provider,
+.feed-card__player media-poster,
+.feed-card__player video,
+.feed-card__player img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.feed-card__player video,
+.feed-card__player img {
+  object-fit: cover;
+}
+
+.feed-card__player-controls {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.7rem 0.55rem;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.52) 54%,
+      rgba(0, 0, 0, 0.82) 100%
+    );
+}
+
+.feed-card__player-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.feed-card__player-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.95rem;
+  height: 1.95rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.94);
+  cursor: pointer;
+  transition:
+    color 0.18s ease,
+    opacity 0.18s ease,
+    transform 0.15s ease;
+}
+
+.feed-card__player-control:hover {
+  color: #fff;
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.feed-card__player-control-icon {
+  position: absolute;
+  inset: 0;
+  width: 1rem;
+  height: 1rem;
+  margin: auto;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.feed-card__player-play-icon--pause,
+.feed-card__player-mute-icon--off,
+.feed-card__player-fullscreen-icon--exit {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.feed-card__player media-play-button:not([data-paused]) .feed-card__player-play-icon--play,
+.feed-card__player media-mute-button[data-muted] .feed-card__player-mute-icon--on,
+.feed-card__player media-fullscreen-button[data-fullscreen] .feed-card__player-fullscreen-icon--enter {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.feed-card__player media-play-button:not([data-paused]) .feed-card__player-play-icon--pause,
+.feed-card__player media-mute-button[data-muted] .feed-card__player-mute-icon--off,
+.feed-card__player media-fullscreen-button[data-fullscreen] .feed-card__player-fullscreen-icon--exit {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.feed-card__player media-controls,
+.feed-card__player media-controls-group,
+.feed-card__player media-play-button,
+.feed-card__player media-mute-button,
+.feed-card__player media-fullscreen-button {
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .viewer__player-controls {
+    padding: 0.48rem 0.55rem 0.6rem;
+  }
+
+  .viewer__player-control {
+    width: 1.8rem;
+    height: 1.8rem;
+  }
+
+  .viewer__player-control-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
 @media (max-width: 768px) {
   .viewer__card-wrapper {
     flex-direction: column;

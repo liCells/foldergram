@@ -119,6 +119,7 @@ export interface ImageDetail extends FeedImage {
   fileSize: number;
   exif: ImageExifData | null;
   originalUrl: string;
+  playbackStrategy?: PlaybackStrategy | null;
   nextImageId: number | null;
   previousImageId: number | null;
 }

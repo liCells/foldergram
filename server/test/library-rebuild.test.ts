@@ -28,6 +28,7 @@ describe.sequential('library rebuild reuses existing derivatives', () => {
     tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'insta-library-rebuild-'));
 
     vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('DERIVATIVE_MODE', 'eager');
     vi.stubEnv('DATA_ROOT', path.join(tempRoot, 'data'));
     vi.stubEnv('GALLERY_ROOT', path.join(tempRoot, 'gallery'));
     vi.stubEnv('DB_DIR', path.join(tempRoot, 'db'));

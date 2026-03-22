@@ -1,0 +1,265 @@
+:root {
+  --fg-home-glow-1: rgba(14, 165, 233, 0.28);
+  --fg-home-glow-2: rgba(99, 102, 241, 0.24);
+  --fg-home-glow-3: rgba(236, 72, 153, 0.2);
+  --fg-home-glow-4: rgba(245, 158, 11, 0.18);
+}
+
+:root.fg-home-rainbow {
+  animation: foldergram-rainbow 38s linear infinite;
+}
+
+:root.fg-home-rainbow .VPHome .VPHero {
+  isolation: isolate;
+}
+
+:root.fg-home-rainbow .VPHome .VPHero .container {
+  position: relative;
+  z-index: 1;
+}
+
+:root.fg-home-rainbow .VPHome .VPHero::before,
+:root.fg-home-rainbow .VPHome .VPHero::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(56px);
+}
+
+:root.fg-home-rainbow .VPHome .VPHero::before {
+  top: -7rem;
+  left: -5rem;
+  width: 24rem;
+  height: 24rem;
+  background: radial-gradient(circle at center, var(--fg-home-glow-1) 0%, transparent 72%);
+  animation: foldergram-orbit-a 16s ease-in-out infinite alternate;
+}
+
+:root.fg-home-rainbow .VPHome .VPHero::after {
+  right: -4rem;
+  bottom: -8rem;
+  width: 26rem;
+  height: 26rem;
+  background: radial-gradient(circle at center, var(--fg-home-glow-3) 0%, transparent 74%);
+  animation: foldergram-orbit-b 19s ease-in-out infinite alternate;
+}
+
+:root.fg-home-rainbow .VPHome .heading .name.clip {
+  background: linear-gradient(135deg, var(--vp-c-brand-1) 0%, var(--vp-c-brand-2) 48%, var(--vp-c-brand-3) 100%);
+  background-size: 220% 220%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: gradient-shift 8s ease infinite;
+}
+
+:root.fg-home-rainbow .VPHome .tagline {
+  max-width: 38rem;
+}
+
+:root.fg-home-rainbow .VPHome .actions .VPButton.brand {
+  box-shadow: 0 14px 32px var(--fg-home-glow-2);
+}
+
+:root.fg-home-rainbow .VPHome .VPHero.has-image .image-container {
+  isolation: isolate;
+}
+
+:root.fg-home-rainbow .VPHome .VPHero.has-image .image-container::before,
+:root.fg-home-rainbow .VPHome .VPHero.has-image .image-container::after {
+  content: none;
+}
+
+:root.fg-home-rainbow .VPHome .VPHero.has-image .image-bg {
+  z-index: 0;
+  width: 360px;
+  height: 360px;
+  background:
+    radial-gradient(circle at 26% 28%, var(--fg-home-glow-3) 0%, transparent 34%),
+    radial-gradient(circle at 72% 34%, var(--fg-home-glow-1) 0%, transparent 36%),
+    radial-gradient(circle at 52% 72%, var(--fg-home-glow-4) 0%, transparent 38%),
+    radial-gradient(circle at 50% 50%, var(--fg-home-glow-2) 0%, transparent 46%);
+  filter: blur(82px) saturate(138%);
+  opacity: 0.96;
+  transition:
+    transform 1.35s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 1.35s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 1.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root.fg-home-rainbow .VPHome .VPHero.has-image:hover .image-bg {
+  transform: translate(-50%, -50%) scale(0.72);
+  opacity: 0.46;
+  filter: blur(62px) saturate(144%);
+}
+
+:root.fg-home-rainbow .VPHome .VPHero.has-image .image-src {
+  z-index: 1;
+  filter: drop-shadow(0 20px 46px rgba(15, 23, 42, 0.18));
+}
+
+:root.fg-home-rainbow .VPNavBarTitle .logo {
+  filter: brightness(0) invert(1);
+}
+
+@keyframes foldergram-rainbow {
+  0% {
+    --vp-c-brand-1: #10b981;
+    --vp-c-brand-2: #0ea5e9;
+    --vp-c-brand-3: #6366f1;
+    --vp-c-brand-soft: rgba(16, 185, 129, 0.14);
+    --vp-button-brand-bg: #10b981;
+    --vp-button-brand-hover-bg: #0f9f92;
+    --vp-button-brand-active-bg: #0b7f74;
+    --fg-home-glow-1: rgba(14, 165, 233, 0.3);
+    --fg-home-glow-2: rgba(99, 102, 241, 0.24);
+    --fg-home-glow-3: rgba(16, 185, 129, 0.22);
+    --fg-home-glow-4: rgba(236, 72, 153, 0.18);
+  }
+
+  16% {
+    --vp-c-brand-1: #06b6d4;
+    --vp-c-brand-2: #3b82f6;
+    --vp-c-brand-3: #8b5cf6;
+    --vp-c-brand-soft: rgba(6, 182, 212, 0.15);
+    --vp-button-brand-bg: #06b6d4;
+    --vp-button-brand-hover-bg: #0891b2;
+    --vp-button-brand-active-bg: #0e7490;
+    --fg-home-glow-1: rgba(59, 130, 246, 0.3);
+    --fg-home-glow-2: rgba(139, 92, 246, 0.24);
+    --fg-home-glow-3: rgba(6, 182, 212, 0.24);
+    --fg-home-glow-4: rgba(236, 72, 153, 0.18);
+  }
+
+  32% {
+    --vp-c-brand-1: #6366f1;
+    --vp-c-brand-2: #a855f7;
+    --vp-c-brand-3: #ec4899;
+    --vp-c-brand-soft: rgba(99, 102, 241, 0.15);
+    --vp-button-brand-bg: #6366f1;
+    --vp-button-brand-hover-bg: #4f46e5;
+    --vp-button-brand-active-bg: #4338ca;
+    --fg-home-glow-1: rgba(99, 102, 241, 0.28);
+    --fg-home-glow-2: rgba(168, 85, 247, 0.22);
+    --fg-home-glow-3: rgba(236, 72, 153, 0.24);
+    --fg-home-glow-4: rgba(244, 114, 182, 0.18);
+  }
+
+  48% {
+    --vp-c-brand-1: #ec4899;
+    --vp-c-brand-2: #f97316;
+    --vp-c-brand-3: #f59e0b;
+    --vp-c-brand-soft: rgba(236, 72, 153, 0.16);
+    --vp-button-brand-bg: #ec4899;
+    --vp-button-brand-hover-bg: #db2777;
+    --vp-button-brand-active-bg: #be185d;
+    --fg-home-glow-1: rgba(236, 72, 153, 0.26);
+    --fg-home-glow-2: rgba(249, 115, 22, 0.24);
+    --fg-home-glow-3: rgba(245, 158, 11, 0.2);
+    --fg-home-glow-4: rgba(251, 191, 36, 0.18);
+  }
+
+  64% {
+    --vp-c-brand-1: #f59e0b;
+    --vp-c-brand-2: #84cc16;
+    --vp-c-brand-3: #10b981;
+    --vp-c-brand-soft: rgba(245, 158, 11, 0.14);
+    --vp-button-brand-bg: #f59e0b;
+    --vp-button-brand-hover-bg: #d97706;
+    --vp-button-brand-active-bg: #b45309;
+    --fg-home-glow-1: rgba(245, 158, 11, 0.26);
+    --fg-home-glow-2: rgba(132, 204, 22, 0.22);
+    --fg-home-glow-3: rgba(16, 185, 129, 0.24);
+    --fg-home-glow-4: rgba(14, 165, 233, 0.18);
+  }
+
+  80% {
+    --vp-c-brand-1: #22c55e;
+    --vp-c-brand-2: #14b8a6;
+    --vp-c-brand-3: #0ea5e9;
+    --vp-c-brand-soft: rgba(34, 197, 94, 0.14);
+    --vp-button-brand-bg: #22c55e;
+    --vp-button-brand-hover-bg: #16a34a;
+    --vp-button-brand-active-bg: #15803d;
+    --fg-home-glow-1: rgba(34, 197, 94, 0.24);
+    --fg-home-glow-2: rgba(20, 184, 166, 0.22);
+    --fg-home-glow-3: rgba(14, 165, 233, 0.24);
+    --fg-home-glow-4: rgba(99, 102, 241, 0.18);
+  }
+
+  100% {
+    --vp-c-brand-1: #10b981;
+    --vp-c-brand-2: #0ea5e9;
+    --vp-c-brand-3: #6366f1;
+    --vp-c-brand-soft: rgba(16, 185, 129, 0.14);
+    --vp-button-brand-bg: #10b981;
+    --vp-button-brand-hover-bg: #0f9f92;
+    --vp-button-brand-active-bg: #0b7f74;
+    --fg-home-glow-1: rgba(14, 165, 233, 0.3);
+    --fg-home-glow-2: rgba(99, 102, 241, 0.24);
+    --fg-home-glow-3: rgba(16, 185, 129, 0.22);
+    --fg-home-glow-4: rgba(236, 72, 153, 0.18);
+  }
+}
+
+@keyframes foldergram-orbit-a {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.94);
+  }
+
+  100% {
+    transform: translate3d(2.5rem, 1.5rem, 0) scale(1.08);
+  }
+}
+
+@keyframes foldergram-orbit-b {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.94);
+  }
+
+  100% {
+    transform: translate3d(-2rem, -1.75rem, 0) scale(1.08);
+  }
+}
+
+@media (max-width: 960px) {
+  :root.fg-home-rainbow .VPHome .VPHero::before {
+    width: 18rem;
+    height: 18rem;
+    left: -4rem;
+  }
+
+  :root.fg-home-rainbow .VPHome .VPHero::after {
+    width: 20rem;
+    height: 20rem;
+    right: -3rem;
+  }
+}
+
+@media (max-width: 640px) {
+  :root.fg-home-rainbow .VPHome .VPHero.has-image .image-bg {
+    width: 300px;
+    height: 300px;
+  }
+
+  :root.fg-home-rainbow .VPHome .VPHero::before,
+  :root.fg-home-rainbow .VPHome .VPHero::after {
+    filter: blur(42px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root.fg-home-rainbow {
+    animation: none;
+  }
+
+  :root.fg-home-rainbow .VPHome .VPHero::before,
+  :root.fg-home-rainbow .VPHome .VPHero::after,
+  :root.fg-home-rainbow .VPHome .heading .name.clip,
+  :root.fg-home-rainbow .VPHome .VPHero.has-image .image-bg {
+    animation: none;
+  }
+}
