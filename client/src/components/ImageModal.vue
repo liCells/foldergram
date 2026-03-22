@@ -122,20 +122,100 @@
           },
         ]"
       >
-        <video
-          v-if="image.mediaType === 'video'"
-          ref="videoElement"
-          :src="image.previewUrl"
-          :poster="image.thumbnailUrl"
-          :width="image.width"
-          :height="image.height"
-          controls
-          loop
-          playsinline
-          preload="metadata"
-          @loadedmetadata="attemptVideoPlayback"
-          @volumechange="handleVideoVolumeChange"
-        />
+        <template v-if="image.mediaType === 'video'">
+          <div
+            class="viewer__video-shell"
+            :style="videoShellStyle"
+          >
+            <media-player
+              ref="playerElement"
+              class="viewer__player"
+              :src.prop="videoSource"
+              :title.prop="image.filename"
+              :playsInline.prop="true"
+              :muted.prop="appStore.videoMuted"
+              :loop.prop="true"
+              load="eager"
+              preload="metadata"
+            >
+              <media-provider />
+              <media-poster
+                class="viewer__player-poster"
+                :src.prop="image.thumbnailUrl"
+                :alt.prop="image.filename"
+              />
+              <media-controls class="viewer__player-controls">
+                <media-controls-group class="viewer__player-controls-group">
+                  <media-play-button
+                    class="viewer__player-control"
+                    aria-label="Toggle playback"
+                  >
+                    <span
+                      class="viewer__player-control-icon viewer__player-play-icon viewer__player-play-icon--play i-fluent-play-16-filled"
+                      aria-hidden="true"
+                    />
+                    <span
+                      class="viewer__player-control-icon viewer__player-play-icon viewer__player-play-icon--pause i-fluent-pause-16-filled"
+                      aria-hidden="true"
+                    />
+                  </media-play-button>
+                  <media-mute-button
+                    class="viewer__player-control"
+                    aria-label="Toggle sound"
+                  >
+                    <span
+                      class="viewer__player-control-icon viewer__player-mute-icon viewer__player-mute-icon--on i-fluent-speaker-2-16-regular"
+                      aria-hidden="true"
+                    />
+                    <span
+                      class="viewer__player-control-icon viewer__player-mute-icon viewer__player-mute-icon--off i-fluent-speaker-mute-16-regular"
+                      aria-hidden="true"
+                    />
+                  </media-mute-button>
+                </media-controls-group>
+                <media-controls-group class="viewer__player-controls-group">
+                  <button
+                    v-if="showHdButton"
+                    class="viewer__player-control"
+                    :class="{ 'viewer__player-control--active': isPlayingHd }"
+                    type="button"
+                    :aria-label="
+                      isPlayingHd
+                        ? 'Switch to preview quality'
+                        : 'Switch to HD original'
+                    "
+                    :aria-pressed="isPlayingHd"
+                    :title="isPlayingHd ? 'Preview quality' : 'HD original'"
+                    @click.stop="toggleHdSource"
+                  >
+                    <span
+                      class="viewer__player-control-icon"
+                      :class="
+                        isPlayingHd
+                          ? 'i-fluent-hd-16-filled'
+                          : 'i-fluent-hd-16-regular'
+                      "
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <media-fullscreen-button
+                    class="viewer__player-control"
+                    aria-label="Toggle fullscreen"
+                  >
+                    <span
+                      class="viewer__player-control-icon viewer__player-fullscreen-icon viewer__player-fullscreen-icon--enter i-fluent-full-screen-maximize-16-regular"
+                      aria-hidden="true"
+                    />
+                    <span
+                      class="viewer__player-control-icon viewer__player-fullscreen-icon viewer__player-fullscreen-icon--exit i-fluent-full-screen-minimize-16-regular"
+                      aria-hidden="true"
+                    />
+                  </media-fullscreen-button>
+                </media-controls-group>
+              </media-controls>
+            </media-player>
+          </div>
+        </template>
         <ResilientImage
           v-else
           :src="image.previewUrl"
@@ -367,8 +447,12 @@
 </template>
 
 <script setup lang="ts">
+  import "vidstack/bundle"
+
   import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
   import { RouterLink, useRoute, useRouter } from "vue-router"
+  import type { PlayerSrc } from "vidstack"
+  import type { MediaPlayerElement } from "vidstack/elements"
 
   import type { ImageDetail, FolderSummary } from "../types/api"
   import { useAppStore } from "../stores/app"
@@ -376,7 +460,7 @@
   import { useLikesStore } from "../stores/likes"
   import Avatar from "./Avatar.vue"
   import ResilientImage from "./ResilientImage.vue"
-  import { formatMediaDuration } from "../utils/media"
+  import { formatMediaDuration, videoPreviewWouldDownscale } from "../utils/media"
 
   const props = defineProps<{
     image: ImageDetail | null
@@ -395,7 +479,7 @@
   const authStore = useAuthStore()
   const route = useRoute()
   const router = useRouter()
-  const videoElement = ref<HTMLVideoElement | null>(null)
+  const playerElement = ref<MediaPlayerElement | null>(null)
   const cardWrapperElement = ref<HTMLElement | null>(null)
   const sidebarElement = ref<HTMLElement | null>(null)
   const sidebarToggleElement = ref<HTMLButtonElement | null>(null)
@@ -403,6 +487,7 @@
   const navigationLockedUntil = ref(0)
   const isSidebarCollapsible = ref(false)
   const isSidebarExpanded = ref(true)
+  const isPlayingHd = ref(false)
 
   const WHEEL_NAVIGATION_THRESHOLD = 72
   const NAVIGATION_COOLDOWN_MS = 320
@@ -414,6 +499,8 @@
   }
 
   let videoMuteSyncToken = 0
+  let pendingVideoRestore: { currentTime: number; wasPaused: boolean } | null = null
+  let removePlayerEventListeners: (() => void) | null = null
 
   const fileSize = computed(() => {
     if (!props.image) {
@@ -422,6 +509,45 @@
 
     const megabytes = props.image.fileSize / (1024 * 1024)
     return `${megabytes.toFixed(2)} MB`
+  })
+
+  const showHdButton = computed(
+    () =>
+      props.image?.mediaType === 'video' &&
+      props.image?.playbackStrategy === 'original' &&
+      videoPreviewWouldDownscale(props.image.width, props.image.height),
+  )
+
+  const videoSrc = computed(() => {
+    if (!props.image || props.image.mediaType !== 'video') {
+      return props.image?.previewUrl ?? ''
+    }
+
+    if (isPlayingHd.value && props.image.originalUrl) {
+      return props.image.originalUrl
+    }
+
+    return props.image.previewUrl
+  })
+  const videoSource = computed<PlayerSrc>(() => {
+    if (!props.image || props.image.mediaType !== "video") {
+      return { src: props.image?.previewUrl ?? "", type: "video/mp4" }
+    }
+
+    return {
+      src: videoSrc.value,
+      type: "video/mp4",
+    }
+  })
+  const videoShellStyle = computed(() => {
+    if (!props.image || props.image.mediaType !== "video") {
+      return undefined
+    }
+
+    return {
+      "--viewer-media-aspect-ratio": `${props.image.width} / ${props.image.height}`,
+      "--viewer-media-intrinsic-width": `${props.image.width}px`,
+    }
   })
 
   const folderAvatar = computed(() => props.folder?.avatarUrl ?? null)
@@ -533,9 +659,9 @@
     () => isModalSidebarCollapsible.value && isSidebarExpanded.value,
   )
 
-  function syncVideoMuted(video: HTMLVideoElement, muted: boolean) {
+  function syncVideoMuted(player: MediaPlayerElement, muted: boolean) {
     const token = ++videoMuteSyncToken
-    video.muted = muted
+    player.muted = muted
 
     requestAnimationFrame(() => {
       if (videoMuteSyncToken === token) {
@@ -698,15 +824,15 @@
     }
 
     await nextTick()
-    const video = videoElement.value
-    if (!video) {
+    const player = playerElement.value
+    if (!player) {
       return
     }
 
-    syncVideoMuted(video, appStore.videoMuted)
+    syncVideoMuted(player, appStore.videoMuted)
 
     try {
-      await video.play()
+      await player.play()
       return
     } catch {
       if (appStore.videoMuted) {
@@ -715,23 +841,85 @@
       }
     }
 
-    syncVideoMuted(video, true)
+    syncVideoMuted(player, true)
 
     try {
-      await video.play()
+      await player.play()
     } catch {
       // Ignore autoplay rejections and leave manual controls available.
     }
   }
 
-  function handleVideoVolumeChange() {
-    const video = videoElement.value
-    if (!video || videoMuteSyncToken !== 0) {
+  function handlePlayerVolumeChange() {
+    const player = playerElement.value
+    if (!player || videoMuteSyncToken !== 0) {
       return
     }
 
-    if (video.muted !== appStore.videoMuted) {
-      appStore.setVideoMuted(video.muted)
+    if (player.muted !== appStore.videoMuted) {
+      appStore.setVideoMuted(player.muted)
+    }
+  }
+
+  function toggleHdSource() {
+    const player = playerElement.value
+    const image = props.image
+    if (!player || !image || image.mediaType !== 'video') {
+      return
+    }
+
+    const savedTime = player.currentTime
+    pendingVideoRestore = {
+      currentTime: savedTime,
+      wasPaused: player.paused
+    }
+    isPlayingHd.value = !isPlayingHd.value
+  }
+
+  async function handlePlayerReadyForPlayback(): Promise<void> {
+    const player = playerElement.value
+    if (player && pendingVideoRestore) {
+      const restoreState = pendingVideoRestore
+      pendingVideoRestore = null
+      player.currentTime = restoreState.currentTime
+
+      if (!restoreState.wasPaused) {
+        void player.play().catch(() => { /* ignore */ })
+      }
+
+      return
+    }
+
+    await attemptVideoPlayback()
+  }
+
+  function bindPlayerEventListeners(player: MediaPlayerElement | null) {
+    removePlayerEventListeners?.()
+    removePlayerEventListeners = null
+
+    if (!player) {
+      return
+    }
+
+    const handleReady = () => {
+      void handlePlayerReadyForPlayback()
+    }
+    const handleVolume = () => {
+      handlePlayerVolumeChange()
+    }
+
+    player.addEventListener("loaded-metadata", handleReady)
+    player.addEventListener("can-play", handleReady)
+    player.addEventListener("volume-change", handleVolume)
+
+    removePlayerEventListeners = () => {
+      player.removeEventListener("loaded-metadata", handleReady)
+      player.removeEventListener("can-play", handleReady)
+      player.removeEventListener("volume-change", handleVolume)
+    }
+
+    if (player.hasAttribute("data-can-play")) {
+      void handlePlayerReadyForPlayback()
     }
   }
 
@@ -740,6 +928,8 @@
     () => {
       wheelDeltaAccumulator.value = 0
       navigationLockedUntil.value = 0
+      isPlayingHd.value = false
+      pendingVideoRestore = null
       void attemptVideoPlayback()
     },
   )
@@ -747,14 +937,18 @@
   watch(
     () => appStore.videoMuted,
     videoMuted => {
-      const video = videoElement.value
-      if (!video) {
+      const player = playerElement.value
+      if (!player) {
         return
       }
 
-      syncVideoMuted(video, videoMuted)
+      syncVideoMuted(player, videoMuted)
     },
   )
+
+  watch(playerElement, player => {
+    bindPlayerEventListeners(player)
+  })
 
   watch(
     () => props.isModal,
@@ -860,6 +1054,8 @@
   onUnmounted(() => {
     window.removeEventListener("resize", updateSidebarLayout)
     window.removeEventListener("keydown", handleKeydown)
-    videoElement.value?.pause()
+    removePlayerEventListeners?.()
+    removePlayerEventListeners = null
+    void playerElement.value?.pause().catch(() => { /* ignore */ })
   })
 </script>

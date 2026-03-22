@@ -15,8 +15,18 @@ export function formatMediaDuration(durationMs: number | null | undefined): stri
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+export const VIDEO_PREVIEW_MAX_LONG_EDGE = 1280;
+export const VIDEO_PREVIEW_MAX_SHORT_EDGE = 720;
 const INSTAGRAM_MIN_ASPECT_RATIO = 4 / 5;
 const INSTAGRAM_MAX_ASPECT_RATIO = 1.91;
+
+export function videoPreviewWouldDownscale(width: number | null | undefined, height: number | null | undefined): boolean {
+  if (!width || !height || width <= 0 || height <= 0) {
+    return false;
+  }
+
+  return width > height ? width > VIDEO_PREVIEW_MAX_LONG_EDGE : width > VIDEO_PREVIEW_MAX_SHORT_EDGE;
+}
 
 export function clampFeedAspectRatio(width: number | null | undefined, height: number | null | undefined): number {
   if (!width || !height || width <= 0 || height <= 0) {

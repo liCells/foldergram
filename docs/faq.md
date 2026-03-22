@@ -53,14 +53,24 @@ several payload fields still use `image` terminology while carrying mixed media.
 
 ## Can Foldergram play videos directly from the original file?
 
-Yes, sometimes. Compatible MP4 files within the current playback budget can skip
-preview transcoding and stream directly from `/api/originals/:id`.
+Yes, sometimes. Compatible MP4 originals can be exposed as an optional `HD`
+source in the detail player while the generated preview remains the default
+playback source.
 
-## Why would I use thumbnail rebuild instead of full rebuild?
+## Why are thumbnails or previews being created while I browse?
 
-Use thumbnail rebuild when the index is still correct and you only want to
-regenerate feed/profile thumbnails and video poster images. Use full rebuild
-when the gallery root changed or the index itself needs to be reset.
+That is expected when `DERIVATIVE_MODE=lazy`.
+
+Foldergram still indexes metadata during scans, but it waits to generate
+missing thumbnails and previews until `/thumbnails/...` or `/previews/...` is
+requested. Once generated, those files are cached on disk for later requests.
+
+## Why would I use `Regenerate Thumbnails` instead of `Rebuild Library Index`?
+
+Use `Regenerate Thumbnails` when the index is still correct and you only want to
+regenerate feed/profile thumbnails and video poster images. Use `Rebuild
+Library Index` when the gallery root changed or the index itself needs to be
+reset.
 
 ## Is the local-origin mutation check the same as authentication?
 

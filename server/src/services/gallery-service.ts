@@ -92,13 +92,15 @@ function buildOriginalUrl(id: number): string {
   return `/api/originals/${id}`;
 }
 
-function buildPreviewUrl(image: {
-  id: number;
-  mediaType: MediaType;
-  previewUrl: string;
-  playbackStrategy?: PlaybackStrategy | null;
-}): string {
-  if (image.mediaType === 'video' && image.playbackStrategy === 'original') {
+function buildPreviewUrl(
+  image: {
+    id: number;
+    mediaType: MediaType;
+    previewUrl: string;
+  },
+  useOriginalForImages = false
+): string {
+  if (useOriginalForImages && image.mediaType === 'image') {
     return buildOriginalUrl(image.id);
   }
 
@@ -161,6 +163,35 @@ async function removeDirectoryTree(targetPath: string | null): Promise<void> {
   }
 }
 
+function countDerivativeFilesOnDisk(rootPath: string): number {
+  try {
+    const entries = fs.readdirSync(rootPath, { withFileTypes: true });
+    let count = 0;
+
+    for (const entry of entries) {
+      const entryPath = path.join(rootPath, entry.name);
+
+      if (entry.isDirectory()) {
+        count += countDerivativeFilesOnDisk(entryPath);
+        continue;
+      }
+
+      if (entry.isFile() && entry.name !== '.gitkeep') {
+        count += 1;
+      }
+    }
+
+    return count;
+  } catch (error) {
+    const filesystemError = error as NodeJS.ErrnoException;
+    if (filesystemError.code === 'ENOENT') {
+      return 0;
+    }
+
+    throw error;
+  }
+}
+
 function isSameOrDescendantFolderPath(rootFolderPath: string, candidateFolderPath: string): boolean {
   return candidateFolderPath === rootFolderPath || candidateFolderPath.startsWith(`${rootFolderPath}/`);
 }
@@ -175,14 +206,14 @@ function mapFeedImage(image: IndexedFeedImage, thumbnailVersion = getThumbnailAs
     previewUrl: buildPreviewUrl({
       id: rest.id,
       mediaType: rest.mediaType,
-      previewUrl: rest.previewUrl,
-      playbackStrategy
+      previewUrl: rest.previewUrl
     })
   };
 }
 
 function mapImageDetail(image: IndexedImageDetail, thumbnailVersion = getThumbnailAssetVersion()): ImageDetail {
   const { playbackStrategy, exifJson, ...rest } = image;
+  const useOriginalForImages = appConfig.imageDetailSource === 'original';
   return {
     ...rest,
     isAnimated: Boolean(rest.isAnimated),
@@ -192,10 +223,10 @@ function mapImageDetail(image: IndexedImageDetail, thumbnailVersion = getThumbna
     previewUrl: buildPreviewUrl({
       id: rest.id,
       mediaType: rest.mediaType,
-      previewUrl: rest.previewUrl,
-      playbackStrategy
-    }),
-    originalUrl: buildOriginalUrl(rest.id)
+      previewUrl: rest.previewUrl
+    }, useOriginalForImages),
+    originalUrl: buildOriginalUrl(rest.id),
+    playbackStrategy
   };
 }
 
@@ -209,8 +240,7 @@ function mapTrashImage(image: IndexedTrashImage, thumbnailVersion = getThumbnail
     previewUrl: buildPreviewUrl({
       id: rest.id,
       mediaType: rest.mediaType,
-      previewUrl: rest.previewUrl,
-      playbackStrategy
+      previewUrl: rest.previewUrl
     })
   };
 }
@@ -880,8 +910,8 @@ export const galleryService = {
       indexedImages: storageState.libraryAvailable ? imageRepository.countFeed() : 0,
       indexedVideos: storageState.libraryAvailable ? imageRepository.countByMediaType('video') : 0,
       deletedImages: storageState.libraryAvailable ? imageRepository.countDeleted() : 0,
-      thumbnailCount: storageState.libraryAvailable ? imageRepository.countWithThumbnail() : 0,
-      previewCount: storageState.libraryAvailable ? imageRepository.countWithPreview() : 0,
+      thumbnailCount: storageState.libraryAvailable ? countDerivativeFilesOnDisk(appConfig.thumbnailsDir) : 0,
+      previewCount: storageState.libraryAvailable ? countDerivativeFilesOnDisk(appConfig.previewsDir) : 0,
       lastScan: lastCompletedScan,
       scan: {
         ...scanProgress,

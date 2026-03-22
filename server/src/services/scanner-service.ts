@@ -1460,13 +1460,15 @@ class ScannerService {
 
       return {
         status: 'unchanged',
-        derivativeJob: shouldQueueDerivativeJobForStatus('unchanged', options) || needsPlaybackStrategyBackfill
-          ? {
-              absolutePath: file.absolutePath,
-              relativePath: file.relativePath,
-              force: false,
-              kind: 'all'
-            }
+        derivativeJob: !appConfig.derivativeMode || appConfig.derivativeMode === 'eager'
+          ? (shouldQueueDerivativeJobForStatus('unchanged', options) || needsPlaybackStrategyBackfill
+            ? {
+                absolutePath: file.absolutePath,
+                relativePath: file.relativePath,
+                force: false,
+                kind: 'all'
+              }
+            : null)
           : null,
         refreshedIndexedRow,
         relativePath: file.relativePath
@@ -1529,15 +1531,17 @@ class ScannerService {
 
       return {
         status: existing ? 'updated' : 'new',
-        derivativeJob: {
-          absolutePath: file.absolutePath,
-          relativePath: file.relativePath,
-          force: existing ? true : options.forceNewFileDerivatives,
-          kind: 'all'
-        },
-      refreshedIndexedRow: false,
-      relativePath: file.relativePath
-    };
+        derivativeJob: appConfig.derivativeMode === 'lazy'
+          ? null
+          : {
+              absolutePath: file.absolutePath,
+              relativePath: file.relativePath,
+              force: existing ? true : options.forceNewFileDerivatives,
+              kind: 'all'
+            },
+        refreshedIndexedRow: false,
+        relativePath: file.relativePath
+      };
   }
 }
 

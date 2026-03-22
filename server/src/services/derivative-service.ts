@@ -18,9 +18,10 @@ import {
 import { safeJoin } from '../utils/path-utils.js';
 
 const execFileAsync = promisify(execFile);
-const DIRECT_VIDEO_PLAYBACK_MAX_FILE_SIZE_BYTES = 24 * 1024 * 1024;
 const DIRECT_VIDEO_PLAYBACK_ALLOWED_AUDIO_CODECS = new Set(['aac']);
 const DIRECT_VIDEO_PLAYBACK_ALLOWED_PIXEL_FORMATS = new Set(['yuv420p']);
+export const VIDEO_PREVIEW_MAX_LONG_EDGE = 1280;
+export const VIDEO_PREVIEW_MAX_SHORT_EDGE = 720;
 
 interface FfprobeStream {
   codec_type?: string;
@@ -112,17 +113,6 @@ async function readVideoProbe(sourcePath: string): Promise<FfprobePayload> {
   return JSON.parse(stdout) as FfprobePayload;
 }
 
-async function removeFileIfPresent(filePath: string): Promise<void> {
-  try {
-    await fs.unlink(filePath);
-  } catch (error) {
-    const fileError = error as NodeJS.ErrnoException;
-    if (fileError.code !== 'ENOENT') {
-      throw error;
-    }
-  }
-}
-
 async function readImageMetadata(sourcePath: string): Promise<MediaMetadata> {
   const [metadata, imageExif] = await Promise.all([
     sharp(sourcePath, { animated: false }).metadata(),
@@ -143,9 +133,7 @@ async function readImageMetadata(sourcePath: string): Promise<MediaMetadata> {
 
 async function resolveVideoPlaybackStrategy(
   sourcePath: string,
-  payload: FfprobePayload,
-  width: number,
-  fileSize?: number
+  payload: FfprobePayload
 ): Promise<PlaybackStrategy> {
   if (path.extname(sourcePath).toLowerCase() !== '.mp4') {
     return 'preview';
@@ -154,7 +142,6 @@ async function resolveVideoPlaybackStrategy(
   const videoStream = payload.streams?.find((stream) => stream.codec_type === 'video');
   const audioStream = payload.streams?.find((stream) => stream.codec_type === 'audio');
   const formatName = payload.format?.format_name?.toLowerCase() ?? '';
-  const effectiveFileSize = typeof fileSize === 'number' ? fileSize : (await fs.stat(sourcePath)).size;
 
   if (!videoStream) {
     return 'preview';
@@ -164,15 +151,11 @@ async function resolveVideoPlaybackStrategy(
   const hasCompatibleVideoCodec = videoStream.codec_name === 'h264';
   const hasCompatiblePixelFormat = DIRECT_VIDEO_PLAYBACK_ALLOWED_PIXEL_FORMATS.has(videoStream.pix_fmt ?? '');
   const hasCompatibleAudioCodec = !audioStream || DIRECT_VIDEO_PLAYBACK_ALLOWED_AUDIO_CODECS.has(audioStream.codec_name ?? '');
-  const isWithinSizeBudget = effectiveFileSize <= DIRECT_VIDEO_PLAYBACK_MAX_FILE_SIZE_BYTES;
-  const isWithinResolutionBudget = width > 0 && width <= PREVIEW_MAX_WIDTH;
 
   return hasCompatibleContainer &&
     hasCompatibleVideoCodec &&
     hasCompatiblePixelFormat &&
-    hasCompatibleAudioCodec &&
-    isWithinSizeBudget &&
-    isWithinResolutionBudget
+    hasCompatibleAudioCodec
     ? 'original'
     : 'preview';
 }
@@ -183,7 +166,6 @@ async function readVideoMetadata(sourcePath: string, options: ReadMediaMetadataO
   const durationSeconds = payload.format?.duration ? Number.parseFloat(payload.format.duration) : Number.NaN;
   const durationMs = Number.isFinite(durationSeconds) ? Math.round(durationSeconds * 1000) : null;
   const takenAt = normalizeTakenAtValue(videoStream?.tags?.creation_time ?? payload.format?.tags?.creation_time ?? null);
-  const playbackWidth = videoStream?.width ?? 0;
   const width = videoStream?.width ?? THUMBNAIL_SIZE;
 
   return {
@@ -193,7 +175,7 @@ async function readVideoMetadata(sourcePath: string, options: ReadMediaMetadataO
     exif: null,
     durationMs,
     mediaType: 'video',
-    playbackStrategy: await resolveVideoPlaybackStrategy(sourcePath, payload, playbackWidth, options.fileSize),
+    playbackStrategy: await resolveVideoPlaybackStrategy(sourcePath, payload),
     isAnimated: false
   };
 }
@@ -218,7 +200,7 @@ async function writeImageThumbnail(sourcePath: string, thumbnailAbsolutePath: st
     .toFile(thumbnailAbsolutePath);
 }
 
-async function writeImagePreview(sourcePath: string, previewAbsolutePath: string): Promise<void> {
+export async function writeImagePreview(sourcePath: string, previewAbsolutePath: string): Promise<void> {
   await ensureParentDirectory(previewAbsolutePath);
   await sharp(sourcePath, { animated: true })
     .rotate()
@@ -252,8 +234,15 @@ async function writeVideoThumbnail(sourcePath: string, thumbnailAbsolutePath: st
   ]);
 }
 
-async function writeVideoPreview(sourcePath: string, previewAbsolutePath: string): Promise<void> {
+export async function writeVideoPreview(sourcePath: string, previewAbsolutePath: string): Promise<void> {
   await ensureParentDirectory(previewAbsolutePath);
+  // Landscape videos target up to 1280x720. Portrait and square videos cap their
+  // short edge at 720 while preserving aspect ratio. Output dimensions are rounded
+  // to even numbers for yuv420p compatibility.
+  const scaleFilter =
+    `scale=` +
+    `'trunc(if(gt(iw,ih),min(${VIDEO_PREVIEW_MAX_LONG_EDGE},iw),min(${VIDEO_PREVIEW_MAX_SHORT_EDGE},iw))/2)*2':` +
+    `'trunc(if(gt(iw,ih),min(${VIDEO_PREVIEW_MAX_LONG_EDGE},iw)*ih/iw,min(${VIDEO_PREVIEW_MAX_SHORT_EDGE},iw)*ih/iw)/2)*2':flags=lanczos`;
   await runBinary('ffmpeg', [
     '-y',
     '-v',
@@ -265,7 +254,7 @@ async function writeVideoPreview(sourcePath: string, previewAbsolutePath: string
     '-map',
     '0:a?',
     '-vf',
-    `scale='min(${PREVIEW_MAX_WIDTH},iw)':-2:flags=lanczos`,
+    scaleFilter,
     '-c:v',
     'libx264',
     '-preset',
@@ -311,18 +300,13 @@ async function generateVideoDerivatives(
   sourcePath: string,
   thumbnailAbsolutePath: string,
   previewAbsolutePath: string,
-  playbackStrategy: PlaybackStrategy,
   force: boolean
 ): Promise<Pick<DerivativeResult, 'generatedThumbnail' | 'generatedPreview'>> {
   const shouldWriteThumbnail = force || !(await fileExists(thumbnailAbsolutePath));
-  const shouldWritePreview = playbackStrategy === 'preview' && (force || !(await fileExists(previewAbsolutePath)));
+  const shouldWritePreview = force || !(await fileExists(previewAbsolutePath));
 
   if (shouldWriteThumbnail) {
     await writeVideoThumbnail(sourcePath, thumbnailAbsolutePath);
-  }
-
-  if (playbackStrategy === 'original') {
-    await removeFileIfPresent(previewAbsolutePath);
   }
 
   if (shouldWritePreview) {
@@ -368,7 +352,7 @@ export async function generateDerivatives(sourcePath: string, relativePath: stri
   const metadata = await readMediaMetadata(sourcePath, mediaType);
   const generated =
     mediaType === 'video'
-      ? await generateVideoDerivatives(sourcePath, thumbnailAbsolutePath, previewAbsolutePath, metadata.playbackStrategy, force)
+      ? await generateVideoDerivatives(sourcePath, thumbnailAbsolutePath, previewAbsolutePath, force)
       : await generateImageDerivatives(sourcePath, thumbnailAbsolutePath, previewAbsolutePath, force);
 
   return {

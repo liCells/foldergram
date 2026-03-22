@@ -1,0 +1,206 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
+import express from 'express';
+import pLimit from 'p-limit';
+
+import { appConfig } from '../config/env.js';
+import { imageRepository } from '../db/repositories.js';
+import { log } from '../services/log-service.js';
+import { generateThumbnailDerivative, writeImagePreview, writeVideoPreview } from '../services/derivative-service.js';
+import { getMediaTypeFromExtension } from '../utils/image-utils.js';
+import { applyDerivativeErrorHeaders, applyProtectedMediaHeaders } from '../utils/media-response.js';
+import { normalizePath, safeJoin } from '../utils/path-utils.js';
+
+// In-memory map to deduplicate concurrent generation requests for the same derivative path.
+const inflightGenerations = new Map<string, Promise<void>>();
+const generationLimit = pLimit(appConfig.scanDerivativeConcurrency);
+
+type SendDerivativeResult = 'sent' | 'aborted';
+
+function getRequestedPath(request: express.Request): string | null {
+  const rawPath = request.params.path;
+  const relativePath = Array.isArray(rawPath) ? rawPath.join('/') : rawPath ?? '';
+  const normalizedPath = normalizePath(relativePath).replace(/^\/+/, '');
+
+  return normalizedPath.length > 0 ? normalizedPath : null;
+}
+
+function resolveDerivativePath(rootDir: string, requestedPath: string): string | null {
+  try {
+    return safeJoin(rootDir, requestedPath);
+  } catch {
+    return null;
+  }
+}
+
+function isConnectionTerminationError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const code = 'code' in error ? error.code : null;
+  return code === 'ECONNABORTED' || code === 'ECONNRESET' || code === 'ERR_STREAM_PREMATURE_CLOSE';
+}
+
+function sendDerivativeFile(response: express.Response, absolutePath: string): Promise<SendDerivativeResult> {
+  applyProtectedMediaHeaders(response);
+
+  return new Promise((resolve, reject) => {
+    response.sendFile(absolutePath, (error) => {
+      if (error) {
+        if (response.headersSent || isConnectionTerminationError(error)) {
+          resolve('aborted');
+          return;
+        }
+
+        reject(error);
+        return;
+      }
+
+      resolve('sent');
+    });
+  });
+}
+
+async function serveOrGenerate(
+  request: express.Request,
+  response: express.Response,
+  rootDir: string,
+  kind: 'thumbnail' | 'preview'
+): Promise<void> {
+  const requestedPath = getRequestedPath(request);
+  if (!requestedPath) {
+    applyDerivativeErrorHeaders(response);
+    response.status(400).json({ message: 'Invalid derivative path.' });
+    return;
+  }
+
+  const absoluteOutputPath = resolveDerivativePath(rootDir, requestedPath);
+  if (!absoluteOutputPath) {
+    applyDerivativeErrorHeaders(response);
+    response.status(400).json({ message: 'Invalid derivative path.' });
+    return;
+  }
+
+  // Fast path: file already exists.
+  try {
+    await fs.access(absoluteOutputPath);
+    try {
+      const result = await sendDerivativeFile(response, absoluteOutputPath);
+      if (result === 'aborted') {
+        return;
+      }
+    } catch {
+      if (response.headersSent) {
+        return;
+      }
+
+      applyDerivativeErrorHeaders(response);
+      response.status(500).json({ message: 'Failed to serve derivative.' });
+    }
+    return;
+  } catch {
+    // File does not exist — fall through to generation.
+  }
+
+  // Look up the source row by derivative path.
+  const imageRecord =
+    kind === 'thumbnail'
+      ? imageRepository.getByThumbnailPath(requestedPath)
+      : imageRepository.getByPreviewPath(requestedPath);
+
+  if (!imageRecord) {
+    applyDerivativeErrorHeaders(response);
+    response.status(404).json({ message: 'Derivative not found.' });
+    return;
+  }
+
+  const mediaType = getMediaTypeFromExtension(path.extname(imageRecord.relative_path));
+  let generationPromise = inflightGenerations.get(absoluteOutputPath);
+
+  if (!generationPromise) {
+    log.info('Lazy derivative generate', {
+      kind,
+      file: requestedPath,
+      source: imageRecord.relative_path
+    });
+
+    generationPromise = generationLimit(async () => {
+      try {
+        if (kind === 'thumbnail') {
+          await generateThumbnailDerivative(imageRecord.absolute_path, imageRecord.relative_path, false);
+          return;
+        }
+
+        if (mediaType === 'video') {
+          const previewAbsolutePath = resolveDerivativePath(appConfig.previewsDir, requestedPath);
+          if (!previewAbsolutePath) {
+            throw new Error('Invalid derivative path.');
+          }
+
+          await writeVideoPreview(imageRecord.absolute_path, previewAbsolutePath);
+          return;
+        }
+
+        const previewAbsolutePath = resolveDerivativePath(appConfig.previewsDir, requestedPath);
+        if (!previewAbsolutePath) {
+          throw new Error('Invalid derivative path.');
+        }
+
+        await writeImagePreview(imageRecord.absolute_path, previewAbsolutePath);
+      } finally {
+        inflightGenerations.delete(absoluteOutputPath);
+      }
+    });
+
+    inflightGenerations.set(absoluteOutputPath, generationPromise);
+  }
+
+  const queuedGeneration = generationPromise;
+  if (!queuedGeneration) {
+    applyDerivativeErrorHeaders(response);
+    response.status(500).json({ message: 'Failed to queue derivative generation.' });
+    return;
+  }
+
+  try {
+    await queuedGeneration;
+  } catch (error) {
+    if (response.headersSent) {
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : 'Failed to generate derivative.';
+    applyDerivativeErrorHeaders(response);
+    response.status(500).json({ message });
+    return;
+  }
+
+  try {
+    const result = await sendDerivativeFile(response, absoluteOutputPath);
+    if (result === 'aborted') {
+      return;
+    }
+  } catch {
+    if (response.headersSent) {
+      return;
+    }
+
+    applyDerivativeErrorHeaders(response);
+    response.status(500).json({ message: 'Failed to serve derivative.' });
+  }
+}
+
+const lazyThumbnailsRouter = express.Router();
+const lazyPreviewsRouter = express.Router();
+
+lazyThumbnailsRouter.get('/*path', async (request, response) => {
+  await serveOrGenerate(request, response, appConfig.thumbnailsDir, 'thumbnail');
+});
+
+lazyPreviewsRouter.get('/*path', async (request, response) => {
+  await serveOrGenerate(request, response, appConfig.previewsDir, 'preview');
+});
+
+export { lazyThumbnailsRouter, lazyPreviewsRouter };

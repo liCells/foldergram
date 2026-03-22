@@ -12,8 +12,8 @@ All documented routes come from `server/src/routes/api.ts`.
 | Base path | Purpose |
 | --- | --- |
 | `/api` | JSON API |
-| `/thumbnails` | Static thumbnail derivatives |
-| `/previews` | Static preview derivatives |
+| `/thumbnails` | Protected thumbnail derivatives, served from cache or generated on demand in lazy mode |
+| `/previews` | Protected preview derivatives, served from cache or generated on demand in lazy mode |
 
 ## Authentication and protected routes
 
@@ -62,7 +62,7 @@ The shipped frontend adds `x-foldergram-intent: 1` automatically for `POST`,
 | `400` | Validation or request-shape errors surfaced through the Express error handler. |
 | `403` | Missing intent header, failed local-origin check, or a viewer session hitting an admin-only route. |
 | `404` | Missing folder, post, moment, or original media. |
-| `409` | A scan or thumbnail rebuild was requested while the library requires a full rebuild after a gallery-root change. |
+| `409` | A scan or thumbnail rebuild was requested while the library requires a library-index rebuild after a gallery-root change. |
 
 ## Read endpoints
 
@@ -135,7 +135,7 @@ Notes:
 
 - `items` contain both images and videos.
 - `thumbnailUrl` points to `/thumbnails/...`.
-- `previewUrl` points to `/previews/...` unless a video is served directly from its original file.
+- `previewUrl` points to `/previews/...`.
 
 ### `GET /api/feed/moments`
 
@@ -275,11 +275,18 @@ Returns one post detail payload with:
 - `mimeType`
 - `fileSize`
 - `originalUrl`
+- `playbackStrategy` for videos when an original MP4 is browser-compatible
 - `nextImageId`
 - `previousImageId`
 
 `nextImageId` and `previousImageId` are resolved within the same folder and the
 same active `mediaType` filter when one is supplied.
+
+Detail media rules:
+
+- if `IMAGE_DETAIL_SOURCE=original` and the item is an image, `previewUrl` points to `/api/originals/:id`
+- videos keep `previewUrl` on `/previews/...`
+- compatible original MP4 videos can set `playbackStrategy: "original"` so the client can expose an optional original-quality switch
 
 Errors:
 
@@ -329,8 +336,8 @@ additional fields below:
 | Field | Notes |
 | --- | --- |
 | `deletedImages` | Soft-deleted post count. |
-| `thumbnailCount` | Active posts with a thumbnail path. |
-| `previewCount` | Active items with a preview output. Videos served directly from originals are excluded here. |
+| `thumbnailCount` | Actual generated thumbnail files currently present on disk. |
+| `previewCount` | Actual generated preview files currently present on disk. |
 | `storage.usingInMemoryDatabase` | Whether SQLite had to fall back to in-memory mode. |
 | `libraryIndex.currentGalleryRoot` | Current configured gallery root. |
 | `libraryIndex.previousGalleryRoot` | Prior configured gallery root when the root changed. |
@@ -637,6 +644,10 @@ Errors:
 Stops the watcher, clears the indexed library tables, rescans the current
 gallery root, and then restarts the watcher.
 
+Matching cached derivatives already on disk are left in place and can be reused.
+In `DERIVATIVE_MODE=lazy`, this rebuild does not pre-generate missing thumbnails
+or previews.
+
 This resets:
 
 - `likes`
@@ -659,7 +670,7 @@ It does **not** reset:
 
 Errors:
 
-- `409` with the library-rebuild-required message when a full rebuild is required
+- `409` with the library-rebuild-required message when a library-index rebuild is required
 - `403` for viewer sessions
 
 ## Client helpers

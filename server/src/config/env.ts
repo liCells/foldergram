@@ -26,6 +26,8 @@ const envSchema = z.object({
   SCAN_DERIVATIVE_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
   PUBLIC_DEMO_MODE: z.string().optional(),
   CSRF_TRUSTED_ORIGINS: z.string().optional(),
+  IMAGE_DETAIL_SOURCE: z.enum(['preview', 'original']).default('preview'),
+  DERIVATIVE_MODE: z.enum(['eager', 'lazy']).default('eager'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development')
 });
 
@@ -135,5 +137,7 @@ export const appConfig = {
   csrfTrustedOrigins,
   scanDiscoveryConcurrency: parsed.SCAN_DISCOVERY_CONCURRENCY,
   scanDerivativeConcurrency: parsed.SCAN_DERIVATIVE_CONCURRENCY,
-  databasePath: path.join(dbDir, 'gallery.sqlite')
+  databasePath: path.join(dbDir, 'gallery.sqlite'),
+  imageDetailSource: parsed.IMAGE_DETAIL_SOURCE,
+  derivativeMode: parsed.DERIVATIVE_MODE
 };
