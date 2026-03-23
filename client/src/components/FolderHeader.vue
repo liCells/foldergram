@@ -28,7 +28,7 @@
           v-if="authStore.canManageLibrary"
           type="button"
           class="inline-flex items-center justify-center px-4 pt-2 pb-1.5 text-[0.75rem] font-semibold leading-none rounded-lg bg-surface-hover text-text hover:bg-border transition-colors border border-border cursor-pointer"
-          @click="isEditingProfile = true"
+          @click="openProfileEditor"
         >
           Edit App Folder
         </button>
@@ -53,8 +53,9 @@
         v-if="isEditingProfile"
         :initial-name="folder.name"
         :initial-description="folder.description"
+        :error="profileError"
         :loading="savingProfile"
-        @cancel="isEditingProfile = false"
+        @cancel="closeProfileEditor"
         @save="handleSaveProfile"
       />
     </Teleport>
@@ -82,6 +83,7 @@ const route = useRoute();
 
 const isEditingProfile = ref(false);
 const savingProfile = ref(false);
+const profileError = ref<string | null>(null);
 
 const formattedUpdatedDate = computed(() =>
   props.folder.latestImageMtimeMs
@@ -96,13 +98,24 @@ const formattedUpdatedDate = computed(() =>
 async function handleSaveProfile(data: { name: string; description: string | null }) {
   try {
     savingProfile.value = true;
+    profileError.value = null;
     await foldersStore.updateFolderProfile(props.folder.slug, data.name, data.description);
-    isEditingProfile.value = false;
+    closeProfileEditor();
   } catch (error) {
-    alert(error instanceof Error ? error.message : 'Failed to update profile');
+    profileError.value = error instanceof Error ? error.message : 'Failed to update profile';
   } finally {
     savingProfile.value = false;
   }
+}
+
+function openProfileEditor() {
+  profileError.value = null;
+  isEditingProfile.value = true;
+}
+
+function closeProfileEditor() {
+  profileError.value = null;
+  isEditingProfile.value = false;
 }
 
 function buildAvatarRoute(id: number) {

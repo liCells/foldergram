@@ -32,7 +32,12 @@
             ></textarea>
           </div>
 
-          <p v-if="error" class="m-0 text-[0.85rem] text-[#d93025]">{{ error }}</p>
+          <p
+            v-if="errorMessage"
+            class="m-0 rounded-[0.95rem] border border-[rgba(214,48,49,0.24)] bg-[rgba(214,48,49,0.08)] px-4 py-3 text-[0.88rem] text-[#c0392b]"
+          >
+            {{ errorMessage }}
+          </p>
 
           <div class="flex justify-end gap-3 mt-2">
             <button class="min-h-[2.5rem] px-4 py-[0.6rem] border border-transparent rounded-[0.75rem] font-semibold cursor-pointer bg-surface-hover text-text disabled:opacity-70 disabled:cursor-wait" type="button" @click="$emit('cancel')">
@@ -49,11 +54,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 const props = defineProps<{
   initialName: string;
   initialDescription: string | null;
+  error?: string | null;
   loading?: boolean;
 }>();
 
@@ -63,20 +69,22 @@ const emit = defineEmits<{
 }>();
 
 const titleId = `profile-dialog-title-${Math.random().toString(36).slice(2, 10)}`;
-const error = ref<string | null>(null);
+const validationError = ref<string | null>(null);
 
 const formData = reactive({
   name: props.initialName,
   description: props.initialDescription ?? ''
 });
 
+const errorMessage = computed(() => validationError.value ?? props.error ?? null);
+
 function submit() {
   if (!formData.name.trim()) {
-    error.value = 'Name is required.';
+    validationError.value = 'Name is required.';
     return;
   }
 
-  error.value = null;
+  validationError.value = null;
   emit('save', {
     name: formData.name.trim(),
     description: formData.description.trim() || null
