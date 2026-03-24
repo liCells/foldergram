@@ -6,7 +6,7 @@ type HeaderResponse = {
 
 export function applyProtectedMediaHeaders(response: HeaderResponse): void {
   if (authService.isEnabled()) {
-    response.setHeader('Cache-Control', 'private, no-store');
+    response.setHeader('Cache-Control', 'private, max-age=604800, immutable');
     response.setHeader('Vary', 'Cookie');
     return;
   }

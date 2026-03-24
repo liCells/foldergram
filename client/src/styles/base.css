@@ -173,8 +173,7 @@ img[data-loaded="true"] {
 }
 
 .viewer__media img,
-.viewer__media video,
-.viewer__media :deep(img) {
+.viewer__media video {
   max-height: 100%;
   max-width: 100%;
   width: auto;
@@ -564,5 +563,4 @@ img[data-loaded="true"] {
     opacity: 0.92;
   }
 }
-
 

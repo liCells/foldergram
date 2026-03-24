@@ -83,7 +83,7 @@ function getDefaultHomeFeedMode(): FeedMode {
   return parseFeedMode(appSettingsRepository.get(HOME_FEED_DEFAULT_MODE_SETTING_KEY));
 }
 
-function getThumbnailAssetVersion(): string | null {
+function getDerivativeAssetVersion(): string | null {
   const lastCompletedScanId = scanRunRepository.latestCompleted()?.id ?? null;
   return lastCompletedScanId === null ? null : String(lastCompletedScanId);
 }
@@ -107,13 +107,14 @@ function buildPreviewUrl(
     mediaType: MediaType;
     previewUrl: string;
   },
-  useOriginalForImages = false
+  useOriginalForImages = false,
+  version?: string | null
 ): string {
   if (useOriginalForImages && image.mediaType === 'image') {
     return buildOriginalUrl(image.id);
   }
 
-  return toPublicMediaUrl('/previews', image.previewUrl);
+  return toPublicMediaUrl('/previews', image.previewUrl, version);
 }
 
 function resolveWithinRoot(rootPath: string, targetPath: string): string | null {
@@ -205,22 +206,22 @@ function isSameOrDescendantFolderPath(rootFolderPath: string, candidateFolderPat
   return candidateFolderPath === rootFolderPath || candidateFolderPath.startsWith(`${rootFolderPath}/`);
 }
 
-function mapFeedImage(image: IndexedFeedImage, thumbnailVersion = getThumbnailAssetVersion()): FeedImage {
+function mapFeedImage(image: IndexedFeedImage, derivativeVersion = getDerivativeAssetVersion()): FeedImage {
   const { playbackStrategy, ...rest } = image;
   return {
     ...rest,
     isAnimated: Boolean(rest.isAnimated),
     folderBreadcrumb: getPathBreadcrumb(rest.folderPath),
-    thumbnailUrl: toPublicMediaUrl('/thumbnails', rest.thumbnailUrl, thumbnailVersion),
+    thumbnailUrl: toPublicMediaUrl('/thumbnails', rest.thumbnailUrl, derivativeVersion),
     previewUrl: buildPreviewUrl({
       id: rest.id,
       mediaType: rest.mediaType,
       previewUrl: rest.previewUrl
-    })
+    }, false, derivativeVersion)
   };
 }
 
-function mapImageDetail(image: IndexedImageDetail, thumbnailVersion = getThumbnailAssetVersion()): ImageDetail {
+function mapImageDetail(image: IndexedImageDetail, derivativeVersion = getDerivativeAssetVersion()): ImageDetail {
   const { playbackStrategy, exifJson, ...rest } = image;
   const useOriginalForImages = appConfig.imageDetailSource === 'original';
   return {
@@ -228,34 +229,34 @@ function mapImageDetail(image: IndexedImageDetail, thumbnailVersion = getThumbna
     isAnimated: Boolean(rest.isAnimated),
     exif: deserializeImageExifData(exifJson),
     folderBreadcrumb: getPathBreadcrumb(rest.folderPath),
-    thumbnailUrl: toPublicMediaUrl('/thumbnails', rest.thumbnailUrl, thumbnailVersion),
+    thumbnailUrl: toPublicMediaUrl('/thumbnails', rest.thumbnailUrl, derivativeVersion),
     previewUrl: buildPreviewUrl({
       id: rest.id,
       mediaType: rest.mediaType,
       previewUrl: rest.previewUrl
-    }, useOriginalForImages),
+    }, useOriginalForImages, derivativeVersion),
     originalUrl: buildOriginalUrl(rest.id),
     playbackStrategy
   };
 }
 
-function mapTrashImage(image: IndexedTrashImage, thumbnailVersion = getThumbnailAssetVersion()): TrashImage {
+function mapTrashImage(image: IndexedTrashImage, derivativeVersion = getDerivativeAssetVersion()): TrashImage {
   const { playbackStrategy, ...rest } = image;
   return {
     ...rest,
     isAnimated: Boolean(rest.isAnimated),
     folderBreadcrumb: getPathBreadcrumb(rest.folderPath),
-    thumbnailUrl: toPublicMediaUrl('/thumbnails', rest.thumbnailUrl, thumbnailVersion),
+    thumbnailUrl: toPublicMediaUrl('/thumbnails', rest.thumbnailUrl, derivativeVersion),
     previewUrl: buildPreviewUrl({
       id: rest.id,
       mediaType: rest.mediaType,
       previewUrl: rest.previewUrl
-    })
+    }, false, derivativeVersion)
   };
 }
 
 function buildFolderSummary(folder: FolderSummaryRecord) {
-  const thumbnailVersion = getThumbnailAssetVersion();
+  const derivativeVersion = getDerivativeAssetVersion();
   const preferredAvatarImageId = folder.avatar_image_id ?? imageRepository.getLatestFolderImageId(folder.id);
   let avatar = preferredAvatarImageId ? imageRepository.getImageDetail(preferredAvatarImageId, undefined, true) : undefined;
 
@@ -275,7 +276,7 @@ function buildFolderSummary(folder: FolderSummaryRecord) {
     videoCount: folder.video_count,
     latestImageMtimeMs: folder.latest_image_mtime_ms,
     avatarImageId: avatar?.id ?? null,
-    avatarUrl: avatar ? mapImageDetail(avatar, thumbnailVersion).thumbnailUrl : null
+    avatarUrl: avatar ? mapImageDetail(avatar, derivativeVersion).thumbnailUrl : null
   };
 }
 
@@ -306,8 +307,8 @@ function formatMonthYear(date: Date): string {
   return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date);
 }
 
-function mapFeedItems(items: IndexedFeedImage[], thumbnailVersion = getThumbnailAssetVersion()): FeedImage[] {
-  return items.map((item) => mapFeedImage(item, thumbnailVersion));
+function mapFeedItems(items: IndexedFeedImage[], derivativeVersion = getDerivativeAssetVersion()): FeedImage[] {
+  return items.map((item) => mapFeedImage(item, derivativeVersion));
 }
 
 function buildPaginatedPayload(items: FeedImage[], page: number, limit: number, total: number) {
@@ -560,7 +561,7 @@ function buildHighlightRailDefinition(now = new Date()): FeedRailDefinition {
 
 function materializeRailDefinition(definition: FeedRailDefinition) {
   const usedCoverImageIds = new Set<number>();
-  const thumbnailVersion = getThumbnailAssetVersion();
+  const derivativeVersion = getDerivativeAssetVersion();
 
   return {
     ...definition,
@@ -585,7 +586,7 @@ function materializeRailDefinition(definition: FeedRailDefinition) {
           subtitle: capsule.subtitle,
           dateContext: capsule.dateContext,
           imageCount,
-          coverImage: mapFeedImage(coverImage, thumbnailVersion)
+          coverImage: mapFeedImage(coverImage, derivativeVersion)
         };
       })
       .filter((capsule): capsule is NonNullable<typeof capsule> => capsule !== null)
@@ -777,11 +778,11 @@ export const galleryService = {
     }
 
     const total = mediaType ? imageRepository.countVisibleByFolder(folder.id, mediaType) : folder.image_count;
-    const thumbnailVersion = getThumbnailAssetVersion();
+    const derivativeVersion = getDerivativeAssetVersion();
 
     return {
       folder: buildFolderSummary(folder),
-      items: imageRepository.listFolderImages(folder.id, page, limit, mediaType).map((image) => mapFeedImage(image, thumbnailVersion)),
+      items: imageRepository.listFolderImages(folder.id, page, limit, mediaType).map((image) => mapFeedImage(image, derivativeVersion)),
       page,
       limit,
       total,
@@ -806,7 +807,7 @@ export const galleryService = {
       return null;
     }
 
-    return mapImageDetail(detail, getThumbnailAssetVersion());
+    return mapImageDetail(detail, getDerivativeAssetVersion());
   },
 
   getTrashImages(page: number, limit: number) {
@@ -821,8 +822,8 @@ export const galleryService = {
     }
 
     const total = imageRepository.countTrashed();
-    const thumbnailVersion = getThumbnailAssetVersion();
-    const items = imageRepository.listTrashed(page, limit).map((image) => mapTrashImage(image as IndexedTrashImage, thumbnailVersion));
+    const derivativeVersion = getDerivativeAssetVersion();
+    const items = imageRepository.listTrashed(page, limit).map((image) => mapTrashImage(image as IndexedTrashImage, derivativeVersion));
 
     return buildTrashPaginatedPayload(items, page, limit, total);
   },

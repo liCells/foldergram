@@ -172,7 +172,7 @@ describe.sequential('thumbnail-only rebuild', () => {
       .getFeed(1, 10, 'recent')
       .items.find((item) => item.id === indexed.images[0]?.id);
     expect(refreshedFeedItem?.thumbnailUrl).toContain(`?v=${lastScan?.id}`);
-    expect(refreshedFeedItem?.previewUrl.includes('?')).toBe(false);
+    expect(refreshedFeedItem?.previewUrl).toContain(`?v=${lastScan?.id}`);
   });
 
   it('reports missing indexed source files without deleting previews or indexed rows', async () => {

@@ -1,8 +1,12 @@
 <div align="center">
 
-<img src="client/public/github_banner.png" alt="Foldergram" />
+<a href="https://foldergram.intentdeep.com/">
+  <img src="client/public/github_banner.png" alt="Foldergram" />
+</a>
 <br /><br />
-<img src="client/public/favicon.svg" width="80" alt="Foldergram Logo" />
+<a href="https://foldergram.intentdeep.com/">
+  <img src="client/public/favicon.svg" width="80" alt="Foldergram Logo" />
+</a>
 
 # Foldergram
 

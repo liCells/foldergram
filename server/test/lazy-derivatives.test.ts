@@ -14,6 +14,7 @@ import {
 } from '../src/utils/image-utils.js';
 
 type AppConfigModule = typeof import('../src/config/env.js');
+type AuthServiceModule = typeof import('../src/services/auth-service.js');
 type LazyRoutesModule = typeof import('../src/routes/lazy-derivatives.js');
 type ScannerServiceModule = typeof import('../src/services/scanner-service.js');
 type RepositoriesModule = typeof import('../src/db/repositories.js');
@@ -31,6 +32,7 @@ const writeVideoPreviewMock = vi.fn();
 describe.sequential('DERIVATIVE_MODE lazy behavior', () => {
   let tempRoot = '';
   let appConfig: AppConfigModule['appConfig'];
+  let authService: AuthServiceModule['authService'];
   let lazyThumbnailsRouter: LazyRoutesModule['lazyThumbnailsRouter'];
   let lazyPreviewsRouter: LazyRoutesModule['lazyPreviewsRouter'];
   let scannerService: ScannerServiceModule['scannerService'];
@@ -67,6 +69,7 @@ describe.sequential('DERIVATIVE_MODE lazy behavior', () => {
     vi.stubEnv('SCAN_DERIVATIVE_CONCURRENCY', String(scanDerivativeConcurrency));
 
     ({ appConfig } = await import('../src/config/env.js'));
+    ({ authService } = await import('../src/services/auth-service.js'));
     ({ lazyThumbnailsRouter, lazyPreviewsRouter } = await import('../src/routes/lazy-derivatives.js'));
     ({ scannerService } = await import('../src/services/scanner-service.js'));
     ({ folderRepository, imageRepository, maintenanceRepository } = await import('../src/db/repositories.js'));
@@ -364,6 +367,21 @@ describe.sequential('DERIVATIVE_MODE lazy behavior', () => {
     expect(secondResponse.statusCode).toBe(200);
     expect(secondResponse.body).toBe(`thumbnail:${image.relative_path}`);
     expect(generateThumbnailDerivativeMock).toHaveBeenCalledOnce();
+  });
+
+  it('uses private browser caching headers for protected derivative responses', async () => {
+    await reset('lazy');
+
+    authService.setAdminPassword('password123');
+    maintenanceRepository.resetLibraryIndex();
+    const folder = folderRepository.upsert({ slug: 'secured', name: 'Secured', folderPath: 'secured' });
+    const image = createIndexedMedia(folder, 'photo.jpg', 2500, 'preview');
+
+    const response = await dispatchRoute(lazyThumbnailsRouter, `/${encodeRelativePath(image.thumbnail_path)}`);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, max-age=604800, immutable');
+    expect(response.headers.get('vary')).toBe('Cookie');
   });
 
   it('generates a missing image preview on first request', async () => {

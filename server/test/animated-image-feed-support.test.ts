@@ -62,7 +62,7 @@ describe.sequential('animated image feed support', () => {
 
     const firstFeedItem = galleryService.getFeed(1, 10, 'recent').items[0];
     expect(firstFeedItem?.isAnimated).toBe(true);
-    expect(firstFeedItem?.previewUrl).toBe('/previews/albums/animated-post.webp');
+    expect(firstFeedItem?.previewUrl).toMatch(/^\/previews\/albums\/animated-post\.webp\?v=\d+$/);
 
     const firstDetail = firstFeedItem ? galleryService.getImageDetail(firstFeedItem.id, 'image') : null;
     expect(firstDetail?.isAnimated).toBe(true);
