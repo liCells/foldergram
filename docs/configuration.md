@@ -17,10 +17,11 @@ yourself.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
+| `NODE_ENV` | `development` | Must be `development`, `test`, or `production`. |
 | `SERVER_PORT` | `4141` | Production Express port. Used by Docker and `pnpm start`. |
 | `DEV_SERVER_PORT` | `4140` | Express server port during `pnpm dev`. |
 | `DEV_CLIENT_PORT` | `4141` | Base Vite dev server port during `pnpm dev`. The client may fall forward through `4144`. The same range is allowed for non-production local-origin mutation checks. |
-| `DATA_ROOT` | `./data` | Base directory used when specific paths are not set. |
+| `DATA_ROOT` | `./data` | Base directory for app-managed storage. Other storage paths default under it unless overridden. |
 | `DATA_DIR` | unset | Optional alias that falls back into `DATA_ROOT` resolution when `DATA_ROOT` is absent. |
 | `GALLERY_ROOT` | `./data/gallery` | Source media root. Foldergram scans below this path. |
 | `DB_DIR` | `./data/db` | SQLite directory. Database file is `gallery.sqlite`. |
@@ -33,7 +34,6 @@ yourself.
 | `SCAN_DERIVATIVE_CONCURRENCY` | `4` | Derivative concurrency, validated from `1` to `32`. |
 | `PUBLIC_DEMO_MODE` | `0` | When enabled, mutating API routes return `403` for read-only demo deployments. |
 | `CSRF_TRUSTED_ORIGINS` | unset | Comma-separated extra browser origins allowed for mutating API requests. Useful behind reverse proxies or HTTPS terminators. |
-| `NODE_ENV` | `development` | Must be `development`, `test`, or `production`. |
 
 ## Access protection configuration
 
@@ -50,6 +50,10 @@ instance, not a multi-user account system.
 
 ## Path resolution rules
 
+- `DATA_ROOT` is the common fallback parent for the app's storage directories.
+- If you set only `DATA_ROOT=/mnt/foldergram`, the default paths become `/mnt/foldergram/gallery`, `/mnt/foldergram/db`, `/mnt/foldergram/thumbnails`, and `/mnt/foldergram/previews`.
+- Setting `GALLERY_ROOT`, `DB_DIR`, `THUMBNAILS_DIR`, or `PREVIEWS_DIR` overrides only that specific path.
+- `DATA_DIR` is a legacy alias. It is used only when `DATA_ROOT` is unset.
 - Relative paths are resolved from the repository root.
 - Absolute paths are used as-is.
 - `THUMBNAILS_DIR` and `PREVIEWS_DIR` must be separate, non-overlapping directories.
@@ -112,13 +116,15 @@ discovery. That prevents generated files from being re-indexed as source media.
 
 ## Recommended local `.env`
 
-`.env.example` intentionally keeps only the development ports. Production
-runtimes still use `SERVER_PORT`, which defaults to `4141` unless you override
-it in Docker Compose or at process start.
+`.env.example` groups the main runtime settings in the same order shown above.
+Production runtimes still use `SERVER_PORT`, which defaults to `4141` unless
+you override it in Docker Compose or at process start.
 
 ```bash
-DEV_CLIENT_PORT=4141
+NODE_ENV=development
+SERVER_PORT=4141
 DEV_SERVER_PORT=4140
+DEV_CLIENT_PORT=4141
 DATA_ROOT=./data
 GALLERY_ROOT=./data/gallery
 DB_DIR=./data/db
@@ -131,7 +137,6 @@ SCAN_DISCOVERY_CONCURRENCY=4
 SCAN_DERIVATIVE_CONCURRENCY=4
 PUBLIC_DEMO_MODE=0
 CSRF_TRUSTED_ORIGINS=
-NODE_ENV=development
 ```
 
 ## Concurrency tuning

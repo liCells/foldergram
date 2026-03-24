@@ -18,7 +18,7 @@
 [![Vue 3](https://img.shields.io/badge/Vue.js-3-4fc08d?style=flat-square&logo=vuedotjs)](https://vuejs.org/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=flat-square)](https://www.gnu.org/licenses/agpl-3.0)
 
-[Live Demo](https://foldergram.intentdeep.com/) • [Features](#features) • [Installation](#installation) • [Configuration](#configuration) • [Tech Stack](#tech-stack)
+[Live Demo](https://foldergram.intentdeep.com/) • [Features](#features) • [Installation](#installation) • [Configuration](#configuration) • [Tech Stack](#tech-stack) • [Contributing](CONTRIBUTING.md)
 
 **Try the public demo:** [foldergram.intentdeep.com](https://foldergram.intentdeep.com/)
 
@@ -211,8 +211,9 @@ data/
 
 | Variable                      | Default             | Description                                                               |
 | ----------------------------- | ------------------- | ------------------------------------------------------------------------- |
+| `NODE_ENV`                    | `development`       | Runtime mode.                                                             |
 | `SERVER_PORT`                 | `4141`              | Production Express port.                                                  |
-| `DEV_SERVER_PORT`             | `4140`              | Express server port during for Development `pnpm dev`.                    |
+| `DEV_SERVER_PORT`             | `4140`              | Express server port during `pnpm dev`.                                    |
 | `DEV_CLIENT_PORT`             | `4141`              | Base Vite client port during `pnpm dev`. The client may use up to `4144`. |
 | `DATA_ROOT`                   | `./data`            | Root directory for app-managed storage.                                   |
 | `GALLERY_ROOT`                | `./data/gallery`    | Root directory scanned for App Folders.                                   |
@@ -221,13 +222,21 @@ data/
 | `PREVIEWS_DIR`                | `./data/previews`   | Generated preview output directory.                                       |
 | `IMAGE_DETAIL_SOURCE`         | `preview`           | For image detail pages, use generated previews or stream originals.       |
 | `DERIVATIVE_MODE`             | `eager`             | Generate derivatives during scans or lazily on first request.             |
+| `LOG_VERBOSE`                 | `0`                 | Truthy values are `1`, `true`, `yes`, and `on`.                           |
 | `SCAN_DISCOVERY_CONCURRENCY`  | `4`                 | Folder discovery concurrency.                                             |
 | `SCAN_DERIVATIVE_CONCURRENCY` | `4`                 | Derivative generation concurrency.                                        |
 | `PUBLIC_DEMO_MODE`            | `0`                 | When enabled, all API mutations become read-only and return `403`.        |
 | `CSRF_TRUSTED_ORIGINS`        | empty               | Comma-separated extra browser origins allowed for mutating API requests.  |
-| `NODE_ENV`                    | `development`       | Runtime mode.                                                             |
 
-The shipped `.env.example` only includes the `DEV_*` port values. Docker uses the fixed internal container port `4141`, and other production runtimes continue to use `SERVER_PORT`, which defaults to `4141` in the Docker image.
+`DATA_ROOT` is the base path for the app's local storage layout. If you set
+only `DATA_ROOT`, Foldergram will default the other storage paths to
+`<DATA_ROOT>/gallery`, `<DATA_ROOT>/db`, `<DATA_ROOT>/thumbnails`, and
+`<DATA_ROOT>/previews`. Set `GALLERY_ROOT`, `DB_DIR`, `THUMBNAILS_DIR`, or
+`PREVIEWS_DIR` separately only when you need a non-standard layout.
+
+Docker uses the fixed internal container port `4141`, and other production
+runtimes continue to use `SERVER_PORT`, which defaults to `4141` in the Docker
+image.
 
 For the default Docker Compose setup, runtime variables are defined in
 [`docker-compose.yml`](docker-compose.yml). The source-install `.env` file is
@@ -309,3 +318,11 @@ only needed when the browser-visible origin differs from the upstream Node host 
 - `pnpm start`
 - `pnpm test`
 - `pnpm rescan`
+
+## Contributing
+
+Foldergram welcomes small, clearly aligned pull requests for bug fixes, documentation, tests, and focused polish.
+
+Before working on major features, architectural changes, or changes to core behavior such as scanning, indexing, routing, auth or access flow, and storage strategy, open an issue or discussion first. Pull requests for large changes that were not discussed in advance will not be accepted.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution policy, local setup notes, branch naming guidance, and pull request expectations.

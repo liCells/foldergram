@@ -179,6 +179,10 @@ The shipped `.env.example` points at:
 | `THUMBNAILS_DIR` | `./data/thumbnails` |
 | `PREVIEWS_DIR` | `./data/previews` |
 
+`DATA_ROOT` is the base path for this layout. If you change only `DATA_ROOT`,
+Foldergram will look for `gallery`, `db`, `thumbnails`, and `previews`
+under that directory unless you override those paths individually.
+
 Foldergram resolves relative paths from the repository root.
 
 ## Production behavior
