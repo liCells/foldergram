@@ -1,19 +1,25 @@
 <template>
   <!-- Desktop: fixed sidebar + content with margin-left -->
   <!-- Mobile: no sidebar, TopNav handles nav -->
-  <div class="app-shell flex min-h-screen overflow-x-clip" :class="{ 'app-shell--explore': isExploreShell }">
+  <div
+    class="app-shell flex min-h-screen overflow-x-clip"
+    :class="{
+      'app-shell--explore': isExploreShell,
+      'app-shell--reels': isReelsShell
+    }"
+  >
     <!-- Sidebar: fixed on desktop, hidden on mobile -->
     <SidebarNav class="hidden md:flex fixed top-0 left-0 h-screen z-30" />
     <!-- Content: margin-left matches sidebar width on desktop -->
-    <div class="app-shell__content flex-1 min-w-0 md:ml-[4.85rem]">
+    <div class="app-shell__content flex flex-1 min-h-screen min-w-0 flex-col md:ml-[4.85rem]">
       <TopNav />
       <main
-        class="app-shell__main"
+        class="app-shell__main flex-1 min-h-0"
         :class="[
-          isExploreShell
+          isImmersiveShell
             ? 'px-0 pt-0 pb-0 md:px-0 md:pt-0 md:pb-0'
             : 'px-10 pt-7 pb-16 md:px-[0.9rem] md:pt-4 md:pb-10',
-          showStickyScanStatus ? 'pb-36 md:pb-40' : ''
+          showStickyScanStatus && !isReelsShell ? 'pb-36 md:pb-40' : ''
         ]"
       >
         <slot />
@@ -79,6 +85,8 @@ import type { ScanProgress } from '../types/api';
 const appStore = useAppStore();
 const route = useRoute();
 const isExploreShell = computed(() => route.meta.shell === 'explore');
+const isReelsShell = computed(() => route.meta.shell === 'reels');
+const isImmersiveShell = computed(() => isExploreShell.value || isReelsShell.value);
 const activeScan = computed(() => appStore.stats?.scan ?? null);
 const showStickyScanStatus = computed(() => Boolean(activeScan.value?.isScanning));
 
@@ -172,3 +180,19 @@ const stickyScanMetricLine = computed(() => {
 const stickyScanCurrentFolder = computed(() => activeScan.value?.currentFolder ?? null);
 const stickyScanProgressPercent = computed(() => calculateProgressPercent(activeScan.value));
 </script>
+
+<style scoped>
+.app-shell--reels {
+  height: 100dvh;
+  min-height: 100dvh;
+}
+
+.app-shell--reels .app-shell__content {
+  height: 100dvh;
+  min-height: 100dvh;
+}
+
+.app-shell--reels .app-shell__main {
+  overflow: hidden;
+}
+</style>

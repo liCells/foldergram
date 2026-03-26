@@ -16,6 +16,7 @@ import { buildMonthDayKey, countFeedBursts, diversifyFeedCandidates, groupFeedBu
 import { shouldPreferMomentRail, type FeedRailKind } from '../utils/feed-rail-utils.js';
 import { countSupportedRootMediaFiles } from '../utils/gallery-root-utils.js';
 import { getPathBreadcrumb } from '../utils/path-utils.js';
+import { buildReelQueue, type ReelAffinitySignals } from '../utils/reels-utils.js';
 import { scannerService } from './scanner-service.js';
 import { storageService } from './storage-service.js';
 
@@ -658,6 +659,43 @@ export const galleryService = {
       mode,
       ...buildPaginatedPayload(mapFeedItems(items), page, limit, total)
     };
+  },
+
+  getReels(page: number, limit: number, seed?: number, signals: ReelAffinitySignals = {}) {
+    if (!storageService.getState().libraryAvailable) {
+      return {
+        items: [],
+        page,
+        limit,
+        total: 0,
+        hasMore: false
+      };
+    }
+
+    const candidates = imageRepository.listVisibleVideoCandidates();
+    const total = candidates.length;
+    if (total === 0) {
+      return {
+        items: [],
+        page,
+        limit,
+        total: 0,
+        hasMore: false
+      };
+    }
+
+    const sessionSeed = Number.isFinite(seed)
+      ? Number(seed)
+      : Number(new Date().toISOString().slice(0, 10).replaceAll('-', ''));
+    const orderedCandidates = buildReelQueue(candidates, sessionSeed, signals);
+    const offset = (page - 1) * limit;
+
+    return buildPaginatedPayload(
+      mapFeedItems(orderedCandidates.slice(offset, offset + limit)),
+      page,
+      limit,
+      total
+    );
   },
 
   searchMedia(query: string, page: number, limit: number) {

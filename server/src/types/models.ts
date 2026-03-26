@@ -116,6 +116,10 @@ export interface FeedImage {
   takenAt: number | null;
 }
 
+export interface ReelCandidate extends FeedImage {
+  likedAt: string | null;
+}
+
 export interface ImageDetail extends FeedImage {
   folderAvatarImageId: number | null;
   relativePath: string;

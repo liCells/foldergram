@@ -20,7 +20,9 @@
     "build:client": "node scripts/run-workspace-script.mjs client build",
     "build:docs": "node scripts/run-workspace-script.mjs docs build",
     "rescan": "node scripts/run-workspace-script.mjs server rescan",
-    "test": "node scripts/run-workspace-script.mjs server test"
+    "test": "node scripts/run-workspace-script.mjs server test && node scripts/run-workspace-script.mjs client test",
+    "test:server": "node scripts/run-workspace-script.mjs server test",
+    "test:client": "node scripts/run-workspace-script.mjs client test"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

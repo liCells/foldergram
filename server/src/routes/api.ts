@@ -39,6 +39,11 @@ const feedQuerySchema = paginationQuerySchema.extend({
   mode: z.enum(['recent', 'rediscover', 'random']).default('random'),
   seed: z.coerce.number().int().nonnegative().optional()
 });
+const reelsQuerySchema = paginationQuerySchema.extend({
+  seed: z.coerce.number().int().nonnegative().optional(),
+  lastFolder: z.string().trim().min(1).max(240).optional(),
+  recentFolders: z.string().trim().max(2400).optional()
+});
 const mediaSearchQuerySchema = paginationQuerySchema.extend({
   q: z.string().trim().min(1).max(160)
 });
@@ -280,6 +285,23 @@ router.put('/auth/viewer-access', authRateLimiter, (request, response) => {
 router.get('/feed', (request, response) => {
   const query = feedQuerySchema.parse(request.query);
   response.json(galleryService.getFeed(query.page, query.limit, query.mode, query.seed));
+});
+
+router.get('/reels', (request, response) => {
+  const query = reelsQuerySchema.parse(request.query);
+  const recentOpenedFolderSlugs = query.recentFolders
+    ? query.recentFolders
+        .split(',')
+        .map((slug) => slug.trim())
+        .filter((slug, index, items) => slug.length > 0 && items.indexOf(slug) === index)
+    : [];
+
+  response.json(
+    galleryService.getReels(query.page, query.limit, query.seed, {
+      lastOpenedFolderSlug: query.lastFolder ?? null,
+      recentOpenedFolderSlugs
+    })
+  );
 });
 
 router.get('/feed/search', (request, response) => {

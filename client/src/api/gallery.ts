@@ -39,6 +39,35 @@ export function fetchFeed(page = 1, limit = 24, mode: FeedMode = 'random', seed?
   return requestJson<PaginatedFeed>(`/api/feed?${params.toString()}`);
 }
 
+export function fetchReels(
+  page = 1,
+  limit = 6,
+  seed?: number,
+  options: {
+    lastFolder?: string | null;
+    recentFolders?: string[];
+  } = {}
+) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit)
+  });
+
+  if (typeof seed === 'number') {
+    params.set('seed', String(seed));
+  }
+
+  if (options.lastFolder) {
+    params.set('lastFolder', options.lastFolder);
+  }
+
+  if (options.recentFolders && options.recentFolders.length > 0) {
+    params.set('recentFolders', options.recentFolders.join(','));
+  }
+
+  return requestJson<PaginatedFeed>(`/api/reels?${params.toString()}`);
+}
+
 export function fetchFeedSearch(query: string, page = 1, limit = 24) {
   const params = new URLSearchParams({
     q: query,
