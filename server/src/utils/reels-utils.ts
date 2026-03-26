@@ -190,6 +190,22 @@ export function rankReelCandidates(
     });
 }
 
+export function shuffleReelCandidates(
+  candidates: ReelRecommendationCandidate[],
+  seed: number
+): ReelRecommendationCandidate[] {
+  return [...candidates].sort((left, right) => {
+    const leftRank = createSeededUnit(seed, left.id);
+    const rightRank = createSeededUnit(seed, right.id);
+
+    if (rightRank !== leftRank) {
+      return rightRank - leftRank;
+    }
+
+    return right.id - left.id;
+  });
+}
+
 export function buildReelQueue(
   candidates: ReelRecommendationCandidate[],
   seed: number,

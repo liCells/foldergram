@@ -1,11 +1,13 @@
 import { defineStore } from 'pinia';
 
 import { fetchReels } from '../api/gallery';
-import type { FeedItem } from '../types/api';
+import type { FeedItem, ReelsFeedMode } from '../types/api';
 import { resolveReelsAffinitySnapshot, type ReelsAffinitySnapshot } from '../utils/reels';
 import { useAppStore } from './app';
 
 interface ReelsState {
+  mode: ReelsFeedMode;
+  loadedMode: ReelsFeedMode | null;
   items: FeedItem[];
   page: number;
   limit: number;
@@ -29,6 +31,8 @@ function createReelsSeed(): number {
 
 export const useReelsStore = defineStore('reels', {
   state: (): ReelsState => ({
+    mode: 'random',
+    loadedMode: null,
     items: [],
     page: 1,
     limit: 6,
@@ -44,6 +48,21 @@ export const useReelsStore = defineStore('reels', {
     activeItem: (state) => state.items.find((item) => item.id === state.activeReelId) ?? state.items[0] ?? null
   },
   actions: {
+    syncModeWithDefault(force = false) {
+      const appStore = useAppStore();
+      const nextMode = appStore.defaultReelsFeedMode;
+      const modeChanged = this.mode !== nextMode;
+
+      this.mode = nextMode;
+
+      if (modeChanged) {
+        this.seed = null;
+      }
+
+      this.affinitySnapshot = this.mode === 'recommended' && !force && !modeChanged ? this.affinitySnapshot : null;
+      return modeChanged;
+    },
+
     ensureSeed() {
       if (this.seed !== null) {
         return this.seed;
@@ -58,6 +77,8 @@ export const useReelsStore = defineStore('reels', {
     },
 
     reset() {
+      this.mode = 'random';
+      this.loadedMode = null;
       this.items = [];
       this.page = 1;
       this.hasMore = true;
@@ -74,16 +95,20 @@ export const useReelsStore = defineStore('reels', {
         return;
       }
 
-      if (this.initialized && !force) {
+      const modeChanged = this.syncModeWithDefault(force);
+      const queueRequiresSeed = this.mode !== 'recent';
+      const queueMatchesMode = this.loadedMode === this.mode && (!queueRequiresSeed || this.seed !== null);
+
+      if (this.initialized && !force && !modeChanged && queueMatchesMode) {
         return;
       }
 
       this.items = [];
+      this.loadedMode = null;
       this.page = 1;
       this.hasMore = true;
       this.error = null;
       this.initialized = false;
-      this.affinitySnapshot = force ? null : this.affinitySnapshot;
       this.activeReelId = null;
       await this.loadMore();
     },
@@ -94,22 +119,35 @@ export const useReelsStore = defineStore('reels', {
       }
 
       const appStore = useAppStore();
-      this.affinitySnapshot = resolveReelsAffinitySnapshot(
-        this.affinitySnapshot,
-        appStore.lastOpenedFolderSlug,
-        appStore.recentOpenedFolderSlugs
-      );
+      if (this.mode === 'recommended') {
+        this.affinitySnapshot = resolveReelsAffinitySnapshot(
+          this.affinitySnapshot,
+          appStore.lastOpenedFolderSlug,
+          appStore.recentOpenedFolderSlugs
+        );
+      } else {
+        this.affinitySnapshot = null;
+      }
 
       this.loading = true;
       this.error = null;
 
       try {
-        const payload = await fetchReels(this.page, this.limit, this.ensureSeed(), {
-          lastFolder: this.affinitySnapshot.lastFolder,
-          recentFolders: this.affinitySnapshot.recentFolders
-        });
+        const payload = await fetchReels(
+          this.page,
+          this.limit,
+          this.mode,
+          this.mode === 'recent' ? undefined : this.ensureSeed(),
+          this.mode === 'recommended'
+            ? {
+                lastFolder: this.affinitySnapshot?.lastFolder ?? null,
+                recentFolders: this.affinitySnapshot?.recentFolders ?? []
+              }
+            : {}
+        );
 
         this.items.push(...payload.items);
+        this.loadedMode = payload.mode ?? this.mode;
         this.page += 1;
         this.hasMore = payload.hasMore;
         this.initialized = true;

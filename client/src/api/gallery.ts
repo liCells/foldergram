@@ -4,6 +4,7 @@ import type {
   AuthMutationResult,
   AuthStatus,
   HomeFeedDefaultSetting,
+  ReelsFeedDefaultSetting,
   ViewerAccessMode,
   DeleteImageResult,
   DeleteFolderResult,
@@ -15,7 +16,9 @@ import type {
   MomentFeedPayload,
   MomentsPayload,
   PaginatedFeed,
+  PaginatedReels,
   FolderImagesPayload,
+  ReelsFeedMode,
   RestoreImageResult,
   RebuildLibraryResult,
   RebuildThumbnailsResult,
@@ -42,6 +45,7 @@ export function fetchFeed(page = 1, limit = 24, mode: FeedMode = 'random', seed?
 export function fetchReels(
   page = 1,
   limit = 6,
+  mode: ReelsFeedMode = 'recommended',
   seed?: number,
   options: {
     lastFolder?: string | null;
@@ -50,7 +54,8 @@ export function fetchReels(
 ) {
   const params = new URLSearchParams({
     page: String(page),
-    limit: String(limit)
+    limit: String(limit),
+    mode
   });
 
   if (typeof seed === 'number') {
@@ -65,7 +70,7 @@ export function fetchReels(
     params.set('recentFolders', options.recentFolders.join(','));
   }
 
-  return requestJson<PaginatedFeed>(`/api/reels?${params.toString()}`);
+  return requestJson<PaginatedReels>(`/api/reels?${params.toString()}`);
 }
 
 export function fetchFeedSearch(query: string, page = 1, limit = 24) {
@@ -285,6 +290,14 @@ export function triggerThumbnailRebuild() {
 
 export function updateHomeFeedDefault(defaultMode: FeedMode) {
   return requestJson<HomeFeedDefaultSetting>('/api/admin/settings/home-feed-default', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ defaultMode })
+  });
+}
+
+export function updateReelsFeedDefault(defaultMode: ReelsFeedMode) {
+  return requestJson<ReelsFeedDefaultSetting>('/api/admin/settings/reels-feed-default', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ defaultMode })

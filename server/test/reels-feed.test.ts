@@ -71,25 +71,43 @@ describe.sequential('reels feed', () => {
     imageRepository.markDeleted(deletedVideo.relative_path);
     expect(imageRepository.moveToTrash(trashedVideo.id)).toBe(true);
 
-    const payload = galleryService.getReels(1, 12, 17);
+    const payload = galleryService.getReels(1, 12, 'recommended', 17);
 
+    expect(payload.mode).toBe('recommended');
     expect(payload.total).toBe(1);
     expect(payload.items).toHaveLength(1);
     expect(payload.items[0]?.id).toBe(visibleVideo.id);
     expect(payload.items[0]?.mediaType).toBe('video');
   });
 
-  it('keeps ordering stable for one seed and changes it for a different seed', async () => {
+  it('keeps random ordering stable for one seed and changes it for a different seed', async () => {
     await createIndexedMedia('seed/alpha', 'alpha-a.mp4', 1_778_100_000_000);
     await createIndexedMedia('seed/beta', 'beta-a.mp4', 1_778_100_000_000);
     await createIndexedMedia('seed/gamma', 'gamma-a.mp4', 1_778_100_000_000);
 
-    const first = galleryService.getReels(1, 3, 11);
-    const second = galleryService.getReels(1, 3, 11);
-    const differentSeed = galleryService.getReels(1, 3, 29);
+    const first = galleryService.getReels(1, 3, 'random', 11);
+    const second = galleryService.getReels(1, 3, 'random', 11);
+    const differentSeed = galleryService.getReels(1, 3, 'random', 29);
 
+    expect(first.mode).toBe('random');
     expect(first.items.map((item) => item.id)).toEqual(second.items.map((item) => item.id));
     expect(first.items.map((item) => item.id)).not.toEqual(differentSeed.items.map((item) => item.id));
+  });
+
+  it('returns newest visible videos first in recent mode even when affinity and likes would favor older reels', async () => {
+    const newest = await createIndexedMedia('recent/alpha', 'alpha-1.mp4', 1_778_150_003_000);
+    const middle = await createIndexedMedia('recent/beta', 'beta-1.mp4', 1_778_150_002_000);
+    const oldest = await createIndexedMedia('recent/gamma', 'gamma-1.mp4', 1_778_150_001_000);
+
+    likeRepository.upsert(oldest.id);
+
+    const payload = galleryService.getReels(1, 3, 'recent', 91, {
+      lastOpenedFolderSlug: 'recent-gamma',
+      recentOpenedFolderSlugs: ['recent-gamma', 'recent-beta']
+    });
+
+    expect(payload.mode).toBe('recent');
+    expect(payload.items.map((item) => item.id)).toEqual([newest.id, middle.id, oldest.id]);
   });
 
   it('uses likes for the first reel while keeping nearby queue slots folder-diverse', async () => {
@@ -106,17 +124,19 @@ describe.sequential('reels feed', () => {
 
     likeRepository.upsert(alphaLead.id);
 
-    const payload = galleryService.getReels(1, 4, 91);
+    const payload = galleryService.getReels(1, 4, 'recommended', 91);
 
+    expect(payload.mode).toBe('recommended');
     expect(payload.items[0]?.folderSlug).toBe('reels-alpha');
     expect(payload.items[0]?.id).toBe(alphaLead.id);
     expect(payload.items[1]?.folderSlug).not.toBe('reels-alpha');
   });
 
   it('returns an empty payload when the indexed library has no visible videos', () => {
-    const payload = galleryService.getReels(1, 8, 13);
+    const payload = galleryService.getReels(1, 8, 'random', 13);
 
     expect(payload).toEqual({
+      mode: 'random',
       items: [],
       page: 1,
       limit: 8,

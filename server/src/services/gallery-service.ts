@@ -6,7 +6,8 @@ import {
   HOME_FEED_DEFAULT_MODE_SETTING_KEY,
   LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY,
   LIBRARY_REBUILD_REQUIRED_SETTING_KEY,
-  PREVIOUS_GALLERY_ROOT_SETTING_KEY
+  PREVIOUS_GALLERY_ROOT_SETTING_KEY,
+  REELS_FEED_DEFAULT_MODE_SETTING_KEY
 } from '../constants/app-setting-keys.js';
 import { appConfig } from '../config/env.js';
 import { appSettingsRepository, folderRepository, folderScanStateRepository, imageRepository, likeRepository, scanRunRepository } from '../db/repositories.js';
@@ -16,11 +17,12 @@ import { buildMonthDayKey, countFeedBursts, diversifyFeedCandidates, groupFeedBu
 import { shouldPreferMomentRail, type FeedRailKind } from '../utils/feed-rail-utils.js';
 import { countSupportedRootMediaFiles } from '../utils/gallery-root-utils.js';
 import { getPathBreadcrumb } from '../utils/path-utils.js';
-import { buildReelQueue, type ReelAffinitySignals } from '../utils/reels-utils.js';
+import { buildReelQueue, shuffleReelCandidates, type ReelAffinitySignals } from '../utils/reels-utils.js';
 import { scannerService } from './scanner-service.js';
 import { storageService } from './storage-service.js';
 
 type FeedMode = 'recent' | 'rediscover' | 'random';
+type ReelsFeedMode = 'recommended' | 'recent' | 'random';
 
 interface FeedCapsuleDefinition {
   id: string;
@@ -82,6 +84,14 @@ function parseFeedMode(value: string | null): FeedMode {
 
 function getDefaultHomeFeedMode(): FeedMode {
   return parseFeedMode(appSettingsRepository.get(HOME_FEED_DEFAULT_MODE_SETTING_KEY));
+}
+
+function parseReelsFeedMode(value: string | null): ReelsFeedMode {
+  return value === 'recommended' || value === 'recent' || value === 'random' ? value : 'random';
+}
+
+function getDefaultReelsFeedMode(): ReelsFeedMode {
+  return parseReelsFeedMode(appSettingsRepository.get(REELS_FEED_DEFAULT_MODE_SETTING_KEY));
 }
 
 function getDerivativeAssetVersion(): string | null {
@@ -661,9 +671,10 @@ export const galleryService = {
     };
   },
 
-  getReels(page: number, limit: number, seed?: number, signals: ReelAffinitySignals = {}) {
+  getReels(page: number, limit: number, mode: ReelsFeedMode = 'recommended', seed?: number, signals: ReelAffinitySignals = {}) {
     if (!storageService.getState().libraryAvailable) {
       return {
+        mode,
         items: [],
         page,
         limit,
@@ -676,6 +687,7 @@ export const galleryService = {
     const total = candidates.length;
     if (total === 0) {
       return {
+        mode,
         items: [],
         page,
         limit,
@@ -684,18 +696,27 @@ export const galleryService = {
       };
     }
 
-    const sessionSeed = Number.isFinite(seed)
-      ? Number(seed)
-      : Number(new Date().toISOString().slice(0, 10).replaceAll('-', ''));
-    const orderedCandidates = buildReelQueue(candidates, sessionSeed, signals);
+    const orderedCandidates =
+      mode === 'recent'
+        ? candidates
+        : (() => {
+            const sessionSeed = Number.isFinite(seed)
+              ? Number(seed)
+              : Number(new Date().toISOString().slice(0, 10).replaceAll('-', ''));
+
+            return mode === 'random' ? shuffleReelCandidates(candidates, sessionSeed) : buildReelQueue(candidates, sessionSeed, signals);
+          })();
     const offset = (page - 1) * limit;
 
-    return buildPaginatedPayload(
-      mapFeedItems(orderedCandidates.slice(offset, offset + limit)),
-      page,
-      limit,
-      total
-    );
+    return {
+      mode,
+      ...buildPaginatedPayload(
+        mapFeedItems(orderedCandidates.slice(offset, offset + limit)),
+        page,
+        limit,
+        total
+      )
+    };
   },
 
   searchMedia(query: string, page: number, limit: number) {
@@ -998,6 +1019,7 @@ export const galleryService = {
     const scanProgress = scannerService.getProgress();
     const rebuildRequired = appSettingsRepository.get(LIBRARY_REBUILD_REQUIRED_SETTING_KEY) === '1';
     const defaultHomeFeedMode = getDefaultHomeFeedMode();
+    const defaultReelsFeedMode = getDefaultReelsFeedMode();
 
     return {
       folders: storageState.libraryAvailable ? folderRepository.count() : 0,
@@ -1018,7 +1040,8 @@ export const galleryService = {
         ignoredRootMediaCount: storageState.libraryAvailable ? countSupportedRootMediaFiles(appConfig.galleryRoot) : 0
       },
       preferences: {
-        defaultHomeFeedMode
+        defaultHomeFeedMode,
+        defaultReelsFeedMode
       }
     };
   },
@@ -1032,6 +1055,7 @@ export const galleryService = {
     const rebuildRequired = appSettingsRepository.get(LIBRARY_REBUILD_REQUIRED_SETTING_KEY) === '1';
     const lastSuccessfulGalleryRoot = appSettingsRepository.get(LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY);
     const defaultHomeFeedMode = getDefaultHomeFeedMode();
+    const defaultReelsFeedMode = getDefaultReelsFeedMode();
 
     return {
       folders: storageState.libraryAvailable ? folderRepository.count() : 0,
@@ -1059,13 +1083,22 @@ export const galleryService = {
         ignoredRootMediaCount: storageState.libraryAvailable ? countSupportedRootMediaFiles(currentGalleryRoot) : 0
       },
       preferences: {
-        defaultHomeFeedMode
+        defaultHomeFeedMode,
+        defaultReelsFeedMode
       }
     };
   },
 
   setDefaultHomeFeedMode(mode: FeedMode) {
     appSettingsRepository.set(HOME_FEED_DEFAULT_MODE_SETTING_KEY, mode);
+
+    return {
+      defaultMode: mode
+    };
+  },
+
+  setDefaultReelsFeedMode(mode: ReelsFeedMode) {
+    appSettingsRepository.set(REELS_FEED_DEFAULT_MODE_SETTING_KEY, mode);
 
     return {
       defaultMode: mode

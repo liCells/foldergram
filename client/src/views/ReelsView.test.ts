@@ -120,7 +120,8 @@ function createAppStatus(): AppStatus {
       ignoredRootMediaCount: 0
     },
     preferences: {
-      defaultHomeFeedMode: 'random'
+      defaultHomeFeedMode: 'random',
+      defaultReelsFeedMode: 'random'
     }
   };
 }

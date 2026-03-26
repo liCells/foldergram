@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 
 import { fetchStats } from '../api/gallery';
-import type { AppStatus, FeedMode } from '../types/api';
+import type { AppStatus, FeedMode, ReelsFeedMode } from '../types/api';
 
 interface AppState {
   stats: AppStatus | null;
@@ -64,7 +64,8 @@ export const useAppStore = defineStore('app', {
     isRebuilding: (state) => state.stats?.scan.isScanning === true && state.stats?.scan.scanReason === 'rebuild',
     hasCompletedScan: (state) => state.stats?.scan.lastCompletedScan !== null,
     isInitialScan: (state) => state.stats?.scan.isScanning === true && state.stats?.scan.lastCompletedScan === null,
-    defaultHomeFeedMode: (state): FeedMode => state.stats?.preferences.defaultHomeFeedMode ?? 'random'
+    defaultHomeFeedMode: (state): FeedMode => state.stats?.preferences.defaultHomeFeedMode ?? 'random',
+    defaultReelsFeedMode: (state): ReelsFeedMode => state.stats?.preferences.defaultReelsFeedMode ?? 'random'
   },
   actions: {
     persistOpenedFolderState() {

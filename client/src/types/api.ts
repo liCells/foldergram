@@ -1,8 +1,13 @@
 export type FeedMode = 'recent' | 'rediscover' | 'random';
+export type ReelsFeedMode = 'recommended' | 'recent' | 'random';
 export type FeedRailKind = 'moments' | 'highlights';
 
 export interface HomeFeedDefaultSetting {
   defaultMode: FeedMode;
+}
+
+export interface ReelsFeedDefaultSetting {
+  defaultMode: ReelsFeedMode;
 }
 
 export interface FeedItem {
@@ -54,6 +59,15 @@ export interface ImageExifData {
 
 export interface PaginatedFeed {
   mode?: FeedMode;
+  items: FeedItem[];
+  page: number;
+  limit: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface PaginatedReels {
+  mode?: ReelsFeedMode;
   items: FeedItem[];
   page: number;
   limit: number;
@@ -200,6 +214,7 @@ export interface AppStatus {
   };
   preferences: {
     defaultHomeFeedMode: FeedMode;
+    defaultReelsFeedMode: ReelsFeedMode;
   };
 }
 

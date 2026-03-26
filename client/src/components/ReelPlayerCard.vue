@@ -29,6 +29,14 @@
           />
         </media-player>
 
+        <div
+          v-if="showPausedIndicator"
+          class="reel-player-card__pause-indicator"
+          aria-hidden="true"
+        >
+          <span class="reel-player-card__pause-icon i-fluent-play-20-filled" />
+        </div>
+
         <div class="reel-player-card__bottom-fade" aria-hidden="true" />
 
         <div
@@ -94,10 +102,12 @@ const props = defineProps<{
 
 const appStore = useAppStore();
 const playerElement = ref<MediaPlayerElement | null>(null);
+const isPaused = ref(false);
 const videoSource = computed<PlayerSrc>(() => ({
   src: props.item.previewUrl,
   type: 'video/mp4'
 }));
+const showPausedIndicator = computed(() => props.active && isPaused.value);
 const folderDescription = computed(
   () => props.folder?.description?.trim() || props.folder?.breadcrumb || 'App Folder'
 );
@@ -123,6 +133,7 @@ async function syncPlayback() {
   }
 
   if (!props.active) {
+    isPaused.value = false;
     void player.pause().catch(() => {
       // Ignore pause rejections before the provider is ready.
     });
@@ -134,6 +145,7 @@ async function syncPlayback() {
 
   try {
     await player.play();
+    isPaused.value = false;
     return;
   } catch {
     if (appStore.videoMuted) {
@@ -154,21 +166,27 @@ function bindPlayerEventListeners(player: MediaPlayerElement | null) {
     void syncPlayback();
   };
   const handlePlay = () => {
+    isPaused.value = false;
     if (!props.active) {
       void player.pause().catch(() => {
         // Ignore pause rejections before the provider is ready.
       });
     }
   };
+  const handlePause = () => {
+    isPaused.value = props.active;
+  };
 
   player.addEventListener('loaded-metadata', handleReady);
   player.addEventListener('can-play', handleReady);
   player.addEventListener('play', handlePlay);
+  player.addEventListener('pause', handlePause);
 
   removePlayerEventListeners = () => {
     player.removeEventListener('loaded-metadata', handleReady);
     player.removeEventListener('can-play', handleReady);
     player.removeEventListener('play', handlePlay);
+    player.removeEventListener('pause', handlePause);
   };
 
   if (player.hasAttribute('data-can-play')) {
@@ -203,6 +221,7 @@ async function handleSurfaceClick() {
     return;
   }
 
+  isPaused.value = true;
   void player.pause().catch(() => {
     // Ignore pause rejections before the provider is ready.
   });
@@ -304,6 +323,27 @@ onBeforeUnmount(() => {
 .reel-player-card__player :deep(img) {
   object-fit: contain;
   background: #000;
+}
+
+.reel-player-card__pause-indicator {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.25rem;
+  height: 4.25rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.48);
+  color: #fff;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.reel-player-card__pause-icon {
+  width: 1.45rem;
+  height: 1.45rem;
 }
 
 .reel-player-card__bottom-fade {
@@ -415,6 +455,11 @@ onBeforeUnmount(() => {
 
   .reel-player-card__overlay {
     padding: 0 0.85rem 0.9rem;
+  }
+
+  .reel-player-card__pause-indicator {
+    width: 3.9rem;
+    height: 3.9rem;
   }
 
   .reel-player-card__copy {

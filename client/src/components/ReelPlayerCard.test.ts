@@ -138,18 +138,21 @@ describe('ReelPlayerCard', () => {
     const player = getPlayerElement(wrapper);
     expect(player.playCallCount).toBeGreaterThanOrEqual(1);
     expect(player.paused).toBe(false);
+    expect(wrapper.find('.reel-player-card__pause-indicator').exists()).toBe(false);
 
     await wrapper.get('.reel-player-card__surface').trigger('click');
     await flushPromises();
 
     expect(player.pauseCallCount).toBe(1);
     expect(player.paused).toBe(true);
+    expect(wrapper.find('.reel-player-card__pause-indicator').exists()).toBe(true);
 
     await wrapper.get('.reel-player-card__surface').trigger('click');
     await flushPromises();
 
     expect(player.playCallCount).toBeGreaterThanOrEqual(2);
     expect(player.paused).toBe(false);
+    expect(wrapper.find('.reel-player-card__pause-indicator').exists()).toBe(false);
   });
 
   it('persists the mute preference for the current reel and later reels', async () => {
