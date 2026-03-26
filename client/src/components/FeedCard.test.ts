@@ -143,7 +143,7 @@ describe('FeedCard', () => {
 
     await flushPromises();
 
-    const player = wrapper.get('media-player').element as FakeMediaPlayerElement;
+    const player = wrapper.get('media-player').element as unknown as FakeMediaPlayerElement;
     const container = player.parentElement as HTMLElement;
 
     expect(container.style.aspectRatio).toBe('1920 / 1080');
@@ -180,7 +180,7 @@ describe('FeedCard', () => {
 
     await flushPromises();
 
-    const player = wrapper.get('media-player').element as FakeMediaPlayerElement;
+    const player = wrapper.get('media-player').element as unknown as FakeMediaPlayerElement;
     expect(player.playCallCount).toBeGreaterThanOrEqual(1);
     expect(player.paused).toBe(false);
     expect(wrapper.find('.feed-card__pause-indicator').exists()).toBe(false);
