@@ -10,6 +10,7 @@ import type {
   LikeRecord,
   MediaType,
   PlaybackStrategy,
+  ReelCandidate,
   FolderRecord,
   FolderSummaryRecord,
   ScanRunRecord,
@@ -702,6 +703,36 @@ export const imageRepository = {
       LIMIT ? OFFSET ?
       `
     ).all(seed, limit, offset) as unknown as FeedImage[];
+  },
+
+  listVisibleVideoCandidates(): ReelCandidate[] {
+    return database.prepare(
+      `
+      SELECT
+        images.id,
+        images.folder_id AS folderId,
+        folders.slug AS folderSlug,
+        folders.name AS folderName,
+        folders.folder_path AS folderPath,
+        images.filename,
+        images.width,
+        images.height,
+        images.media_type AS mediaType,
+        images.duration_ms AS durationMs,
+        images.is_animated AS isAnimated,
+        images.thumbnail_path AS thumbnailUrl,
+        images.preview_path AS previewUrl,
+        images.playback_strategy AS playbackStrategy,
+        images.sort_timestamp AS sortTimestamp,
+        images.taken_at AS takenAt,
+        likes.created_at AS likedAt
+      FROM images
+      INNER JOIN folders ON folders.id = images.folder_id
+      LEFT JOIN likes ON likes.image_id = images.id
+      WHERE ${VISIBLE_IMAGE_WHERE_SQL} AND images.media_type = 'video'
+      ORDER BY images.sort_timestamp DESC, images.id DESC
+      `
+    ).all() as unknown as ReelCandidate[];
   },
 
   listVisibleSearch(query: string, page: number, limit: number): FeedImage[] {

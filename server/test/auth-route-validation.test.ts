@@ -97,4 +97,22 @@ describe.sequential('auth route validation', () => {
       defaultMode: 'random'
     });
   });
+
+  it('rejects invalid reels-feed default modes', () => {
+    expect(() =>
+      settingsRequestBodySchemas.reelsFeedDefault.parse({
+        defaultMode: 'rediscover'
+      })
+    ).toThrowError();
+  });
+
+  it('accepts recommended as a valid reels-feed default mode', () => {
+    expect(
+      settingsRequestBodySchemas.reelsFeedDefault.parse({
+        defaultMode: 'recommended'
+      })
+    ).toEqual({
+      defaultMode: 'recommended'
+    });
+  });
 });

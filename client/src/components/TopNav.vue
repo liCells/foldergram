@@ -16,6 +16,17 @@
           <span class="w-[1.45rem] h-[1.45rem]" :class="isActive ? 'i-fluent-home-16-filled' : 'i-fluent-home-16-regular'" aria-hidden="true" />
         </a>
       </RouterLink>
+      <RouterLink custom :to="{ name: 'reels' }" v-slot="{ href, navigate, isActive }">
+        <a
+          :href="href"
+          class="topbar__icon-link inline-flex items-center justify-center w-11 h-12 rounded-[1rem] border-0 bg-transparent color-inherit cursor-pointer transition-colors duration-150 hover:bg-white/8"
+          :class="isActive ? topbarActiveClass : ''"
+          aria-label="Reels"
+          @click="navigate"
+        >
+          <span class="w-[1.45rem] h-[1.45rem]" :class="isActive ? 'i-fluent-play-circle-24-filled' : 'i-fluent-play-circle-24-regular'" aria-hidden="true" />
+        </a>
+      </RouterLink>
       <RouterLink custom :to="{ name: 'explore' }" v-slot="{ href, navigate, isActive }">
         <a
           :href="href"

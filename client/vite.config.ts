@@ -52,7 +52,8 @@ export default defineConfig(async ({ command, mode }) => {
   const devServerPort = Number.parseInt(env.DEV_SERVER_PORT ?? '4140', 10);
   const devClientPort = Number.parseInt(env.DEV_CLIENT_PORT ?? '4141', 10);
   const devHost = '0.0.0.0';
-  const resolvedDevClientPort = command === 'serve' ? await resolveDevClientPort(devClientPort, devHost) : devClientPort;
+  const isVitest = process.env.VITEST === 'true';
+  const resolvedDevClientPort = command === 'serve' && !isVitest ? await resolveDevClientPort(devClientPort, devHost) : devClientPort;
 
   return {
     envDir: repositoryRoot,
@@ -80,6 +81,11 @@ export default defineConfig(async ({ command, mode }) => {
         '/thumbnails': `http://localhost:${devServerPort}`,
         '/previews': `http://localhost:${devServerPort}`
       }
+    },
+    test: {
+      environment: 'jsdom',
+      setupFiles: './vitest.setup.ts',
+      css: true
     }
   };
 });

@@ -36,6 +36,7 @@ import { useLikesStore } from './stores/likes';
 import { useFoldersStore } from './stores/folders';
 import { useFeedStore } from './stores/feed';
 import { useMomentsStore } from './stores/moments';
+import { useReelsStore } from './stores/reels';
 import { useTrashStore } from './stores/trash';
 import { useViewerStore } from './stores/viewer';
 
@@ -46,6 +47,7 @@ const feedStore = useFeedStore();
 const likesStore = useLikesStore();
 const foldersStore = useFoldersStore();
 const momentsStore = useMomentsStore();
+const reelsStore = useReelsStore();
 const route = useRoute();
 const router = useRouter();
 const trashStore = useTrashStore();
@@ -99,6 +101,7 @@ function resetProtectedState() {
   foldersStore.resetForRebuild();
   likesStore.resetForRebuild();
   momentsStore.resetForRebuild();
+  reelsStore.reset();
   exploreStore.reset();
   trashStore.reset();
   viewerStore.reset();

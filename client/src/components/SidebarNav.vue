@@ -47,6 +47,38 @@
 
       <RouterLink
         custom
+        :to="{ name: 'reels' }"
+        v-slot="{ href, navigate, isActive }"
+      >
+        <a
+          :href="href"
+          class="sidebar__link sidebar-item"
+          :class="isActive ? sidebarActiveClass : ''"
+          @click="navigate"
+        >
+          <span
+            class="sidebar__icon flex-shrink-0 w-[1.45rem] h-[1.45rem]"
+            :class="
+              isActive
+                ? 'i-fluent-play-circle-24-filled'
+                : 'i-fluent-play-circle-24-regular'
+            "
+            aria-hidden="true"
+          />
+          <span
+            class="sidebar__label max-w-0 overflow-hidden whitespace-nowrap text-[0.9rem] opacity-0 group-hover:max-w-[12rem] group-hover:opacity-100"
+            style="
+              transition:
+                opacity 0.18s ease,
+                max-width 0.22s ease;
+            "
+            >Reels</span
+          >
+        </a>
+      </RouterLink>
+
+      <RouterLink
+        custom
         :to="{ name: 'explore' }"
         v-slot="{ href, navigate, isActive }"
       >

@@ -351,49 +351,87 @@
 
         <!-- CATEGORY: LIBRARY -->
         <template v-if="currentCategory === 'library'">
-          <section class="card grid gap-[0.95rem] p-6">
+          <section class="card grid gap-[1.15rem] p-6">
             <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
               <div>
-                <h2 class="m-0 text-[1.18rem]">Home Feed Default</h2>
-                <p class="m-0 mt-[0.25rem] text-muted">Choose the first feed mode shown on Home.</p>
+                <h2 class="m-0 text-[1.18rem]">Feed Defaults</h2>
+                <p class="m-0 mt-[0.25rem] text-muted">Choose what Home and Reels open with by default.</p>
               </div>
-              <span class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap text-accent-strong bg-[color-mix(in_srgb,var(--accent-soft)_78%,transparent_22%)]">
-                Current: {{ savedHomeFeedDefaultModeLabel }}
+              <span class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap text-accent-strong bg-[color-mix(in_srgb,var(--accent-soft)_78%,transparent_22%)] max-sm:whitespace-normal">
+                Home: {{ savedHomeFeedDefaultModeLabel }} · Reels: {{ savedReelsFeedDefaultModeLabel }}
               </span>
             </div>
 
             <div
-              v-if="homeFeedDefaultFeedback"
+              v-if="feedDefaultsFeedback"
               class="rounded-[0.95rem] px-4 py-3 text-[0.9rem]"
-              :class="homeFeedDefaultFeedback.tone === 'error' ? 'border border-[rgba(214,48,49,0.24)] text-[#c0392b] bg-[rgba(214,48,49,0.08)]' : 'border border-[rgba(24,119,242,0.2)] text-accent-strong bg-[rgba(24,119,242,0.08)]'"
+              :class="feedDefaultsFeedback.tone === 'error' ? 'border border-[rgba(214,48,49,0.24)] text-[#c0392b] bg-[rgba(214,48,49,0.08)]' : 'border border-[rgba(24,119,242,0.2)] text-accent-strong bg-[rgba(24,119,242,0.08)]'"
             >
-              {{ homeFeedDefaultFeedback.message }}
+              {{ feedDefaultsFeedback.message }}
             </div>
 
-            <div class="grid grid-cols-3 gap-3 mt-1">
-              <label
-                v-for="mode in homeFeedDefaultOptions"
-                :key="mode.id"
-                class="flex min-w-0 items-start gap-[0.6rem] rounded-[0.85rem] border border-border px-3 py-[0.8rem] cursor-pointer"
-              >
-                <input
-                  v-model="homeFeedDefaultMode"
-                  class="mt-[0.2rem]"
-                  type="radio"
-                  :value="mode.id"
-                  :disabled="savingHomeFeedDefault || waitingForInitialStatus"
-                />
-                <span class="grid min-w-0 gap-[0.08rem]">
-                  <span class="text-[0.88rem] font-semibold text-text">{{ mode.label }}</span>
-                  <span class="overflow-hidden text-ellipsis whitespace-nowrap text-[0.75rem] text-muted">{{ mode.description }}</span>
-                </span>
-              </label>
+            <div class="grid gap-4 lg:grid-cols-2">
+              <section class="grid gap-[0.75rem] rounded-[0.95rem] border border-border p-4">
+                <div class="grid gap-[0.12rem]">
+                  <h3 class="m-0 text-[0.98rem]">Home feed default</h3>
+                  <p class="m-0 text-[0.82rem] text-muted">Choose the first feed mode shown on Home.</p>
+                </div>
+
+                <div class="grid gap-2">
+                  <label
+                    v-for="mode in homeFeedDefaultOptions"
+                    :key="mode.id"
+                    class="flex min-w-0 items-start gap-[0.55rem] rounded-[0.8rem] border border-border px-3 py-[0.7rem] cursor-pointer"
+                  >
+                    <input
+                      v-model="homeFeedDefaultMode"
+                      class="mt-[0.15rem]"
+                      :name="HOME_FEED_DEFAULT_GROUP_NAME"
+                      type="radio"
+                      :value="mode.id"
+                      :disabled="savingFeedDefaults || waitingForInitialStatus"
+                    />
+                    <span class="grid min-w-0 gap-[0.08rem]">
+                      <span class="text-[0.86rem] font-semibold text-text">{{ mode.label }}</span>
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-[0.74rem] text-muted">{{ mode.description }}</span>
+                    </span>
+                  </label>
+                </div>
+              </section>
+
+              <section class="grid gap-[0.75rem] rounded-[0.95rem] border border-border p-4">
+                <div class="grid gap-[0.12rem]">
+                  <h3 class="m-0 text-[0.98rem]">Reels feed default</h3>
+                  <p class="m-0 text-[0.82rem] text-muted">Choose the queue style used when Reels opens.</p>
+                </div>
+
+                <div class="grid gap-2">
+                  <label
+                    v-for="mode in reelsFeedDefaultOptions"
+                    :key="mode.id"
+                    class="flex min-w-0 items-start gap-[0.55rem] rounded-[0.8rem] border border-border px-3 py-[0.7rem] cursor-pointer"
+                  >
+                    <input
+                      v-model="reelsFeedDefaultMode"
+                      class="mt-[0.15rem]"
+                      :name="REELS_FEED_DEFAULT_GROUP_NAME"
+                      type="radio"
+                      :value="mode.id"
+                      :disabled="savingFeedDefaults || waitingForInitialStatus"
+                    />
+                    <span class="grid min-w-0 gap-[0.08rem]">
+                      <span class="text-[0.86rem] font-semibold text-text">{{ mode.label }}</span>
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-[0.74rem] text-muted">{{ mode.description }}</span>
+                    </span>
+                  </label>
+                </div>
+              </section>
             </div>
 
             <div class="flex flex-col md:flex-row items-center gap-3 max-sm:items-stretch">
-              <p class="m-0 flex-1 text-muted">{{ homeFeedDefaultActionNote }}</p>
-              <button class="btn-primary min-w-[13rem]" type="button" :disabled="homeFeedDefaultSaveDisabled" @click="saveHomeFeedDefault">
-                {{ homeFeedDefaultButtonLabel }}
+              <p class="m-0 flex-1 text-muted">{{ feedDefaultsActionNote }}</p>
+              <button class="btn-primary min-w-[13rem]" :style="feedDefaultsButtonStyle" type="button" :disabled="feedDefaultsSaveDisabled" @click="saveFeedDefaults">
+                {{ feedDefaultsButtonLabel }}
               </button>
             </div>
           </section>
@@ -576,7 +614,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import ConfirmDialog from '../components/ConfirmDialog.vue';
-import { fetchAdminStats, triggerLibraryRebuild, triggerManualScan, triggerThumbnailRebuild, updateHomeFeedDefault } from '../api/gallery';
+import { fetchAdminStats, triggerLibraryRebuild, triggerManualScan, triggerThumbnailRebuild, updateHomeFeedDefault, updateReelsFeedDefault } from '../api/gallery';
 import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { useFeedStore } from '../stores/feed';
@@ -584,7 +622,7 @@ import { useFoldersStore } from '../stores/folders';
 import { useLikesStore } from '../stores/likes';
 import { useMomentsStore } from '../stores/moments';
 import { useViewerStore } from '../stores/viewer';
-import type { AppStats, FeedMode, ViewerAccessMode } from '../types/api';
+import type { AppStats, FeedMode, ReelsFeedMode, ViewerAccessMode } from '../types/api';
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
@@ -601,12 +639,12 @@ const thumbnailRebuildError = ref<string | null>(null);
 const requestingScan = ref(false);
 const rebuilding = ref(false);
 const rebuildingThumbnails = ref(false);
-const savingHomeFeedDefault = ref(false);
+const savingFeedDefaults = ref(false);
 const confirmRebuildOpen = ref(false);
 const confirmThumbnailRebuildOpen = ref(false);
 const authFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
 const viewerFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
-const homeFeedDefaultFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
+const feedDefaultsFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
 const adminStats = ref<AppStats | null>(null);
 const showChangePasswordForm = ref(false);
 const showDisablePasswordForm = ref(false);
@@ -617,6 +655,8 @@ const nextPassword = ref('');
 const nextPasswordConfirmation = ref('');
 const disablePassword = ref('');
 const homeFeedDefaultMode = ref<FeedMode>('random');
+const reelsFeedDefaultMode = ref<ReelsFeedMode>('random');
+const feedDefaultsHydrated = ref(false);
 const viewerAccessMode = ref<ViewerAccessMode>(authStore.accessMode);
 const viewerPassword = ref('');
 const viewerPasswordConfirmation = ref('');
@@ -624,6 +664,8 @@ const SCAN_ERROR_NOTICE_STORAGE_KEY = 'foldergram-scan-error-notice-dismissal';
 const IGNORED_ROOT_MEDIA_NOTICE_STORAGE_KEY = 'foldergram-ignored-root-media-notice-dismissal';
 const NOTICE_DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 const MIN_PASSWORD_LENGTH = 8;
+const HOME_FEED_DEFAULT_GROUP_NAME = 'home-feed-default';
+const REELS_FEED_DEFAULT_GROUP_NAME = 'reels-feed-default';
 
 function loadDismissedScanErrorNotice(): { scanId: number; dismissedUntil: number } | null {
   if (typeof window === 'undefined') {
@@ -687,8 +729,8 @@ function clearViewerFeedback() {
   authStore.clearError();
 }
 
-function clearHomeFeedDefaultFeedback() {
-  homeFeedDefaultFeedback.value = null;
+function clearFeedDefaultsFeedback() {
+  feedDefaultsFeedback.value = null;
 }
 
 function setAuthError(message: string) {
@@ -719,16 +761,9 @@ function setViewerSuccess(message: string) {
   };
 }
 
-function setHomeFeedDefaultError(message: string) {
-  homeFeedDefaultFeedback.value = {
-    tone: 'error',
-    message
-  };
-}
-
-function setHomeFeedDefaultSuccess(message: string) {
-  homeFeedDefaultFeedback.value = {
-    tone: 'success',
+function setFeedDefaultsFeedback(tone: 'success' | 'error', message: string) {
+  feedDefaultsFeedback.value = {
+    tone,
     message
   };
 }
@@ -773,6 +808,12 @@ function validatePasswordConfirmation(password: string, confirmation: string): s
   return null;
 }
 
+function syncFeedDefaultsFromSaved() {
+  homeFeedDefaultMode.value = appStore.defaultHomeFeedMode;
+  reelsFeedDefaultMode.value = appStore.defaultReelsFeedMode;
+  feedDefaultsHydrated.value = true;
+}
+
 const scan = computed(() => appStore.stats?.scan ?? null);
 const lastCompletedScan = computed(() => scan.value?.lastCompletedScan ?? adminStats.value?.lastScan ?? null);
 const activeScanReason = computed(() => scan.value?.scanReason ?? null);
@@ -793,6 +834,23 @@ const homeFeedDefaultOptions: Array<{ id: FeedMode; label: string; description: 
     description: 'Bring older picks back.'
   }
 ];
+const reelsFeedDefaultOptions: Array<{ id: ReelsFeedMode; label: string; description: string }> = [
+  {
+    id: 'random',
+    label: 'Random',
+    description: 'Stable session shuffle.'
+  },
+  {
+    id: 'recent',
+    label: 'Recent',
+    description: 'Newest videos first.'
+  },
+  {
+    id: 'recommended',
+    label: 'Recommended',
+    description: 'Affinity-ranked mix.'
+  }
+];
 const isLibraryRebuildActive = computed(
   () => rebuilding.value || (appStore.isScanning && activeScanReason.value === 'rebuild')
 );
@@ -804,30 +862,51 @@ const scanProgressActive = computed(() => requestingScan.value || Boolean(scan.v
 const highlightRebuildAction = computed(() => route.query.action === 'rebuild');
 const waitingForInitialStatus = computed(() => !appStore.stats || appStore.loadingStats);
 const savedHomeFeedDefaultMode = computed(() => appStore.defaultHomeFeedMode);
+const savedReelsFeedDefaultMode = computed(() => appStore.defaultReelsFeedMode);
 const savedHomeFeedDefaultModeLabel = computed(
   () => homeFeedDefaultOptions.find((mode) => mode.id === savedHomeFeedDefaultMode.value)?.label ?? 'Random'
 );
-const homeFeedDefaultDirty = computed(() => homeFeedDefaultMode.value !== savedHomeFeedDefaultMode.value);
-const homeFeedDefaultSaveDisabled = computed(
-  () => waitingForInitialStatus.value || savingHomeFeedDefault.value || !homeFeedDefaultDirty.value
+const savedReelsFeedDefaultModeLabel = computed(
+  () => reelsFeedDefaultOptions.find((mode) => mode.id === savedReelsFeedDefaultMode.value)?.label ?? 'Random'
 );
-const homeFeedDefaultButtonLabel = computed(() => {
-  if (savingHomeFeedDefault.value) {
+const homeFeedDefaultDirty = computed(
+  () => feedDefaultsHydrated.value && homeFeedDefaultMode.value !== savedHomeFeedDefaultMode.value
+);
+const reelsFeedDefaultDirty = computed(
+  () => feedDefaultsHydrated.value && reelsFeedDefaultMode.value !== savedReelsFeedDefaultMode.value
+);
+const feedDefaultsDirty = computed(() => homeFeedDefaultDirty.value || reelsFeedDefaultDirty.value);
+const feedDefaultsSaveDisabled = computed(
+  () => waitingForInitialStatus.value || savingFeedDefaults.value || !feedDefaultsDirty.value
+);
+const feedDefaultsButtonLabel = computed(() => {
+  if (savingFeedDefaults.value) {
     return 'Saving...';
   }
 
-  return homeFeedDefaultDirty.value ? 'Save Home Feed Default' : 'Saved';
+  return feedDefaultsDirty.value ? 'Save Feed Defaults' : 'Saved';
 });
-const homeFeedDefaultActionNote = computed(() => {
+const feedDefaultsButtonStyle = computed(() =>
+  feedDefaultsSaveDisabled.value ? { cursor: savingFeedDefaults.value ? 'wait' : 'not-allowed' } : undefined
+);
+const feedDefaultsActionNote = computed(() => {
   if (waitingForInitialStatus.value) {
     return 'Loading the current app preference...';
+  }
+
+  if (homeFeedDefaultDirty.value && reelsFeedDefaultDirty.value) {
+    return 'Save both updates together. Home visitors can still switch modes on the homepage; Reels stays app-default only.';
   }
 
   if (homeFeedDefaultDirty.value) {
     return 'This updates the first feed mode shown on Home for this app. Visitors can still switch modes from the homepage.';
   }
 
-  return 'This is the current app-wide default for the homepage feed.';
+  if (reelsFeedDefaultDirty.value) {
+    return 'This updates the queue style used when Reels opens for this app. Visitors cannot switch modes from the reels page.';
+  }
+
+  return 'These are the current app-wide defaults for Home and Reels.';
 });
 const scanActionDisabled = computed(
   () =>
@@ -1350,28 +1429,54 @@ async function signOut() {
   }
 }
 
-async function saveHomeFeedDefault() {
-  if (homeFeedDefaultSaveDisabled.value) {
+async function saveFeedDefaults() {
+  if (feedDefaultsSaveDisabled.value) {
     return;
   }
 
-  savingHomeFeedDefault.value = true;
-  clearHomeFeedDefaultFeedback();
+  const shouldSaveHome = homeFeedDefaultDirty.value;
+  const shouldSaveReels = reelsFeedDefaultDirty.value;
+
+  savingFeedDefaults.value = true;
+  clearFeedDefaultsFeedback();
 
   try {
-    const payload = await updateHomeFeedDefault(homeFeedDefaultMode.value);
-    if (appStore.stats) {
-      appStore.stats.preferences.defaultHomeFeedMode = payload.defaultMode;
+    if (shouldSaveHome) {
+      const payload = await updateHomeFeedDefault(homeFeedDefaultMode.value);
+      if (appStore.stats) {
+        appStore.stats.preferences.defaultHomeFeedMode = payload.defaultMode;
+      }
+      homeFeedDefaultMode.value = payload.defaultMode;
     }
+
+    if (shouldSaveReels) {
+      const payload = await updateReelsFeedDefault(reelsFeedDefaultMode.value);
+      if (appStore.stats) {
+        appStore.stats.preferences.defaultReelsFeedMode = payload.defaultMode;
+      }
+      reelsFeedDefaultMode.value = payload.defaultMode;
+    }
+
     await appStore.fetchStats({ background: true });
-    homeFeedDefaultMode.value = payload.defaultMode;
-    setHomeFeedDefaultSuccess(
-      `The homepage now opens with ${homeFeedDefaultOptions.find((mode) => mode.id === payload.defaultMode)?.label ?? 'Random'}.`
-    );
+
+    if (shouldSaveHome && shouldSaveReels) {
+      setFeedDefaultsFeedback('success', 'Home and Reels defaults were updated.');
+    } else if (shouldSaveHome) {
+      setFeedDefaultsFeedback(
+        'success',
+        `The homepage now opens with ${homeFeedDefaultOptions.find((mode) => mode.id === homeFeedDefaultMode.value)?.label ?? 'Random'}.`
+      );
+    } else {
+      setFeedDefaultsFeedback(
+        'success',
+        `Reels now opens with ${reelsFeedDefaultOptions.find((mode) => mode.id === reelsFeedDefaultMode.value)?.label ?? 'Random'}.`
+      );
+    }
   } catch (error) {
-    setHomeFeedDefaultError(error instanceof Error ? error.message : 'Unable to update the home feed default.');
+    await appStore.fetchStats({ background: true }).catch(() => {});
+    setFeedDefaultsFeedback('error', error instanceof Error ? error.message : 'Unable to update the feed defaults.');
   } finally {
-    savingHomeFeedDefault.value = false;
+    savingFeedDefaults.value = false;
   }
 }
 
@@ -1488,15 +1593,21 @@ onMounted(async () => {
     await appStore.fetchStats();
   }
 
-  homeFeedDefaultMode.value = appStore.defaultHomeFeedMode;
+  if (appStore.stats) {
+    syncFeedDefaultsFromSaved();
+  }
   await loadAdminStats().catch(() => {});
 });
 
 watch(
-  () => savedHomeFeedDefaultMode.value,
-  (mode) => {
-    if (!homeFeedDefaultDirty.value || savingHomeFeedDefault.value) {
-      homeFeedDefaultMode.value = mode;
+  () => [appStore.stats, appStore.loadingStats, savedHomeFeedDefaultMode.value, savedReelsFeedDefaultMode.value] as const,
+  ([stats, loadingStats]) => {
+    if (!stats || loadingStats) {
+      return;
+    }
+
+    if (!feedDefaultsHydrated.value || savingFeedDefaults.value || !feedDefaultsDirty.value) {
+      syncFeedDefaultsFromSaved();
     }
   },
   {

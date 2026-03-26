@@ -7,6 +7,7 @@ import LikesView from '../views/LikesView.vue';
 import ExploreView from '../views/ExploreView.vue';
 import FolderView from '../views/FolderView.vue';
 import MomentView from '../views/MomentView.vue';
+import ReelsView from '../views/ReelsView.vue';
 import TrashView from '../views/TrashView.vue';
 import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
@@ -56,6 +57,14 @@ export const router = createRouter({
       component: ExploreView,
       meta: {
         shell: 'explore'
+      }
+    },
+    {
+      path: '/reels',
+      name: 'reels',
+      component: ReelsView,
+      meta: {
+        shell: 'reels'
       }
     },
     {

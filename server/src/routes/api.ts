@@ -39,11 +39,20 @@ const feedQuerySchema = paginationQuerySchema.extend({
   mode: z.enum(['recent', 'rediscover', 'random']).default('random'),
   seed: z.coerce.number().int().nonnegative().optional()
 });
+const reelsQuerySchema = paginationQuerySchema.extend({
+  mode: z.enum(['recommended', 'recent', 'random']).default('recommended'),
+  seed: z.coerce.number().int().nonnegative().optional(),
+  lastFolder: z.string().trim().min(1).max(240).optional(),
+  recentFolders: z.string().trim().max(2400).optional()
+});
 const mediaSearchQuerySchema = paginationQuerySchema.extend({
   q: z.string().trim().min(1).max(160)
 });
 const homeFeedDefaultBodySchema = z.object({
   defaultMode: z.enum(['recent', 'rediscover', 'random'])
+});
+const reelsFeedDefaultBodySchema = z.object({
+  defaultMode: z.enum(['recommended', 'recent', 'random'])
 });
 
 const slugSchema = z.object({
@@ -116,7 +125,8 @@ export const authRequestBodySchemas = {
 };
 
 export const settingsRequestBodySchemas = {
-  homeFeedDefault: homeFeedDefaultBodySchema
+  homeFeedDefault: homeFeedDefaultBodySchema,
+  reelsFeedDefault: reelsFeedDefaultBodySchema
 };
 
 const authRateLimiter = createRateLimiter({
@@ -282,6 +292,23 @@ router.get('/feed', (request, response) => {
   response.json(galleryService.getFeed(query.page, query.limit, query.mode, query.seed));
 });
 
+router.get('/reels', (request, response) => {
+  const query = reelsQuerySchema.parse(request.query);
+  const recentOpenedFolderSlugs = query.recentFolders
+    ? query.recentFolders
+        .split(',')
+        .map((slug) => slug.trim())
+        .filter((slug, index, items) => slug.length > 0 && items.indexOf(slug) === index)
+    : [];
+
+  response.json(
+    galleryService.getReels(query.page, query.limit, query.mode, query.seed, {
+      lastOpenedFolderSlug: query.lastFolder ?? null,
+      recentOpenedFolderSlugs
+    })
+  );
+});
+
 router.get('/feed/search', (request, response) => {
   const query = mediaSearchQuerySchema.parse(request.query);
   response.json(galleryService.searchMedia(query.q, query.page, query.limit));
@@ -297,6 +324,15 @@ router.put(
   (request, response) => {
     const body = homeFeedDefaultBodySchema.parse(request.body);
     response.json(galleryService.setDefaultHomeFeedMode(body.defaultMode));
+  }
+);
+
+router.put(
+  '/admin/settings/reels-feed-default',
+  requireCapability('canAccessSettings', 'Admin access is required.'),
+  (request, response) => {
+    const body = reelsFeedDefaultBodySchema.parse(request.body);
+    response.json(galleryService.setDefaultReelsFeedMode(body.defaultMode));
   }
 );
 
