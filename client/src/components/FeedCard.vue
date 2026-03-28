@@ -200,7 +200,7 @@
           >
             <span
               class="w-[1.45rem] h-[1.45rem]"
-              :class="likesStore.isLiked(item.id) ? 'i-fluent-heart-16-filled' : 'i-fluent-heart-16-regular'"
+              :class="likesStore.isLiked(item.id) ? 'i-fluent-heart-20-filled' : 'i-fluent-heart-20-regular'"
               aria-hidden="true"
             />
           </button>

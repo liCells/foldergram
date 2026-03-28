@@ -40,15 +40,22 @@ vi.mock('../components/ReelDeck.vue', async () => {
         }
       },
       emits: ['active-change', 'prefetch'],
-      setup(props, { emit, expose }) {
+      setup(props, { emit, expose, slots }) {
         expose({
           goToPrevious: deckControls.goToPrevious,
           goToNext: deckControls.goToNext,
           navigateByWheel: deckControls.navigateByWheel
         });
 
+        const activeItem = () =>
+          (props.items.find((item) => item.id === props.activeReelId) as FeedItem | undefined) ?? (props.items[0] as FeedItem | undefined);
+
         return () =>
           h('div', { 'data-test': 'reel-deck' }, [
+            slots['mobile-action-rail']?.({
+              item: activeItem(),
+              folder: null
+            }),
             h(
               'button',
               {
@@ -198,6 +205,11 @@ function createFolder(id: number, slug: string, name: string): FolderSummary {
 describe('ReelsView', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: 1280
+    });
     deckControls.goToPrevious.mockReset();
     deckControls.goToNext.mockReset();
     deckControls.navigateByWheel.mockReset();
@@ -233,8 +245,9 @@ describe('ReelsView', () => {
 
     expect(loadInitialSpy).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-test="reel-deck"]').exists()).toBe(true);
-    expect(wrapper.get('[data-test="action-rail"]').text()).toContain('101');
-    expect(wrapper.get('[data-test="action-rail"]').attributes('data-open')).toBe('false');
+    expect(wrapper.get('.reels-view__action-rail--desktop').text()).toContain('101');
+    expect(wrapper.get('.reels-view__action-rail--desktop').attributes('data-open')).toBe('false');
+    expect(wrapper.find('.reels-view__action-rail--mobile').exists()).toBe(false);
     expect(wrapper.find('[data-test="info-shell"]').exists()).toBe(false);
   });
 
@@ -249,7 +262,7 @@ describe('ReelsView', () => {
     await flushPromises();
 
     expect(reelsStore.activeReelId).toBe(202);
-    expect(wrapper.get('[data-test="action-rail"]').text()).toContain('202');
+    expect(wrapper.get('.reels-view__action-rail--desktop').text()).toContain('202');
   });
 
   it('toggles the info sidebar from the action rail and can close it again', async () => {
@@ -259,10 +272,10 @@ describe('ReelsView', () => {
     const wrapper = mount(ReelsView);
     await flushPromises();
 
-    await wrapper.get('[data-test="toggle-info"]').trigger('click');
+    await wrapper.get('.reels-view__action-rail--desktop [data-test="toggle-info"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.get('[data-test="action-rail"]').attributes('data-open')).toBe('true');
+    expect(wrapper.get('.reels-view__action-rail--desktop').attributes('data-open')).toBe('true');
     expect(wrapper.find('[data-test="info-shell"]').exists()).toBe(true);
     expect(wrapper.get('[data-test="info-sidebar"]').text()).toContain('101');
     expect(wrapper.find('button[aria-label="Next reel"]').exists()).toBe(true);
@@ -270,8 +283,31 @@ describe('ReelsView', () => {
     await wrapper.get('[data-test="close-info"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.get('[data-test="action-rail"]').attributes('data-open')).toBe('false');
+    expect(wrapper.get('.reels-view__action-rail--desktop').attributes('data-open')).toBe('false');
     expect(wrapper.find('[data-test="info-shell"]').exists()).toBe(false);
+  });
+
+  it('renders the action rail inside the active reel on mobile viewports', async () => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: 390
+    });
+
+    const reelsStore = useReelsStore();
+    vi.spyOn(reelsStore, 'loadInitial').mockResolvedValue(undefined);
+
+    const wrapper = mount(ReelsView);
+    await flushPromises();
+
+    expect(wrapper.find('.reels-view__action-rail--desktop').exists()).toBe(false);
+    expect(wrapper.get('.reels-view__action-rail--mobile').text()).toContain('101');
+
+    await wrapper.get('.reels-view__action-rail--mobile [data-test="toggle-info"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('.reels-view__action-rail--mobile').attributes('data-open')).toBe('true');
+    expect(wrapper.find('[data-test="info-shell"]').exists()).toBe(true);
   });
 
   it('delegates deck prefetch and fixed navigation controls', async () => {

@@ -375,19 +375,24 @@
             </div>
 
             <div class="flex flex-col md:flex-row items-center gap-3 max-sm:items-stretch">
-              <button class="btn-primary min-w-[13rem]" type="button" :disabled="storiesModeActionBusy || !authStore.canManageLibrary" @click="openStoriesModeConfirm(false)">
+              <button
+                class="btn-primary min-w-[13rem]"
+                type="button"
+                :disabled="savingGeneralSettings || waitingForInitialStatus"
+                @click="selectStoriesMode(false)"
+              >
                 Use Stories Feature
               </button>
               <button
                 class="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] border border-border bg-transparent px-4 text-[0.92rem] font-semibold text-text transition-colors duration-180 hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-60"
                 type="button"
-                :disabled="storiesModeActionBusy || !authStore.canManageLibrary"
-                @click="openStoriesModeConfirm(true)"
+                :disabled="savingGeneralSettings || waitingForInitialStatus"
+                @click="selectStoriesMode(true)"
               >
                 Keep Legacy Behavior
               </button>
             </div>
-            <p class="m-0 text-muted">{{ storiesModeActionHelper }}</p>
+            <p class="m-0 text-muted">{{ storiesMigrationActionHelper }}</p>
           </section>
 
           <section
@@ -439,132 +444,208 @@
          └─ tiger-1.jpg</code></pre>
           </section>
 
-          <section class="card grid gap-[1.15rem] p-6">
-            <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
+          <section class="card overflow-visible p-0">
+            <div class="border-b border-border px-6 py-5">
               <div>
-                <h2 class="m-0 text-[1.18rem]">Stories folders</h2>
-                <p class="m-0 mt-[0.25rem] text-muted">
-                  {{ storiesModeDescription }}
-                </p>
+                <h2 class="m-0 text-[1.18rem]">General Settings</h2>
+                <p class="m-0 mt-[0.25rem] text-muted">App-wide defaults for stories folders, Home, and Reels.</p>
               </div>
-              <span class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap text-accent-strong bg-[color-mix(in_srgb,var(--accent-soft)_78%,transparent_22%)]">
-                {{ storiesMode ? 'Legacy folders' : 'Reserved stories' }}
-              </span>
-            </div>
-
-            <label class="flex items-start gap-3 rounded-[0.95rem] border border-border px-4 py-3 cursor-pointer">
-              <input
-                v-model="storiesMode"
-                class="mt-[0.2rem]"
-                type="checkbox"
-                :disabled="storiesModeActionBusy || waitingForInitialStatus"
-              />
-              <span class="grid gap-[0.15rem]">
-                <span class="text-[0.92rem] font-semibold text-text">Treat stories folders as normal app folders</span>
-                <span class="text-[0.84rem] text-muted">{{ storiesModeLabelDescription }}</span>
-              </span>
-            </label>
-
-            <div v-if="storiesModeFeedback" class="rounded-[0.95rem] px-4 py-3 text-[0.9rem]" :class="storiesModeFeedback.tone === 'error' ? 'border border-[rgba(214,48,49,0.24)] text-[#c0392b] bg-[rgba(214,48,49,0.08)]' : 'border border-[rgba(24,119,242,0.2)] text-accent-strong bg-[rgba(24,119,242,0.08)]'">
-              {{ storiesModeFeedback.message }}
-            </div>
-
-            <div class="flex flex-col md:flex-row items-center gap-3 max-sm:items-stretch">
-              <p class="m-0 flex-1 text-muted">{{ storiesModeActionNote }}</p>
-              <button
-                class="btn-primary min-w-[13rem]"
-                type="button"
-                :disabled="storiesModeActionDisabled"
-                :style="{ cursor: storiesModeActionBusy ? 'wait' : storiesModeActionDisabled ? 'not-allowed' : undefined }"
-                @click="openStoriesModeConfirm(storiesMode)"
-              >
-                {{ storiesModeButtonLabel }}
-              </button>
-            </div>
-          </section>
-
-          <section class="card grid gap-[1.15rem] p-6">
-            <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
-              <div>
-                <h2 class="m-0 text-[1.18rem]">Feed Defaults</h2>
-                <p class="m-0 mt-[0.25rem] text-muted">Choose what Home and Reels open with by default.</p>
-              </div>
-              <span class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap text-accent-strong bg-[color-mix(in_srgb,var(--accent-soft)_78%,transparent_22%)] max-sm:whitespace-normal">
-                Home: {{ savedHomeFeedDefaultModeLabel }} · Reels: {{ savedReelsFeedDefaultModeLabel }}
-              </span>
             </div>
 
             <div
-              v-if="feedDefaultsFeedback"
-              class="rounded-[0.95rem] px-4 py-3 text-[0.9rem]"
-              :class="feedDefaultsFeedback.tone === 'error' ? 'border border-[rgba(214,48,49,0.24)] text-[#c0392b] bg-[rgba(214,48,49,0.08)]' : 'border border-[rgba(24,119,242,0.2)] text-accent-strong bg-[rgba(24,119,242,0.08)]'"
+              v-if="generalSettingsFeedback"
+              class="mx-6 mt-5 rounded-[0.95rem] px-4 py-3 text-[0.9rem]"
+              :class="generalSettingsFeedback.tone === 'error' ? 'border border-[rgba(214,48,49,0.24)] text-[#c0392b] bg-[rgba(214,48,49,0.08)]' : 'border border-[rgba(24,119,242,0.2)] text-accent-strong bg-[rgba(24,119,242,0.08)]'"
             >
-              {{ feedDefaultsFeedback.message }}
+              {{ generalSettingsFeedback.message }}
             </div>
 
-            <div class="grid gap-4 lg:grid-cols-2">
-              <section class="grid gap-[0.75rem] rounded-[0.95rem] border border-border p-4">
-                <div class="grid gap-[0.12rem]">
-                  <h3 class="m-0 text-[0.98rem]">Home feed default</h3>
-                  <p class="m-0 text-[0.82rem] text-muted">Choose the first feed mode shown on Home.</p>
+            <div class="divide-y divide-border">
+              <div class="grid gap-3 px-6 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p class="m-0 text-[0.96rem] font-semibold text-text">Treat stories folders as normal app folders</p>
+                    <div class="group relative inline-flex">
+                      <button
+                        class="inline-flex h-6 w-6 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted cursor-help transition-colors duration-150 hover:text-text focus-visible:text-text"
+                        type="button"
+                        aria-label="Explain stories folders setting"
+                      >
+                        <span class="i-fluent-info-16-regular h-4 w-4" aria-hidden="true" />
+                      </button>
+                      <div class="pointer-events-none absolute left-0 top-[calc(100%+0.55rem)] z-30 hidden w-[min(20rem,calc(100vw-2.5rem))] rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface)_97%,var(--bg)_3%)] px-3 py-3 text-[0.78rem] leading-[1.5] text-muted shadow-[0_20px_50px_rgba(0,0,0,0.16)] group-hover:block group-focus-within:block">
+                        When this stays off, <code>AppFolder/stories</code> becomes the source for avatar stories and highlight circles. Turn it on only if folders literally named <code>stories</code> should continue behaving like normal folders everywhere in the app.
+                      </div>
+                    </div>
+                  </div>
+                  <p class="m-0 mt-[0.25rem] text-[0.84rem] text-muted">{{ storiesModeLabelDescription }}</p>
                 </div>
 
-                <div class="grid gap-2">
-                  <label
-                    v-for="mode in homeFeedDefaultOptions"
-                    :key="mode.id"
-                    class="flex min-w-0 items-start gap-[0.55rem] rounded-[0.8rem] border border-border px-3 py-[0.7rem] cursor-pointer"
+                <button
+                  class="inline-flex items-center justify-end border-0 bg-transparent p-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                  type="button"
+                  role="switch"
+                  :aria-checked="storiesMode"
+                  :disabled="savingGeneralSettings || waitingForInitialStatus"
+                  @click="toggleStoriesModeSetting"
+                >
+                  <span class="sr-only">Toggle stories folders behavior</span>
+                  <span
+                    class="inline-flex h-7 w-12 items-center rounded-full p-[0.15rem] transition-colors duration-180"
+                    :class="storiesMode ? 'bg-accent' : 'bg-[color-mix(in_srgb,var(--border)_88%,var(--surface-alt)_12%)]'"
                   >
-                    <input
-                      v-model="homeFeedDefaultMode"
-                      class="mt-[0.15rem]"
-                      :name="HOME_FEED_DEFAULT_GROUP_NAME"
-                      type="radio"
-                      :value="mode.id"
-                      :disabled="savingFeedDefaults || waitingForInitialStatus"
+                    <span
+                      class="h-[1.35rem] w-[1.35rem] rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.18)] transition-transform duration-180"
+                      :class="storiesMode ? 'translate-x-[1.2rem]' : 'translate-x-0'"
                     />
-                    <span class="grid min-w-0 gap-[0.08rem]">
-                      <span class="text-[0.86rem] font-semibold text-text">{{ mode.label }}</span>
-                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-[0.74rem] text-muted">{{ mode.description }}</span>
-                    </span>
-                  </label>
-                </div>
-              </section>
+                  </span>
+                </button>
+              </div>
 
-              <section class="grid gap-[0.75rem] rounded-[0.95rem] border border-border p-4">
-                <div class="grid gap-[0.12rem]">
-                  <h3 class="m-0 text-[0.98rem]">Reels feed default</h3>
-                  <p class="m-0 text-[0.82rem] text-muted">Choose the queue style used when Reels opens.</p>
+              <div class="grid gap-3 px-6 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div class="min-w-0">
+                  <p class="m-0 text-[0.96rem] font-semibold text-text">Home feed sort order</p>
+                  <p class="m-0 mt-[0.25rem] text-[0.84rem] text-muted">Choose the first feed mode shown on Home.</p>
                 </div>
 
-                <div class="grid gap-2">
-                  <label
-                    v-for="mode in reelsFeedDefaultOptions"
-                    :key="mode.id"
-                    class="flex min-w-0 items-start gap-[0.55rem] rounded-[0.8rem] border border-border px-3 py-[0.7rem] cursor-pointer"
+                <div class="relative w-full md:w-[18rem] md:justify-self-end" @keydown.escape.stop.prevent="closeGeneralSettingsMenu">
+                  <button
+                    class="inline-flex w-full items-center justify-between gap-3 rounded-[0.9rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_80%,transparent_20%)] px-3 py-[0.85rem] text-left transition-[border-color,box-shadow] duration-180 hover:border-[color-mix(in_srgb,var(--accent)_22%,var(--border)_78%)] hover:bg-surface-hover focus-visible:border-[color-mix(in_srgb,var(--accent)_35%,var(--border)_65%)] focus-visible:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                    type="button"
+                    :aria-expanded="activeGeneralSettingsMenu === 'home'"
+                    :disabled="savingGeneralSettings || waitingForInitialStatus"
+                    @click="toggleGeneralSettingsMenu('home')"
                   >
-                    <input
-                      v-model="reelsFeedDefaultMode"
-                      class="mt-[0.15rem]"
-                      :name="REELS_FEED_DEFAULT_GROUP_NAME"
-                      type="radio"
-                      :value="mode.id"
-                      :disabled="savingFeedDefaults || waitingForInitialStatus"
-                    />
-                    <span class="grid min-w-0 gap-[0.08rem]">
-                      <span class="text-[0.86rem] font-semibold text-text">{{ mode.label }}</span>
-                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-[0.74rem] text-muted">{{ mode.description }}</span>
+                    <span class="min-w-0 truncate text-[0.9rem] font-semibold text-text">
+                      {{ selectedHomeFeedDefaultOption.label }}
                     </span>
-                  </label>
+                    <span
+                      class="i-fluent-chevron-down-20-regular h-5 w-5 shrink-0 text-muted transition-transform duration-180"
+                      :class="activeGeneralSettingsMenu === 'home' ? 'rotate-180 text-text' : ''"
+                      aria-hidden="true"
+                    />
+                  </button>
+
+                  <button
+                    v-if="activeGeneralSettingsMenu === 'home'"
+                    class="fixed inset-0 z-40 border-0 bg-transparent"
+                    type="button"
+                    aria-label="Close home feed sort menu"
+                    @click="closeGeneralSettingsMenu"
+                  />
+
+                  <div
+                    v-if="activeGeneralSettingsMenu === 'home'"
+                    class="absolute right-0 top-[calc(100%+0.45rem)] z-50 w-full overflow-hidden rounded-[1rem] border border-border bg-[color-mix(in_srgb,var(--surface)_97%,var(--bg)_3%)] shadow-[0_28px_70px_rgba(0,0,0,0.16)]"
+                  >
+                    <div class="border-b border-border px-4 py-3">
+                      <p class="m-0 text-[0.83rem] font-semibold text-text">Home feed sort order</p>
+                    </div>
+                    <div class="grid gap-1 p-2">
+                      <button
+                        v-for="mode in homeFeedDefaultOptions"
+                        :key="mode.id"
+                        class="flex items-start gap-3 rounded-[0.85rem] border-0 px-3 py-3 text-left cursor-pointer transition-colors duration-150 hover:bg-surface-hover"
+                        :class="homeFeedDefaultMode === mode.id ? 'bg-[color-mix(in_srgb,var(--accent-soft)_72%,transparent_28%)]' : 'bg-transparent'"
+                        type="button"
+                        @click="selectHomeFeedDefault(mode.id)"
+                      >
+                        <span class="mt-[0.05rem] inline-flex h-5 w-5 items-center justify-center shrink-0 text-accent-strong">
+                          <span v-if="homeFeedDefaultMode === mode.id" class="i-fluent-checkmark-20-filled h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <span class="grid min-w-0 gap-[0.08rem]">
+                          <span class="text-[0.9rem] font-semibold text-text">{{ mode.label }}</span>
+                          <span class="text-[0.78rem] text-muted">{{ mode.description }}</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </section>
+              </div>
+
+              <div class="grid gap-3 px-6 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div class="min-w-0">
+                  <p class="m-0 text-[0.96rem] font-semibold text-text">Reels feed sort order</p>
+                  <p class="m-0 mt-[0.25rem] text-[0.84rem] text-muted">Choose the default queue style when Reels opens.</p>
+                </div>
+
+                <div class="relative w-full md:w-[18rem] md:justify-self-end" @keydown.escape.stop.prevent="closeGeneralSettingsMenu">
+                  <button
+                    class="inline-flex w-full items-center justify-between gap-3 rounded-[0.9rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_80%,transparent_20%)] px-3 py-[0.85rem] text-left transition-[border-color,box-shadow] duration-180 hover:border-[color-mix(in_srgb,var(--accent)_22%,var(--border)_78%)] hover:bg-surface-hover focus-visible:border-[color-mix(in_srgb,var(--accent)_35%,var(--border)_65%)] focus-visible:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                    type="button"
+                    :aria-expanded="activeGeneralSettingsMenu === 'reels'"
+                    :disabled="savingGeneralSettings || waitingForInitialStatus"
+                    @click="toggleGeneralSettingsMenu('reels')"
+                  >
+                    <span class="min-w-0 truncate text-[0.9rem] font-semibold text-text">
+                      {{ selectedReelsFeedDefaultOption.label }}
+                    </span>
+                    <span
+                      class="i-fluent-chevron-down-20-regular h-5 w-5 shrink-0 text-muted transition-transform duration-180"
+                      :class="activeGeneralSettingsMenu === 'reels' ? 'rotate-180 text-text' : ''"
+                      aria-hidden="true"
+                    />
+                  </button>
+
+                  <button
+                    v-if="activeGeneralSettingsMenu === 'reels'"
+                    class="fixed inset-0 z-40 border-0 bg-transparent"
+                    type="button"
+                    aria-label="Close reels feed sort menu"
+                    @click="closeGeneralSettingsMenu"
+                  />
+
+                  <div
+                    v-if="activeGeneralSettingsMenu === 'reels'"
+                    class="absolute right-0 top-[calc(100%+0.45rem)] z-50 w-full overflow-hidden rounded-[1rem] border border-border bg-[color-mix(in_srgb,var(--surface)_97%,var(--bg)_3%)] shadow-[0_28px_70px_rgba(0,0,0,0.16)]"
+                  >
+                    <div class="border-b border-border px-4 py-3">
+                      <p class="m-0 text-[0.83rem] font-semibold text-text">Reels feed sort order</p>
+                    </div>
+                    <div class="grid gap-1 p-2">
+                      <button
+                        v-for="mode in reelsFeedDefaultOptions"
+                        :key="mode.id"
+                        class="flex items-start gap-3 rounded-[0.85rem] border-0 px-3 py-3 text-left cursor-pointer transition-colors duration-150 hover:bg-surface-hover"
+                        :class="reelsFeedDefaultMode === mode.id ? 'bg-[color-mix(in_srgb,var(--accent-soft)_72%,transparent_28%)]' : 'bg-transparent'"
+                        type="button"
+                        @click="selectReelsFeedDefault(mode.id)"
+                      >
+                        <span class="mt-[0.05rem] inline-flex h-5 w-5 items-center justify-center shrink-0 text-accent-strong">
+                          <span v-if="reelsFeedDefaultMode === mode.id" class="i-fluent-checkmark-20-filled h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <span class="grid min-w-0 gap-[0.08rem]">
+                          <span class="text-[0.9rem] font-semibold text-text">{{ mode.label }}</span>
+                          <span class="text-[0.78rem] text-muted">{{ mode.description }}</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
-            <div class="flex flex-col md:flex-row items-center gap-3 max-sm:items-stretch">
-              <p class="m-0 flex-1 text-muted">{{ feedDefaultsActionNote }}</p>
-              <button class="btn-primary min-w-[13rem]" :style="feedDefaultsButtonStyle" type="button" :disabled="feedDefaultsSaveDisabled" @click="saveFeedDefaults">
-                {{ feedDefaultsButtonLabel }}
-              </button>
+            <div class="border-t border-border bg-[color-mix(in_srgb,var(--surface)_96%,var(--accent-soft)_4%)] px-6 py-5">
+              <div
+                v-if="showStoriesRescanNotice"
+                class="mb-4 rounded-[0.95rem] border border-[rgba(210,161,51,0.28)] bg-[rgba(210,161,51,0.08)] px-4 py-3 text-[0.88rem] text-[#9f6a00]"
+              >
+                Save this change, then run a library scan before expecting stories folders, avatar stories, or highlights to update.
+              </div>
+
+              <div class="flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch">
+                <p class="m-0 flex-1 text-[0.84rem] text-muted">{{ generalSettingsActionNote }}</p>
+                <button
+                  class="btn-primary min-w-[10.5rem] self-end max-sm:self-stretch"
+                  type="button"
+                  :disabled="generalSettingsSaveDisabled"
+                  :style="generalSettingsButtonStyle"
+                  @click="saveGeneralSettings"
+                >
+                  {{ generalSettingsButtonLabel }}
+                </button>
+              </div>
             </div>
           </section>
 
@@ -739,16 +820,6 @@
       @cancel="confirmThumbnailRebuildOpen = false"
       @confirm="runThumbnailRebuild"
     />
-    <ConfirmDialog
-      v-if="confirmStoriesModeOpen"
-      :title="storiesModeConfirmTitle"
-      :message="storiesModeConfirmMessage"
-      confirm-label="Save and Rescan"
-      loading-label="Saving..."
-      :loading="savingStoriesMode"
-      @cancel="confirmStoriesModeOpen = false"
-      @confirm="runStoriesModeSave"
-    />
   </section>
 </template>
 <script setup lang="ts">
@@ -781,15 +852,12 @@ const thumbnailRebuildError = ref<string | null>(null);
 const requestingScan = ref(false);
 const rebuilding = ref(false);
 const rebuildingThumbnails = ref(false);
-const savingStoriesMode = ref(false);
-const savingFeedDefaults = ref(false);
+const savingGeneralSettings = ref(false);
 const confirmRebuildOpen = ref(false);
 const confirmThumbnailRebuildOpen = ref(false);
-const confirmStoriesModeOpen = ref(false);
 const authFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
 const viewerFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
-const feedDefaultsFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
-const storiesModeFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
+const generalSettingsFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
 const adminStats = ref<AppStats | null>(null);
 const showChangePasswordForm = ref(false);
 const showDisablePasswordForm = ref(false);
@@ -804,7 +872,7 @@ const reelsFeedDefaultMode = ref<ReelsFeedMode>('random');
 const storiesMode = ref(false);
 const feedDefaultsHydrated = ref(false);
 const storiesModeHydrated = ref(false);
-const pendingStoriesModeValue = ref<boolean | null>(null);
+const activeGeneralSettingsMenu = ref<'home' | 'reels' | null>(null);
 const showStoriesAnnouncementStructure = ref(false);
 const viewerAccessMode = ref<ViewerAccessMode>(authStore.accessMode);
 const viewerPassword = ref('');
@@ -813,8 +881,6 @@ const SCAN_ERROR_NOTICE_STORAGE_KEY = 'foldergram-scan-error-notice-dismissal';
 const IGNORED_ROOT_MEDIA_NOTICE_STORAGE_KEY = 'foldergram-ignored-root-media-notice-dismissal';
 const NOTICE_DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 const MIN_PASSWORD_LENGTH = 8;
-const HOME_FEED_DEFAULT_GROUP_NAME = 'home-feed-default';
-const REELS_FEED_DEFAULT_GROUP_NAME = 'reels-feed-default';
 const STORIES_MIGRATION_NOTICE_STORAGE_KEY = 'foldergram-stories-migration-dismissed';
 const STORIES_ANNOUNCEMENT_STORAGE_KEY = 'foldergram-stories-announcement-dismissed';
 
@@ -882,12 +948,8 @@ function clearViewerFeedback() {
   authStore.clearError();
 }
 
-function clearFeedDefaultsFeedback() {
-  feedDefaultsFeedback.value = null;
-}
-
-function clearStoriesModeFeedback() {
-  storiesModeFeedback.value = null;
+function clearGeneralSettingsFeedback() {
+  generalSettingsFeedback.value = null;
 }
 
 function setAuthError(message: string) {
@@ -918,8 +980,8 @@ function setViewerSuccess(message: string) {
   };
 }
 
-function setFeedDefaultsFeedback(tone: 'success' | 'error', message: string) {
-  feedDefaultsFeedback.value = {
+function setGeneralSettingsFeedback(tone: 'success' | 'error', message: string) {
+  generalSettingsFeedback.value = {
     tone,
     message
   };
@@ -1033,6 +1095,12 @@ const savedHomeFeedDefaultModeLabel = computed(
 const savedReelsFeedDefaultModeLabel = computed(
   () => reelsFeedDefaultOptions.find((mode) => mode.id === savedReelsFeedDefaultMode.value)?.label ?? 'Random'
 );
+const selectedHomeFeedDefaultOption = computed(
+  () => homeFeedDefaultOptions.find((mode) => mode.id === homeFeedDefaultMode.value) ?? homeFeedDefaultOptions[0]
+);
+const selectedReelsFeedDefaultOption = computed(
+  () => reelsFeedDefaultOptions.find((mode) => mode.id === reelsFeedDefaultMode.value) ?? reelsFeedDefaultOptions[0]
+);
 const homeFeedDefaultDirty = computed(
   () => feedDefaultsHydrated.value && homeFeedDefaultMode.value !== savedHomeFeedDefaultMode.value
 );
@@ -1041,47 +1109,38 @@ const reelsFeedDefaultDirty = computed(
 );
 const feedDefaultsDirty = computed(() => homeFeedDefaultDirty.value || reelsFeedDefaultDirty.value);
 const storiesModeDirty = computed(() => storiesModeHydrated.value && storiesMode.value !== savedStoriesMode.value);
-const feedDefaultsSaveDisabled = computed(
-  () => waitingForInitialStatus.value || savingFeedDefaults.value || !feedDefaultsDirty.value
+const generalSettingsDirty = computed(
+  () => feedDefaultsDirty.value || storiesModeDirty.value || storiesModeRequiresDecision.value
 );
-const storiesModeActionBusy = computed(
-  () => savingStoriesMode.value || requestingScan.value || rebuilding.value || rebuildingThumbnails.value || appStore.isScanning
+const showStoriesRescanNotice = computed(() => storiesModeDirty.value || storiesModeRequiresDecision.value);
+const generalSettingsSaveDisabled = computed(
+  () => waitingForInitialStatus.value || savingGeneralSettings.value || !generalSettingsDirty.value
 );
-const storiesModeActionDisabled = computed(
-  () =>
-    waitingForInitialStatus.value ||
-    appStore.isLibraryUnavailable ||
-    storiesModeActionBusy.value ||
-    (!storiesModeDirty.value && !storiesModeRequiresDecision.value)
-);
-const feedDefaultsButtonLabel = computed(() => {
-  if (savingFeedDefaults.value) {
+const generalSettingsButtonLabel = computed(() => {
+  if (savingGeneralSettings.value) {
     return 'Saving...';
   }
 
-  return feedDefaultsDirty.value ? 'Save Feed Defaults' : 'Saved';
+  return generalSettingsDirty.value ? 'Save changes' : 'Saved';
 });
-const storiesModeButtonLabel = computed(() => {
-  if (savingStoriesMode.value) {
-    return 'Saving...';
+const generalSettingsButtonStyle = computed(() =>
+  generalSettingsSaveDisabled.value ? { cursor: savingGeneralSettings.value ? 'wait' : 'not-allowed' } : undefined
+);
+const generalSettingsActionNote = computed(() => {
+  if (waitingForInitialStatus.value) {
+    return 'Loading the current app preferences...';
+  }
+
+  if (storiesModeDirty.value && feedDefaultsDirty.value) {
+    return 'Save the new stories rule and the updated feed defaults together.';
   }
 
   if (storiesModeDirty.value || storiesModeRequiresDecision.value) {
-    return 'Save and Rescan';
-  }
-
-  return 'Saved';
-});
-const feedDefaultsButtonStyle = computed(() =>
-  feedDefaultsSaveDisabled.value ? { cursor: savingFeedDefaults.value ? 'wait' : 'not-allowed' } : undefined
-);
-const feedDefaultsActionNote = computed(() => {
-  if (waitingForInitialStatus.value) {
-    return 'Loading the current app preference...';
+    return 'This saves the stories folders rule only. Run a library scan afterward to reindex with the new behavior.';
   }
 
   if (homeFeedDefaultDirty.value && reelsFeedDefaultDirty.value) {
-    return 'Save both updates together. Home visitors can still switch modes on the homepage; Reels stays app-default only.';
+    return 'Save both feed defaults together. Home visitors can still switch modes on the homepage; Reels stays app-default only.';
   }
 
   if (homeFeedDefaultDirty.value) {
@@ -1092,51 +1151,19 @@ const feedDefaultsActionNote = computed(() => {
     return 'This updates the queue style used when Reels opens for this app. Visitors cannot switch modes from the reels page.';
   }
 
-  return 'These are the current app-wide defaults for Home and Reels.';
+  return 'These are the current app-wide defaults for Home, Reels, and stories folders.';
 });
-const storiesModeDescription = computed(() =>
-  storiesMode.value
-    ? 'Folders named stories behave like ordinary app folders across the app.'
-    : 'Folders named stories become profile stories/highlights instead of standalone app folders.'
-);
 const storiesModeLabelDescription = computed(() =>
   storiesMode.value
     ? 'Legacy mode is enabled. stories folders remain ordinary app folders everywhere.'
     : 'Reserved stories mode is enabled. AppFolder/stories powers avatar stories and highlight circles.'
 );
-const storiesModeActionNote = computed(() => {
-  if (waitingForInitialStatus.value) {
-    return 'Loading the current stories folders mode...';
+const storiesMigrationActionHelper = computed(() => {
+  if (savingGeneralSettings.value) {
+    return 'Wait for the current settings update to finish first.';
   }
 
-  if (appStore.isLibraryUnavailable) {
-    return appStore.libraryUnavailableReason;
-  }
-
-  if (storiesModeActionBusy.value) {
-    return 'Wait for the current library task to finish first.';
-  }
-
-  if (storiesModeRequiresDecision.value) {
-    return 'Save your choice and rescan so the indexed folder structure matches the stories mode.';
-  }
-
-  if (storiesModeDirty.value) {
-    return 'Changing this setting requires a rescan because stories paths are reinterpreted.';
-  }
-
-  return 'Reserved stories mode is the default. Enable legacy mode only if you rely on normal app folders literally named stories.';
-});
-const storiesModeActionHelper = computed(() => {
-  if (!authStore.canManageLibrary) {
-    return 'An admin session needs to confirm the stories folder mode and run the rescan.';
-  }
-
-  if (storiesModeActionBusy.value) {
-    return 'Wait for the current library task to finish first.';
-  }
-
-  return 'This saves the setting immediately and starts a full rescan so the library reflects the chosen mode.';
+  return 'Choose a mode here, then save it below. Run a library scan afterward so the indexed folder structure matches.';
 });
 const showStoriesMigrationNotice = computed(
   () =>
@@ -1149,17 +1176,6 @@ const showStoriesAnnouncementCard = computed(
     appStore.stats?.storiesMigration.hasLegacyStoriesCandidates === false &&
     appStore.stats?.storiesMigration.decisionPending === true &&
     !dismissedStoriesAnnouncement.value
-);
-const storiesModeConfirmTarget = computed(() => pendingStoriesModeValue.value ?? storiesMode.value);
-const storiesModeConfirmTitle = computed(() =>
-  storiesModeConfirmTarget.value
-    ? 'Treat stories folders as normal app folders?'
-    : 'Enable reserved stories folders?'
-);
-const storiesModeConfirmMessage = computed(() =>
-  storiesModeConfirmTarget.value
-    ? 'This will keep folders named stories behaving like normal app folders everywhere in the app. A rescan will start immediately because the indexed folder structure may change.'
-    : 'This will reserve AppFolder/stories for avatar stories and highlight capsules by default. A rescan will start immediately because the indexed folder structure may change.'
 );
 const scanActionDisabled = computed(
   () =>
@@ -1709,20 +1725,66 @@ async function signOut() {
   }
 }
 
-async function saveFeedDefaults() {
-  if (feedDefaultsSaveDisabled.value) {
+function closeGeneralSettingsMenu() {
+  activeGeneralSettingsMenu.value = null;
+}
+
+function toggleGeneralSettingsMenu(menu: 'home' | 'reels') {
+  clearGeneralSettingsFeedback();
+  activeGeneralSettingsMenu.value = activeGeneralSettingsMenu.value === menu ? null : menu;
+}
+
+function selectStoriesMode(value: boolean) {
+  clearGeneralSettingsFeedback();
+  closeGeneralSettingsMenu();
+  storiesMode.value = value;
+}
+
+function toggleStoriesModeSetting() {
+  selectStoriesMode(!storiesMode.value);
+}
+
+function selectHomeFeedDefault(mode: FeedMode) {
+  clearGeneralSettingsFeedback();
+  homeFeedDefaultMode.value = mode;
+  closeGeneralSettingsMenu();
+}
+
+function selectReelsFeedDefault(mode: ReelsFeedMode) {
+  clearGeneralSettingsFeedback();
+  reelsFeedDefaultMode.value = mode;
+  closeGeneralSettingsMenu();
+}
+
+async function saveGeneralSettings() {
+  if (generalSettingsSaveDisabled.value) {
     return;
   }
 
+  const shouldSaveStories = storiesModeDirty.value || storiesModeRequiresDecision.value;
   const shouldSaveHome = homeFeedDefaultDirty.value;
   const shouldSaveReels = reelsFeedDefaultDirty.value;
+  const savedParts: string[] = [];
 
-  savingFeedDefaults.value = true;
-  clearFeedDefaultsFeedback();
+  savingGeneralSettings.value = true;
+  closeGeneralSettingsMenu();
+  clearGeneralSettingsFeedback();
 
   try {
+    if (shouldSaveStories) {
+      const payload = await updateStoriesMode(storiesMode.value);
+      savedParts.push('stories folder handling');
+      storiesMode.value = payload.treatStoriesAsFolders;
+
+      if (appStore.stats) {
+        appStore.stats.preferences.treatStoriesAsFolders = payload.treatStoriesAsFolders;
+        appStore.stats.storiesMigration.decisionPending = false;
+      }
+    }
+
     if (shouldSaveHome) {
       const payload = await updateHomeFeedDefault(homeFeedDefaultMode.value);
+      savedParts.push('Home feed default');
       if (appStore.stats) {
         appStore.stats.preferences.defaultHomeFeedMode = payload.defaultMode;
       }
@@ -1731,6 +1793,7 @@ async function saveFeedDefaults() {
 
     if (shouldSaveReels) {
       const payload = await updateReelsFeedDefault(reelsFeedDefaultMode.value);
+      savedParts.push('Reels feed default');
       if (appStore.stats) {
         appStore.stats.preferences.defaultReelsFeedMode = payload.defaultMode;
       }
@@ -1739,36 +1802,45 @@ async function saveFeedDefaults() {
 
     await appStore.fetchStats({ background: true });
 
-    if (shouldSaveHome && shouldSaveReels) {
-      setFeedDefaultsFeedback('success', 'Home and Reels defaults were updated.');
+    if (shouldSaveStories) {
+      await loadAdminStats().catch(() => {});
+    }
+
+    if (shouldSaveStories && (shouldSaveHome || shouldSaveReels)) {
+      setGeneralSettingsFeedback('success', 'Settings were saved. Run a library scan to apply the stories folder change.');
+    } else if (shouldSaveStories) {
+      setGeneralSettingsFeedback('success', 'Stories folder behavior was saved. Run a library scan to apply it.');
+    } else if (shouldSaveHome && shouldSaveReels) {
+      setGeneralSettingsFeedback('success', 'Home and Reels defaults were updated.');
     } else if (shouldSaveHome) {
-      setFeedDefaultsFeedback(
+      setGeneralSettingsFeedback(
         'success',
-        `The homepage now opens with ${homeFeedDefaultOptions.find((mode) => mode.id === homeFeedDefaultMode.value)?.label ?? 'Random'}.`
+        `The homepage now opens with ${selectedHomeFeedDefaultOption.value.label}.`
       );
-    } else {
-      setFeedDefaultsFeedback(
+    } else if (shouldSaveReels) {
+      setGeneralSettingsFeedback(
         'success',
-        `Reels now opens with ${reelsFeedDefaultOptions.find((mode) => mode.id === reelsFeedDefaultMode.value)?.label ?? 'Random'}.`
+        `Reels now opens with ${selectedReelsFeedDefaultOption.value.label}.`
       );
     }
   } catch (error) {
     await appStore.fetchStats({ background: true }).catch(() => {});
-    setFeedDefaultsFeedback('error', error instanceof Error ? error.message : 'Unable to update the feed defaults.');
+    if (shouldSaveStories) {
+      await loadAdminStats().catch(() => {});
+    }
+
+    const message = error instanceof Error ? error.message : 'Unable to update the general settings.';
+    if (savedParts.length > 0) {
+      setGeneralSettingsFeedback(
+        'error',
+        `Some settings were saved (${savedParts.join(', ')}), but the update did not finish: ${message}`
+      );
+    } else {
+      setGeneralSettingsFeedback('error', message);
+    }
   } finally {
-    savingFeedDefaults.value = false;
+    savingGeneralSettings.value = false;
   }
-}
-
-function openStoriesModeConfirm(value: boolean) {
-  if (!authStore.canManageLibrary) {
-    return;
-  }
-
-  clearStoriesModeFeedback();
-  storiesMode.value = value;
-  pendingStoriesModeValue.value = value;
-  confirmStoriesModeOpen.value = true;
 }
 
 async function warmScanStatus() {
@@ -1789,65 +1861,6 @@ async function warmScanStatus() {
 
 async function loadAdminStats() {
   adminStats.value = await fetchAdminStats();
-}
-
-async function runStoriesModeSave() {
-  if (!authStore.canManageLibrary || appStore.isLibraryUnavailable) {
-    return;
-  }
-
-  const targetValue = pendingStoriesModeValue.value ?? storiesMode.value;
-  let savedSetting = false;
-
-  savingStoriesMode.value = true;
-  clearStoriesModeFeedback();
-  confirmStoriesModeOpen.value = false;
-
-  try {
-    const payload = await updateStoriesMode(targetValue);
-    savedSetting = true;
-    storiesMode.value = payload.treatStoriesAsFolders;
-
-    if (appStore.stats) {
-      appStore.stats.preferences.treatStoriesAsFolders = payload.treatStoriesAsFolders;
-      appStore.stats.storiesMigration.decisionPending = false;
-    }
-
-    const request = triggerManualScan();
-    void warmScanStatus();
-    await request;
-    await appStore.fetchStats({ background: true });
-    await loadAdminStats().catch(() => {});
-    await Promise.all([
-      foldersStore.fetchFolders(true),
-      feedStore.loadInitial(true),
-      likesStore.initialize(true),
-      momentsStore.fetchMoments(true)
-    ]);
-
-    storiesModeFeedback.value = {
-      tone: 'success',
-      message: targetValue
-        ? 'stories folders now behave like normal app folders. The library was rescanned.'
-        : 'Reserved stories folders are now active. The library was rescanned.'
-    };
-  } catch (error) {
-    await appStore.fetchStats({ background: true }).catch(() => {});
-    await loadAdminStats().catch(() => {});
-    storiesModeFeedback.value = {
-      tone: 'error',
-      message: savedSetting
-        ? error instanceof Error
-          ? `The stories folders setting was saved, but the rescan failed: ${error.message}`
-          : 'The stories folders setting was saved, but the rescan failed.'
-        : error instanceof Error
-          ? error.message
-          : 'Unable to update the stories folders setting.'
-    };
-  } finally {
-    pendingStoriesModeValue.value = null;
-    savingStoriesMode.value = false;
-  }
 }
 
 async function runManualScan() {
@@ -1957,11 +1970,11 @@ watch(
       return;
     }
 
-    if (!feedDefaultsHydrated.value || savingFeedDefaults.value || !feedDefaultsDirty.value) {
+    if (!feedDefaultsHydrated.value || savingGeneralSettings.value || !feedDefaultsDirty.value) {
       syncFeedDefaultsFromSaved();
     }
 
-    if (!storiesModeHydrated.value || savingStoriesMode.value || !storiesModeDirty.value) {
+    if (!storiesModeHydrated.value || savingGeneralSettings.value || !storiesModeDirty.value) {
       syncStoriesModeFromSaved();
     }
   },

@@ -15,7 +15,15 @@
         :item="item"
         :folder="folderLookup.get(item.folderSlug) ?? null"
         :active="item.id === activeReelId"
-      />
+      >
+        <template v-if="item.id === activeReelId" #mobile-action-rail>
+          <slot
+            name="mobile-action-rail"
+            :item="item"
+            :folder="folderLookup.get(item.folderSlug) ?? null"
+          />
+        </template>
+      </ReelPlayerCard>
     </div>
 
     <div v-if="loading && items.length > 0" class="reel-deck__status" role="status" aria-live="polite">

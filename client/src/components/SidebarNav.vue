@@ -157,8 +157,8 @@
             class="sidebar__icon flex-shrink-0 w-[1.58rem] h-[1.58rem]"
             :class="
               isActive
-                ? 'i-fluent-heart-16-filled'
-                : 'i-fluent-heart-16-regular'
+                ? 'i-fluent-heart-20-filled'
+                : 'i-fluent-heart-20-regular'
             "
             aria-hidden="true"
           />
@@ -254,34 +254,23 @@
             :to="{ name: 'trash' }"
             @click="closeMoreMenu"
           >
-            <svg
-              class="w-[1.18rem] h-[1.18rem] shrink-0"
-              viewBox="0 0 24 24"
-              role="presentation"
-            >
-              <path
-                d="M9 4.75h6m-8 3h10m-8.5 0v10a1.25 1.25 0 0 0 1.25 1.25h4.5A1.25 1.25 0 0 0 15.5 17.75v-10m-4 3v5m4-5v5"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.8"
-              />
-            </svg>
+            <span class="i-fluent-delete-16-regular w-[1.18rem] h-[1.18rem] shrink-0" aria-hidden="true" />
             <span>Trash</span>
           </RouterLink>
 
-          <RouterLink
-            v-if="authStore.canAccessSettings"
-            class="flex items-center gap-[0.95rem] px-[1.2rem] py-[1rem] text-[0.98rem] text-text transition-colors duration-150 hover:bg-surface-hover"
-            :to="{ name: 'settings' }"
-            @click="closeMoreMenu"
-          >
-            <span
-              class="i-fluent-settings-16-regular w-[1.18rem] h-[1.18rem] shrink-0"
-              aria-hidden="true"
-            />
-            <span>Settings</span>
+          <RouterLink v-if="authStore.canAccessSettings" custom :to="{ name: 'settings' }" v-slot="{ href, navigate, isActive }">
+            <a
+              :href="href"
+              class="flex items-center gap-[0.95rem] px-[1.2rem] py-[1rem] text-[0.98rem] text-text transition-colors duration-150 hover:bg-surface-hover"
+              @click="handleSettingsNavigate(navigate)"
+            >
+              <span
+                class="w-[1.18rem] h-[1.18rem] shrink-0"
+                :class="isActive ? 'i-fluent-settings-20-filled' : 'i-fluent-settings-20-regular'"
+                aria-hidden="true"
+              />
+              <span>Settings</span>
+            </a>
           </RouterLink>
 
           <button
@@ -304,36 +293,16 @@
             :aria-label="appearanceLabel"
             @click="handleAppearanceToggle"
           >
-            <svg
+            <span
               v-if="appStore.theme === 'light'"
-              class="w-[1.18rem] h-[1.18rem] shrink-0"
-              viewBox="0 0 24 24"
-              role="presentation"
-            >
-              <path
-                d="M20 14.5A7.5 7.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.8"
-              />
-            </svg>
-            <svg
+              class="i-fluent-weather-moon-20-regular w-[1.18rem] h-[1.18rem] shrink-0"
+              aria-hidden="true"
+            />
+            <span
               v-else
-              class="w-[1.18rem] h-[1.18rem] shrink-0"
-              viewBox="0 0 24 24"
-              role="presentation"
-            >
-              <path
-                d="M12 3v2.5m0 13V21m9-9h-2.5M5.5 12H3m14.86 6.36-1.77-1.77M7.91 7.91 6.14 6.14m11.72 0-1.77 1.77M7.91 16.09l-1.77 1.77M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.8"
-              />
-            </svg>
+              class="i-fluent-weather-sunny-20-regular w-[1.18rem] h-[1.18rem] shrink-0"
+              aria-hidden="true"
+            />
             <span>Switch appearance</span>
           </button>
 
@@ -436,6 +405,11 @@
   function handleUnlockAdmin() {
     authStore.openUnlockDialog()
     closeMoreMenu()
+  }
+
+  function handleSettingsNavigate(navigate: () => void) {
+    closeMoreMenu()
+    navigate()
   }
 
   async function handleSignOut() {

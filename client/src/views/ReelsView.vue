@@ -34,12 +34,35 @@
           :loading="reelsStore.loading"
           @active-change="handleActiveChange"
           @prefetch="handlePrefetch"
-        />
+        >
+          <template #mobile-action-rail="{ item }">
+            <ReelActionRail
+              v-if="isMobileViewport"
+              class="reels-view__action-rail reels-view__action-rail--mobile"
+              :item="item"
+              :info-open="isInfoSidebarOpen"
+              @toggle-info="handleInfoToggle"
+            >
+              <template #info-panel>
+                <Transition name="reels-info-popup">
+                  <div v-if="isInfoSidebarOpen" data-test="info-shell" class="reels-view__info-shell">
+                    <ReelInfoSidebar
+                      :item="item"
+                      :folder="activeFolder"
+                      :open="isInfoSidebarOpen"
+                      @close="closeInfoSidebar"
+                    />
+                  </div>
+                </Transition>
+              </template>
+            </ReelActionRail>
+          </template>
+        </ReelDeck>
       </div>
 
       <ReelActionRail
-        v-if="activeItem"
-        class="reels-view__action-rail hidden md:grid"
+        v-if="activeItem && !isMobileViewport"
+        class="reels-view__action-rail reels-view__action-rail--desktop"
         :item="activeItem"
         :info-open="isInfoSidebarOpen"
         @toggle-info="handleInfoToggle"
@@ -115,6 +138,7 @@ const foldersStore = useFoldersStore();
 const reelsStore = useReelsStore();
 const deckElement = ref<InstanceType<typeof ReelDeck> | null>(null);
 const isInfoSidebarOpen = ref(false);
+const isMobileViewport = ref(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
 
 const activeItem = computed(() => reelsStore.activeItem);
 const activeFolder = computed(() =>
@@ -149,6 +173,10 @@ function closeInfoSidebar() {
   isInfoSidebarOpen.value = false;
 }
 
+function updateViewportMode() {
+  isMobileViewport.value = window.innerWidth <= 768;
+}
+
 function shouldCaptureGlobalWheel(event: WheelEvent) {
   if (event.defaultPrevented || Math.abs(event.deltaY) < 0.5) {
     return false;
@@ -180,11 +208,14 @@ function handleGlobalWheel(event: WheelEvent) {
 }
 
 onMounted(async () => {
+  updateViewportMode();
+  window.addEventListener('resize', updateViewportMode);
   window.addEventListener('wheel', handleGlobalWheel, { passive: false });
   await reelsStore.loadInitial();
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateViewportMode);
   window.removeEventListener('wheel', handleGlobalWheel);
 });
 
@@ -226,8 +257,27 @@ watch(activeItem, (item) => {
   margin-bottom: 4.8rem;
 }
 
+.reels-view__action-rail--mobile {
+  margin-bottom: 0;
+}
+
 .reels-view__info-shell {
   display: block;
+}
+
+.reels-view__action-rail--mobile :deep(.reel-action-rail__button) {
+  color: rgba(255, 255, 255, 0.96);
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.28));
+}
+
+.reels-view__action-rail--mobile :deep(.reel-action-rail__button:hover:not(:disabled)) {
+  color: #fff;
+}
+
+.reels-view__action-rail--mobile :deep(.reel-action-rail__info-panel) {
+  right: calc(100% + 0.75rem);
+  bottom: 0;
+  left: auto;
 }
 
 .reels-view__nav-controls {

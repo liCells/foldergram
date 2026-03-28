@@ -1,5 +1,5 @@
 <template>
-  <div class="reel-action-rail">
+  <div class="reel-action-rail" @click.stop>
     <button
       class="reel-action-rail__button"
       :class="{ 'reel-action-rail__button--liked': isLiked }"
@@ -11,7 +11,7 @@
     >
       <span
         class="reel-action-rail__icon"
-        :class="isLiked ? 'i-fluent-heart-16-filled' : 'i-fluent-heart-16-regular'"
+        :class="isLiked ? 'i-fluent-heart-20-filled' : 'i-fluent-heart-20-regular'"
         aria-hidden="true"
       />
     </button>
@@ -43,16 +43,6 @@
     >
       <span class="reel-action-rail__icon i-fluent-folder-16-regular" aria-hidden="true" />
     </RouterLink>
-
-    <a
-      class="reel-action-rail__button"
-      :href="`/api/originals/${item.id}`"
-      target="_blank"
-      rel="noreferrer"
-      aria-label="Open original video"
-    >
-      <span class="reel-action-rail__icon i-fluent-play-circle-24-regular" aria-hidden="true" />
-    </a>
   </div>
 </template>
 

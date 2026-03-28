@@ -400,8 +400,8 @@
               class="w-[1.55rem] h-[1.55rem]"
               :class="
                 likesStore.isLiked(image.id)
-                  ? 'i-fluent-heart-16-filled'
-                  : 'i-fluent-heart-16-regular'
+                  ? 'i-fluent-heart-20-filled'
+                  : 'i-fluent-heart-20-regular'
               "
               aria-hidden="true"
             />

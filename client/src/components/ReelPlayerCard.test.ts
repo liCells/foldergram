@@ -134,6 +134,47 @@ describe('ReelPlayerCard', () => {
     expect(wrapper.get('.reel-player-card__overlay').classes()).not.toContain('reel-player-card__overlay--visible');
   });
 
+  it('renders mobile action content inside the overlay controls', async () => {
+    const wrapper = mount(ReelPlayerCard, {
+      props: {
+        item: createFeedItem(8),
+        folder: createFolder(),
+        active: true
+      },
+      slots: {
+        'mobile-action-rail': '<div data-test="mobile-action-rail">actions</div>'
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.find('.reel-player-card__mobile-actions [data-test="mobile-action-rail"]').exists()).toBe(true);
+  });
+
+  it('shows a short folder path plus filename in the overlay copy', async () => {
+    const wrapper = mount(ReelPlayerCard, {
+      props: {
+        item: {
+          ...createFeedItem(9),
+          folderPath: 'OnePlus5T/Videos',
+          filename: 'filename.mp4'
+        },
+        folder: createFolder(),
+        active: true
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get('.reel-player-card__folder-description').text()).toBe('Videos/filename.mp4');
+  });
+
   it('toggles playback when the active reel surface is clicked', async () => {
     const wrapper = mount(ReelPlayerCard, {
       props: {

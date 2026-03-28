@@ -54,7 +54,7 @@
                 :name="folder?.name ?? item.folderName"
                 :src="folder?.avatarUrl ?? null"
               />
-              <div class="min-w-0">
+              <div class="reel-player-card__text">
                 <strong class="reel-player-card__folder-name">
                   {{ folder?.name ?? item.folderName }}
                 </strong>
@@ -65,22 +65,31 @@
             </RouterLink>
           </div>
 
-          <button
-            class="reel-player-card__sound-button"
-            type="button"
-            :aria-label="appStore.videoMuted ? 'Enable sound' : 'Mute sound'"
-            @click.stop="toggleSound"
-          >
-            <span
-              class="reel-player-card__sound-icon"
-              :class="
-                appStore.videoMuted
-                  ? 'i-fluent-speaker-mute-16-regular'
-                  : 'i-fluent-speaker-2-16-regular'
-              "
-              aria-hidden="true"
-            />
-          </button>
+          <div class="reel-player-card__controls">
+            <div
+              v-if="$slots['mobile-action-rail']"
+              class="reel-player-card__mobile-actions"
+            >
+              <slot name="mobile-action-rail" />
+            </div>
+
+            <button
+              class="reel-player-card__sound-button"
+              type="button"
+              :aria-label="appStore.videoMuted ? 'Enable sound' : 'Mute sound'"
+              @click.stop="toggleSound"
+            >
+              <span
+                class="reel-player-card__sound-icon"
+                :class="
+                  appStore.videoMuted
+                    ? 'i-fluent-speaker-mute-16-regular'
+                    : 'i-fluent-speaker-2-16-regular'
+                "
+                aria-hidden="true"
+              />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -116,9 +125,13 @@ const videoSource = computed<PlayerSrc>(() => ({
   type: 'video/mp4'
 }));
 const showPausedIndicator = computed(() => props.active && isPaused.value);
-const folderDescription = computed(
-  () => props.folder?.description?.trim() || props.folder?.breadcrumb || 'App Folder'
-);
+const folderDescription = computed(() => {
+  const normalizedFolderPath = props.item.folderPath.replace(/\\/g, '/');
+  const folderSegments = normalizedFolderPath.split('/').filter(Boolean);
+  const currentFolderName = folderSegments.at(-1);
+
+  return currentFolderName ? `${currentFolderName}/${props.item.filename}` : props.item.filename;
+});
 
 let muteSyncToken = 0;
 let removePlayerEventListeners: (() => void) | null = null;
@@ -478,16 +491,34 @@ onBeforeUnmount(() => {
   max-width: calc(100% - 3.3rem);
 }
 
+.reel-player-card__controls {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.reel-player-card__mobile-actions {
+  display: none;
+}
+
 .reel-player-card__folder-row {
   display: flex;
   align-items: center;
   gap: 0.78rem;
   min-width: 0;
+  width: 100%;
 }
 
 .reel-player-card__folder-link {
   color: inherit;
   text-decoration: none;
+}
+
+.reel-player-card__text {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .reel-player-card__folder-link:hover .reel-player-card__folder-name,
@@ -518,14 +549,14 @@ onBeforeUnmount(() => {
 }
 
 .reel-player-card__folder-description {
-  display: -webkit-box;
+  display: block;
   margin: 0.18rem 0 0;
   overflow: hidden;
   font-size: 0.8rem;
   line-height: 1.35;
   color: rgba(255, 255, 255, 0.72);
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reel-player-card__sound-button {
@@ -561,15 +592,21 @@ onBeforeUnmount(() => {
 
 @media (max-width: 768px) {
   .reel-player-card {
-    --reel-stage-max-width: 22.2rem;
+    --reel-stage-gap: 0;
+    padding: 0;
   }
 
   .reel-player-card__stage {
-    border-radius: 1rem;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
   }
 
   .reel-player-card__overlay {
-    padding: 0 0.85rem 0.9rem;
+    display: block;
+    padding: 0 4.85rem 1rem 1rem;
   }
 
   .reel-player-card__pause-indicator {
@@ -578,7 +615,21 @@ onBeforeUnmount(() => {
   }
 
   .reel-player-card__copy {
-    max-width: calc(100% - 3.2rem);
+    max-width: 100%;
+  }
+
+  .reel-player-card__controls {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    display: grid;
+    gap: 0.78rem;
+    align-items: end;
+    justify-items: center;
+  }
+
+  .reel-player-card__mobile-actions {
+    display: block;
   }
 
   .reel-player-card__avatar {
