@@ -6,8 +6,10 @@
       :key="item.id"
       :item="item"
       :context="context"
+      :has-avatar-story="folderLookup.get(item.folderSlug)?.hasAvatarStory ?? false"
       :avatar-url="folderLookup.get(item.folderSlug)?.avatarUrl ?? null"
       :is-active-video="context === 'home' && item.id === activeVideoId"
+      @open-folder-story="emit('openFolderStory', $event)"
       @video-visibility-change="handleVideoVisibilityChange"
     />
   </section>
@@ -39,6 +41,10 @@ const props = withDefaults(
     context: 'default'
   }
 );
+
+const emit = defineEmits<{
+  openFolderStory: [folderSlug: string];
+}>();
 
 const foldersStore = useFoldersStore();
 const folderLookup = computed(() => new Map(foldersStore.items.map((folder) => [folder.slug, folder])));

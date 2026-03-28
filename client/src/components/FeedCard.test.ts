@@ -199,4 +199,28 @@ describe('FeedCard', () => {
     expect(player.paused).toBe(false);
     expect(wrapper.find('.feed-card__pause-indicator').exists()).toBe(false);
   });
+
+  it('renders a story ring on the home avatar and emits an in-place story open event', async () => {
+    const wrapper = mount(FeedCard, {
+      props: {
+        item: createVideoItem(806),
+        avatarUrl: null,
+        hasAvatarStory: true,
+        context: 'home',
+        isActiveVideo: false
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    const avatarButton = wrapper.get('button[aria-label="Open Phone Clips stories"]');
+    expect(avatarButton.exists()).toBe(true);
+
+    await avatarButton.trigger('click');
+
+    expect(wrapper.emitted('openFolderStory')).toEqual([['phone-clips']]);
+  });
 });

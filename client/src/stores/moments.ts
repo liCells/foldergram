@@ -37,6 +37,10 @@ export const useMomentsStore = defineStore('moments', {
     loadingMoment: false,
     momentError: null
   }),
+  getters: {
+    currentCapsule: (state) => state.currentMoment,
+    currentError: (state) => state.momentError
+  },
   actions: {
     removeImage(imageId: number) {
       if (this.currentMoment) {
@@ -124,6 +128,10 @@ export const useMomentsStore = defineStore('moments', {
       } finally {
         this.loadingMoment = false;
       }
+    },
+
+    async loadCapsule(id: string, reset = true) {
+      await this.loadMoment(id, reset);
     }
   }
 });

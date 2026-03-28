@@ -115,7 +115,8 @@ describe.sequential('viewer-safe status payload', () => {
 
     expect(status.preferences).toEqual({
       defaultHomeFeedMode: 'random',
-      defaultReelsFeedMode: 'random'
+      defaultReelsFeedMode: 'random',
+      treatStoriesAsFolders: false
     });
   });
 
@@ -127,7 +128,8 @@ describe.sequential('viewer-safe status payload', () => {
 
     expect(status.preferences).toEqual({
       defaultHomeFeedMode: 'rediscover',
-      defaultReelsFeedMode: 'recommended'
+      defaultReelsFeedMode: 'recommended',
+      treatStoriesAsFolders: false
     });
   });
 });

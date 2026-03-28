@@ -3,8 +3,11 @@ import type {
   AppStats,
   AuthMutationResult,
   AuthStatus,
+  FolderStoriesPayload,
+  FolderStoryFeedPayload,
   HomeFeedDefaultSetting,
   ReelsFeedDefaultSetting,
+  StoriesModeSetting,
   ViewerAccessMode,
   DeleteImageResult,
   DeleteFolderResult,
@@ -111,6 +114,16 @@ export function fetchFolderImages(slug: string, page = 1, limit = 24, mediaType?
   }
 
   return requestJson<FolderImagesPayload>(`/api/folders/${encodeURIComponent(slug)}/images?${params.toString()}`);
+}
+
+export function fetchFolderStories(slug: string) {
+  return requestJson<FolderStoriesPayload>(`/api/folders/${encodeURIComponent(slug)}/stories`);
+}
+
+export function fetchFolderStoryFeed(slug: string, storyId: string, page = 1, limit = 24) {
+  return requestJson<FolderStoryFeedPayload>(
+    `/api/folders/${encodeURIComponent(slug)}/stories/${encodeURIComponent(storyId)}?page=${page}&limit=${limit}`
+  );
 }
 
 export function updateFolderProfile(slug: string, name: string, description: string | null) {
@@ -301,5 +314,13 @@ export function updateReelsFeedDefault(defaultMode: ReelsFeedMode) {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ defaultMode })
+  });
+}
+
+export function updateStoriesMode(treatStoriesAsFolders: boolean) {
+  return requestJson<StoriesModeSetting>('/api/admin/settings/stories-mode', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ treatStoriesAsFolders })
   });
 }

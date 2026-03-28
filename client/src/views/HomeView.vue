@@ -50,7 +50,7 @@
               @click="openRailViewer(moment.id)"
             >
               <div
-                class="rounded-full p-[0.26rem] shadow-[0_14px_30px_rgba(246,106,61,0.18)]"
+                class="rounded-full p-[0.2rem] shadow-[0_14px_30px_rgba(246,106,61,0.18)]"
                 style="background: var(--story-ring);"
               >
                 <div class="rounded-full bg-bg p-[0.2rem]">
@@ -159,21 +159,53 @@
       </section>
       <EmptyState v-else-if="feedStore.initialized && feedStore.items.length === 0" title="No posts indexed yet" description="Add folders under the gallery root and the feed will populate after the next scan." />
       <template v-else>
+        <div
+          v-if="feedStoryError"
+          class="mx-auto mb-[1.1rem] grid w-full max-w-[29.375rem] gap-[0.75rem] rounded-[1rem] border border-[rgba(214,48,49,0.24)] bg-[rgba(214,48,49,0.08)] px-4 py-[0.95rem] text-[#c0392b]"
+          role="alert"
+        >
+          <p class="m-0 text-[0.92rem]">{{ feedStoryError }}</p>
+          <div>
+            <button
+              class="inline-flex min-h-9 items-center justify-center rounded-[0.8rem] border border-[rgba(192,57,43,0.18)] bg-white/65 px-3 text-[0.82rem] font-semibold text-[#a93226] transition-colors duration-180 hover:bg-white"
+              type="button"
+              :disabled="!feedStoryRetrySlug"
+              @click="retryFeedFolderStory"
+            >
+              Retry Story
+            </button>
+          </div>
+        </div>
+
         <!-- Feed cards in home-layout context: transparent card, no shadow -->
         <div class="w-full max-w-[29.375rem] mx-auto flex flex-col gap-[1.2rem]">
-          <FeedList :items="feedStore.items" context="home" :show-skeleton="!feedStore.initialized && feedStore.loading" />
+          <FeedList
+            :items="feedStore.items"
+            context="home"
+            :show-skeleton="!feedStore.initialized && feedStore.loading"
+            @open-folder-story="openFeedFolderStory"
+          />
         </div>
         <div class="w-full max-w-[29.375rem] mx-auto">
           <InfiniteLoader :loading="feedStore.loading" :has-more="feedStore.hasMore" @load-more="feedStore.loadMore" />
         </div>
       </template>
 
-      <RailViewerModal
+      <StoriesModal
         v-if="activeRailViewerId && momentsStore.items.length"
         :items="momentsStore.items"
         :initial-id="activeRailViewerId"
         :rail-singular-label="momentsStore.railSingularLabel"
+        :store="momentsStore"
         @close="closeRailViewer"
+      />
+      <StoriesModal
+        v-if="activeFeedStoryId && folderStoriesStore.items.length"
+        :items="folderStoriesStore.items"
+        :initial-id="activeFeedStoryId"
+        :rail-singular-label="folderStoriesStore.railSingularLabel"
+        :store="folderStoriesStore"
+        @close="closeFeedFolderStory"
       />
     </div>
 
@@ -242,10 +274,11 @@ import EmptyState from '../components/EmptyState.vue';
 import ErrorState from '../components/ErrorState.vue';
 import FeedList from '../components/FeedList.vue';
 import InfiniteLoader from '../components/InfiniteLoader.vue';
-import RailViewerModal from '../components/RailViewerModal.vue';
+import StoriesModal from '../components/StoriesModal.vue';
 import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { useFeedStore } from '../stores/feed';
+import { useFolderStoriesStore } from '../stores/folder-stories';
 import { useLikesStore } from '../stores/likes';
 import { useFoldersStore } from '../stores/folders';
 import { useMomentsStore } from '../stores/moments';
@@ -255,6 +288,7 @@ import { buildLikedCountByFolder, selectHomeRecommendations } from '../utils/hom
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const feedStore = useFeedStore();
+const folderStoriesStore = useFolderStoriesStore();
 const likesStore = useLikesStore();
 const foldersStore = useFoldersStore();
 const momentsStore = useMomentsStore();
@@ -265,10 +299,13 @@ const homeRecommendations = computed(() =>
 const homeSummaryFolder = computed(() => homeRecommendations.value.homeSummaryFolder);
 const recommendedFolders = computed(() => homeRecommendations.value.recommendedFolders);
 const activeRailViewerId = ref<string | null>(null);
+const activeFeedStoryId = ref<string | null>(null);
+const feedStoryRetrySlug = ref<string | null>(null);
 const homeLayoutElement = ref<HTMLElement | null>(null);
 const isCompactHomeLayout = ref(false);
 const requestingHomeScan = ref(false);
 const homeScanError = ref<string | null>(null);
+const feedStoryError = ref<string | null>(null);
 
 const HOME_RIGHT_RAIL_BREAKPOINT = 960;
 let homeLayoutResizeObserver: ResizeObserver | null = null;
@@ -418,11 +455,57 @@ async function selectMode(mode: FeedMode) {
 }
 
 function openRailViewer(id: string) {
+  activeFeedStoryId.value = null;
   activeRailViewerId.value = id;
 }
 
 function closeRailViewer() {
   activeRailViewerId.value = null;
+}
+
+async function openFeedFolderStory(slug: string) {
+  if (appStore.isLibraryUnavailable) {
+    return;
+  }
+
+  activeRailViewerId.value = null;
+  activeFeedStoryId.value = null;
+  feedStoryRetrySlug.value = slug;
+  feedStoryError.value = null;
+
+  await folderStoriesStore.fetchStories(slug, folderStoriesStore.currentFolderSlug !== slug);
+  if (folderStoriesStore.listError) {
+    feedStoryError.value = folderStoriesStore.listError;
+    return;
+  }
+
+  if (!folderStoriesStore.hasAvatarStory || !folderStoriesStore.avatarStoryId) {
+    return;
+  }
+
+  activeFeedStoryId.value = folderStoriesStore.avatarStoryId;
+}
+
+function closeFeedFolderStory() {
+  activeFeedStoryId.value = null;
+}
+
+async function retryFeedFolderStory() {
+  if (!feedStoryRetrySlug.value) {
+    return;
+  }
+
+  await folderStoriesStore.fetchStories(feedStoryRetrySlug.value, true);
+  if (folderStoriesStore.listError) {
+    feedStoryError.value = folderStoriesStore.listError;
+    return;
+  }
+
+  feedStoryError.value = null;
+
+  if (folderStoriesStore.hasAvatarStory && folderStoriesStore.avatarStoryId) {
+    activeFeedStoryId.value = folderStoriesStore.avatarStoryId;
+  }
 }
 
 function updateHomeLayout() {
@@ -517,6 +600,17 @@ watch(
   (ids) => {
     if (activeRailViewerId.value && !ids.includes(activeRailViewerId.value)) {
       activeRailViewerId.value = ids[0] ?? null;
+    }
+  }
+);
+
+watch(
+  () => folderStoriesStore.items.map((item) => item.id),
+  (ids) => {
+    if (activeFeedStoryId.value && !ids.includes(activeFeedStoryId.value)) {
+      activeFeedStoryId.value = folderStoriesStore.avatarStoryId && ids.includes(folderStoriesStore.avatarStoryId)
+        ? folderStoriesStore.avatarStoryId
+        : null;
     }
   }
 );

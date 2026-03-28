@@ -54,12 +54,18 @@ const homeFeedDefaultBodySchema = z.object({
 const reelsFeedDefaultBodySchema = z.object({
   defaultMode: z.enum(['recommended', 'recent', 'random'])
 });
+const storiesModeBodySchema = z.object({
+  treatStoriesAsFolders: z.boolean()
+});
 
 const slugSchema = z.object({
   slug: z.string().min(1).max(240)
 });
 const momentIdSchema = z.object({
   id: z.string().min(1).max(120)
+});
+const storyIdSchema = z.object({
+  id: z.string().min(1).max(240)
 });
 
 const imageIdSchema = z.object({
@@ -126,7 +132,15 @@ export const authRequestBodySchemas = {
 
 export const settingsRequestBodySchemas = {
   homeFeedDefault: homeFeedDefaultBodySchema,
-  reelsFeedDefault: reelsFeedDefaultBodySchema
+  reelsFeedDefault: reelsFeedDefaultBodySchema,
+  storiesMode: storiesModeBodySchema
+};
+
+export const routeParamSchemas = {
+  slug: slugSchema,
+  momentId: momentIdSchema,
+  storyId: storyIdSchema,
+  imageId: imageIdSchema
 };
 
 const authRateLimiter = createRateLimiter({
@@ -336,6 +350,15 @@ router.put(
   }
 );
 
+router.put(
+  '/admin/settings/stories-mode',
+  requireCapability('canAccessSettings', 'Admin access is required.'),
+  (request, response) => {
+    const body = storiesModeBodySchema.parse(request.body);
+    response.json(galleryService.setTreatStoriesAsFolders(body.treatStoriesAsFolders));
+  }
+);
+
 router.get('/feed/moments', (_request, response) => {
   response.json(galleryService.listMoments());
 });
@@ -422,6 +445,31 @@ router.get('/folders/:slug/images', (request, response) => {
 
   if (!payload) {
     response.status(404).json({ message: 'Folder not found' });
+    return;
+  }
+
+  response.json(payload);
+});
+
+router.get('/folders/:slug/stories', (request, response) => {
+  const params = slugSchema.parse(request.params);
+  const payload = galleryService.getFolderStories(params.slug);
+
+  if (!payload) {
+    response.status(404).json({ message: 'Folder not found' });
+    return;
+  }
+
+  response.json(payload);
+});
+
+router.get('/folders/:slug/stories/:id', (request, response) => {
+  const params = slugSchema.merge(storyIdSchema).parse(request.params);
+  const query = paginationQuerySchema.parse(request.query);
+  const payload = galleryService.getFolderStoryFeed(params.slug, params.id, query.page, query.limit);
+
+  if (!payload) {
+    response.status(404).json({ message: 'Story capsule not found' });
     return;
   }
 

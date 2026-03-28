@@ -4,6 +4,7 @@ import type {
   AppSettingRecord,
   FeedImage,
   FolderAvatarSource,
+  FolderRole,
   FolderScanStateRecord,
   ImageDetail,
   ImageRecord,
@@ -22,8 +23,26 @@ const database = databaseManager.connection;
 const EFFECTIVE_FEED_TIME_SQL = 'COALESCE(images.taken_at, images.sort_timestamp)';
 const COVER_FILENAMES = ['cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp', 'cover.gif'] as const;
 const COVER_FILENAME_SQL = COVER_FILENAMES.map((name) => `'${name}'`).join(', ');
-const VISIBLE_IMAGE_WHERE_SQL = `images.is_deleted = 0 AND images.is_trashed = 0 AND LOWER(images.filename) NOT IN (${COVER_FILENAME_SQL})`;
-const VISIBLE_IMAGE_WHERE_UNSCOPED_SQL = `is_deleted = 0 AND is_trashed = 0 AND LOWER(filename) NOT IN (${COVER_FILENAME_SQL})`;
+const NORMAL_FOLDER_ROLE_SQL = "folders.role = 'normal'";
+const NORMAL_FOLDER_ID_SUBQUERY_SQL = "SELECT id FROM folders WHERE role = 'normal'";
+const VISIBLE_IMAGE_WHERE_SQL =
+  `images.is_deleted = 0 AND images.is_trashed = 0 AND LOWER(images.filename) NOT IN (${COVER_FILENAME_SQL}) AND ${NORMAL_FOLDER_ROLE_SQL}`;
+const VISIBLE_IMAGE_WHERE_UNSCOPED_SQL =
+  `is_deleted = 0 AND is_trashed = 0 AND LOWER(filename) NOT IN (${COVER_FILENAME_SQL}) AND folder_id IN (${NORMAL_FOLDER_ID_SUBQUERY_SQL})`;
+const STORY_IMAGE_WHERE_SQL = 'images.is_deleted = 0 AND images.is_trashed = 0';
+const STORY_IMAGE_WHERE_UNSCOPED_SQL = 'is_deleted = 0 AND is_trashed = 0';
+const HAS_AVATAR_STORY_SQL = `
+  EXISTS (
+    SELECT 1
+    FROM folders AS story_folders
+    INNER JOIN images AS story_images ON story_images.folder_id = story_folders.id
+    WHERE story_folders.story_owner_folder_id = folders.id
+      AND story_folders.role IN ('story_root', 'story_capsule')
+      AND story_images.is_deleted = 0
+      AND story_images.is_trashed = 0
+    LIMIT 1
+  )
+`;
 const IMAGE_FILENAME_SEARCH_SQL = 'LOWER(images.filename)';
 const FOLDER_NAME_SEARCH_SQL = 'LOWER(folders.name)';
 const FOLDER_SLUG_SEARCH_SQL = 'LOWER(folders.slug)';
@@ -177,6 +196,8 @@ export interface UpsertFolderInput {
   slug: string;
   name: string;
   folderPath: string;
+  role?: FolderRole;
+  storyOwnerFolderId?: number | null;
 }
 
 export interface SaveFolderResult {
@@ -245,6 +266,10 @@ export const folderRepository = {
     return database.prepare('SELECT * FROM folders ORDER BY folder_path COLLATE NOCASE ASC').all() as unknown as FolderRecord[];
   },
 
+  getNormalBySlug(slug: string): FolderRecord | undefined {
+    return database.prepare("SELECT * FROM folders WHERE slug = ? AND role = 'normal'").get(slug) as FolderRecord | undefined;
+  },
+
   getAllSummaries(): FolderSummaryRecord[] {
     return database
       .prepare(
@@ -253,9 +278,11 @@ export const folderRepository = {
           folders.*,
           COUNT(images.id) AS image_count,
           SUM(CASE WHEN images.media_type = 'video' THEN 1 ELSE 0 END) AS video_count,
-          MAX(images.mtime_ms) AS latest_image_mtime_ms
+          MAX(images.mtime_ms) AS latest_image_mtime_ms,
+          CASE WHEN ${HAS_AVATAR_STORY_SQL} THEN 1 ELSE 0 END AS has_avatar_story
         FROM folders
         INNER JOIN images ON images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+        WHERE folders.role = 'normal'
         GROUP BY folders.id
         ORDER BY latest_image_mtime_ms DESC, folders.name COLLATE NOCASE ASC, folders.folder_path COLLATE NOCASE ASC
         `
@@ -285,10 +312,11 @@ export const folderRepository = {
           folders.*,
           COUNT(images.id) AS image_count,
           SUM(CASE WHEN images.media_type = 'video' THEN 1 ELSE 0 END) AS video_count,
-          MAX(images.mtime_ms) AS latest_image_mtime_ms
+          MAX(images.mtime_ms) AS latest_image_mtime_ms,
+          CASE WHEN ${HAS_AVATAR_STORY_SQL} THEN 1 ELSE 0 END AS has_avatar_story
         FROM folders
         INNER JOIN images ON images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_SQL}
-        WHERE folders.slug = ?
+        WHERE folders.slug = ? AND folders.role = 'normal'
         GROUP BY folders.id
         `
       )
@@ -297,16 +325,20 @@ export const folderRepository = {
 
   upsert(input: UpsertFolderInput): FolderRecord {
     const normalizedFolderPath = normalizePath(input.folderPath);
+    const role = input.role ?? 'normal';
+    const storyOwnerFolderId = input.storyOwnerFolderId ?? null;
     database.prepare(
       `
-      INSERT INTO folders (slug, name, folder_path, updated_at)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO folders (slug, name, folder_path, role, story_owner_folder_id, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(folder_path) DO UPDATE SET
         slug = excluded.slug,
         name = excluded.name,
+        role = excluded.role,
+        story_owner_folder_id = excluded.story_owner_folder_id,
         updated_at = excluded.updated_at
       `
-    ).run(input.slug, input.name, normalizedFolderPath, nowIso());
+    ).run(input.slug, input.name, normalizedFolderPath, role, storyOwnerFolderId, nowIso());
 
     return this.getByFolderPath(normalizedFolderPath) as FolderRecord;
   },
@@ -314,7 +346,15 @@ export const folderRepository = {
   save(input: UpsertFolderInput): SaveFolderResult {
     const normalizedFolderPath = normalizePath(input.folderPath);
     const existing = this.getByFolderPath(normalizedFolderPath);
-    if (existing && existing.slug === input.slug) {
+    const role = input.role ?? 'normal';
+    const storyOwnerFolderId = input.storyOwnerFolderId ?? null;
+
+    if (
+      existing &&
+      existing.slug === input.slug &&
+      existing.role === role &&
+      existing.story_owner_folder_id === storyOwnerFolderId
+    ) {
       return {
         folder: existing,
         wrote: false
@@ -322,7 +362,9 @@ export const folderRepository = {
     }
 
     if (existing) {
-      database.prepare('UPDATE folders SET slug = ?, updated_at = ? WHERE id = ?').run(input.slug, nowIso(), existing.id);
+      database
+        .prepare('UPDATE folders SET slug = ?, role = ?, story_owner_folder_id = ?, updated_at = ? WHERE id = ?')
+        .run(input.slug, role, storyOwnerFolderId, nowIso(), existing.id);
 
       return {
         folder: this.getById(existing.id) as FolderRecord,
@@ -347,11 +389,12 @@ export const folderRepository = {
             `
             SELECT COUNT(*) AS count
             FROM folders
-            WHERE EXISTS (
-              SELECT 1
-              FROM images
-              WHERE images.folder_id = folders.id AND images.is_deleted = 0 AND images.is_trashed = 0
-            )
+            WHERE folders.role = 'normal'
+              AND EXISTS (
+                SELECT 1
+                FROM images
+                WHERE images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_UNSCOPED_SQL}
+              )
             `
           )
           .get() as { count: number }
@@ -373,13 +416,13 @@ export const folderRepository = {
   },
 
   updateMetadata(slug: string, name: string, description: string | null): FolderRecord | undefined {
-    database.prepare('UPDATE folders SET name = ?, description = ?, updated_at = ? WHERE slug = ?').run(
+    database.prepare("UPDATE folders SET name = ?, description = ?, updated_at = ? WHERE slug = ? AND role = 'normal'").run(
       name,
       description,
       nowIso(),
       slug
     );
-    return this.getBySlug(slug);
+    return this.getNormalBySlug(slug);
   },
 
   delete(id: number): void {
@@ -429,6 +472,59 @@ export const folderRepository = {
     }
 
     this.setAvatar(folderId, nextSelection.imageId, nextSelection.source);
+  },
+
+  listOwnedStoryFolders(ownerFolderId: number): FolderRecord[] {
+    return database
+      .prepare(
+        `
+        SELECT *
+        FROM folders
+        WHERE story_owner_folder_id = ?
+          AND role IN ('story_root', 'story_capsule')
+        ORDER BY
+          CASE role
+            WHEN 'story_root' THEN 0
+            ELSE 1
+          END,
+          name COLLATE NOCASE ASC,
+          folder_path COLLATE NOCASE ASC
+        `
+      )
+      .all(ownerFolderId) as unknown as FolderRecord[];
+  },
+
+  getOwnedStoryFolderBySlug(ownerFolderId: number, slug: string): FolderRecord | undefined {
+    return database
+      .prepare(
+        `
+        SELECT *
+        FROM folders
+        WHERE story_owner_folder_id = ?
+          AND slug = ?
+          AND role IN ('story_root', 'story_capsule')
+        `
+      )
+      .get(ownerFolderId, slug) as FolderRecord | undefined;
+  },
+
+  hasLegacyStoriesCandidates(): boolean {
+    const row = database
+      .prepare(
+        `
+        SELECT 1 AS found
+        FROM folders
+        WHERE
+          LOWER(folder_path) = 'stories'
+          OR LOWER(folder_path) LIKE '%/stories'
+          OR LOWER(folder_path) LIKE 'stories/%'
+          OR LOWER(folder_path) LIKE '%/stories/%'
+        LIMIT 1
+        `
+      )
+      .get() as { found: number } | undefined;
+
+    return row?.found === 1;
   }
 };
 
@@ -803,7 +899,7 @@ export const imageRepository = {
             `
             SELECT COUNT(*) AS count
             FROM images
-            WHERE ${VISIBLE_IMAGE_WHERE_SQL}
+            WHERE ${VISIBLE_IMAGE_WHERE_UNSCOPED_SQL}
               AND strftime('%m-%d', ${EFFECTIVE_FEED_TIME_SQL} / 1000, 'unixepoch', 'localtime') IN (${placeholders})
               AND CAST(strftime('%Y', ${EFFECTIVE_FEED_TIME_SQL} / 1000, 'unixepoch', 'localtime') AS INTEGER) < ?
             `
@@ -841,7 +937,7 @@ export const imageRepository = {
             `
             SELECT COUNT(*) AS count
             FROM images
-            WHERE ${VISIBLE_IMAGE_WHERE_SQL}
+            WHERE ${VISIBLE_IMAGE_WHERE_UNSCOPED_SQL}
               AND ${EFFECTIVE_FEED_TIME_SQL} BETWEEN ? AND ?
             `
           )
@@ -875,6 +971,34 @@ export const imageRepository = {
       LIMIT ? OFFSET ?
       `
     ).all(...(mediaType ? [folderId, mediaType, limit, offset] : [folderId, limit, offset])) as unknown as FeedImage[];
+  },
+
+  listStoryFolderImages(folderId: number, page: number, limit: number, mediaType?: MediaType): FeedImage[] {
+    const offset = (page - 1) * limit;
+    const mediaTypeClause = mediaType ? ' AND images.media_type = ?' : '';
+    return database.prepare(
+      `
+      ${FEED_IMAGE_SELECT_SQL}
+      WHERE images.folder_id = ? AND ${STORY_IMAGE_WHERE_SQL}${mediaTypeClause}
+      ORDER BY images.sort_timestamp DESC, images.id DESC
+      LIMIT ? OFFSET ?
+      `
+    ).all(...(mediaType ? [folderId, mediaType, limit, offset] : [folderId, limit, offset])) as unknown as FeedImage[];
+  },
+
+  listStoryCapsuleImagesByOwnerFolder(ownerFolderId: number, page: number, limit: number, mediaType?: MediaType): FeedImage[] {
+    const offset = (page - 1) * limit;
+    const mediaTypeClause = mediaType ? ' AND images.media_type = ?' : '';
+    return database.prepare(
+      `
+      ${FEED_IMAGE_SELECT_SQL}
+      WHERE folders.story_owner_folder_id = ?
+        AND folders.role = 'story_capsule'
+        AND ${STORY_IMAGE_WHERE_SQL}${mediaTypeClause}
+      ORDER BY ${EFFECTIVE_FEED_TIME_SQL} DESC, images.sort_timestamp DESC, images.id DESC
+      LIMIT ? OFFSET ?
+      `
+    ).all(...(mediaType ? [ownerFolderId, mediaType, limit, offset] : [ownerFolderId, limit, offset])) as unknown as FeedImage[];
   },
 
   listTrashed(page: number, limit: number): TrashImage[] {
@@ -936,6 +1060,37 @@ export const imageRepository = {
     );
   },
 
+  countStoryMediaByFolder(folderId: number, mediaType?: MediaType): number {
+    const mediaTypeClause = mediaType ? ' AND media_type = ?' : '';
+    return Number(
+      (
+        database
+          .prepare(`SELECT COUNT(*) AS count FROM images WHERE folder_id = ? AND ${STORY_IMAGE_WHERE_UNSCOPED_SQL}${mediaTypeClause}`)
+          .get(...(mediaType ? [folderId, mediaType] : [folderId])) as { count: number }
+      ).count
+    );
+  },
+
+  countStoryCapsuleMediaByOwnerFolder(ownerFolderId: number, mediaType?: MediaType): number {
+    const mediaTypeClause = mediaType ? ' AND images.media_type = ?' : '';
+    return Number(
+      (
+        database
+          .prepare(
+            `
+            SELECT COUNT(*) AS count
+            FROM images
+            INNER JOIN folders ON folders.id = images.folder_id
+            WHERE folders.story_owner_folder_id = ?
+              AND folders.role = 'story_capsule'
+              AND ${STORY_IMAGE_WHERE_SQL}${mediaTypeClause}
+            `
+          )
+          .get(...(mediaType ? [ownerFolderId, mediaType] : [ownerFolderId])) as { count: number }
+      ).count
+    );
+  },
+
   listActiveByFolder(folderId: number): ImageRecord[] {
     return database
       .prepare('SELECT * FROM images WHERE folder_id = ? AND is_deleted = 0 ORDER BY id ASC')
@@ -987,6 +1142,20 @@ export const imageRepository = {
       `SELECT id FROM images WHERE folder_id = ? AND ${VISIBLE_IMAGE_WHERE_UNSCOPED_SQL} ORDER BY sort_timestamp DESC, id DESC LIMIT 1`
     ).get(folderId) as { id: number } | undefined;
     return row?.id ?? null;
+  },
+
+  getLatestStoryImageId(folderId: number): number | null {
+    const row = database.prepare(
+      `SELECT id FROM images WHERE folder_id = ? AND ${STORY_IMAGE_WHERE_UNSCOPED_SQL} ORDER BY sort_timestamp DESC, id DESC LIMIT 1`
+    ).get(folderId) as { id: number } | undefined;
+    return row?.id ?? null;
+  },
+
+  getLatestEffectiveTimestampByFolder(folderId: number): number | null {
+    const row = database.prepare(
+      `SELECT MAX(COALESCE(taken_at, sort_timestamp)) AS latestTimestamp FROM images WHERE folder_id = ? AND ${STORY_IMAGE_WHERE_UNSCOPED_SQL}`
+    ).get(folderId) as { latestTimestamp: number | null } | undefined;
+    return row?.latestTimestamp ?? null;
   },
 
   getExplicitCoverImageId(folderId: number): number | null {
@@ -1175,6 +1344,7 @@ export const likeRepository = {
             SELECT COUNT(*) AS count
             FROM likes
             INNER JOIN images ON images.id = likes.image_id
+            INNER JOIN folders ON folders.id = images.folder_id
             WHERE ${VISIBLE_IMAGE_WHERE_SQL} AND ${EFFECTIVE_FEED_TIME_SQL} <= ?
             `
           )

@@ -39,7 +39,7 @@
             <div class="story-side-card__shade" />
             <div class="story-side-card__meta">
               <strong class="block truncate text-[0.92rem]">{{ previousCapsule.title }}</strong>
-              <span class="block truncate text-[0.78rem] text-white/68">{{ previousCapsule.imageCount }} posts</span>
+              <span class="block truncate text-[0.78rem] text-white/68">{{ previousCapsule.imageCount }} items</span>
             </div>
           </article>
         </button>
@@ -135,10 +135,24 @@
           />
 
           <div class="story-stage__surface" :style="activeStageTransitionStyle">
+            <video
+              v-if="displayImage?.mediaType === 'video'"
+              :key="`video-${displayImage.id}`"
+              ref="videoElement"
+              class="story-stage__video"
+              :src="displayImage.previewUrl"
+              :poster="displayImage.thumbnailUrl"
+              :muted="appStore.videoMuted"
+              autoplay
+              loop
+              playsinline
+              preload="metadata"
+            />
             <ResilientImage
-              v-if="displayImage"
+              v-else-if="displayImage"
+              :key="`image-${displayImage.id}`"
               class="story-stage__image"
-              :src="displayImage.mediaType === 'video' ? displayImage.thumbnailUrl : displayImage.previewUrl"
+              :src="displayImage.previewUrl"
               :alt="displayImage.filename"
               loading="eager"
               :retry-while="appStore.isScanning"
@@ -149,8 +163,19 @@
           </div>
 
           <footer class="story-stage__footer">
+            <div v-if="currentError" class="story-stage__error" role="alert">
+              <span>{{ currentError }}</span>
+              <button
+                class="story-stage__error-button"
+                type="button"
+                data-swipe-ignore="true"
+                @click="retryCurrentCapsule"
+              >
+                Retry
+              </button>
+            </div>
             <div class="grid gap-[0.18rem]">
-              <strong class="text-[0.92rem]">{{ displayImage?.folderName ?? activeCapsule?.title }}</strong>
+              <strong class="text-[0.92rem]">{{ activeCapsule?.title ?? displayImage?.folderName }}</strong>
               <p class="m-0 text-[0.8rem] text-white/70">{{ footerMeta }}</p>
             </div>
           </footer>
@@ -196,7 +221,7 @@
             <div class="story-side-card__shade" />
             <div class="story-side-card__meta">
               <strong class="block truncate text-[0.9rem]">{{ capsule.title }}</strong>
-              <span class="block truncate text-[0.76rem] text-white/68">{{ capsule.imageCount }} posts</span>
+              <span class="block truncate text-[0.76rem] text-white/68">{{ capsule.imageCount }} items</span>
             </div>
           </article>
         </button>
@@ -209,9 +234,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import { useHorizontalSwipe } from '../composables/useHorizontalSwipe';
-import type { FeedItem, MomentCapsule } from '../types/api';
+import type { FeedItem, RailCapsule, RailViewerStoreContract } from '../types/api';
 import { useAppStore } from '../stores/app';
-import { useMomentsStore } from '../stores/moments';
 import Avatar from './Avatar.vue';
 import ResilientImage from './ResilientImage.vue';
 
@@ -220,9 +244,10 @@ const CAPSULE_SWITCH_ANIMATION_MS = 360;
 const CAPSULE_VIEW_TRANSITION_NAME = 'rail-highlight-stage';
 
 const props = defineProps<{
-  items: MomentCapsule[];
+  items: RailCapsule[];
   initialId: string;
   railSingularLabel: string;
+  store: RailViewerStoreContract;
 }>();
 
 const emit = defineEmits<{
@@ -230,7 +255,6 @@ const emit = defineEmits<{
 }>();
 
 const appStore = useAppStore();
-const momentsStore = useMomentsStore();
 const activeCapsuleId = ref(props.initialId);
 const activeImageIndex = ref(0);
 const autoplayProgress = ref(0);
@@ -238,6 +262,7 @@ const isPaused = ref(false);
 const activeCapsuleTransitionId = ref<string | null>(null);
 const transitionPending = ref(false);
 const isCapsuleSwitching = ref(false);
+const videoElement = ref<HTMLVideoElement | null>(null);
 
 let previousBodyOverflow = '';
 let animationFrameId = 0;
@@ -245,20 +270,24 @@ let autoplayStartedAt = 0;
 
 const activeCapsuleIndex = computed(() => props.items.findIndex((item) => item.id === activeCapsuleId.value));
 const activeCapsule = computed(() => {
-  if (momentsStore.currentMoment?.id === activeCapsuleId.value) {
-    return momentsStore.currentMoment;
+  if (props.store.currentCapsule?.id === activeCapsuleId.value) {
+    return props.store.currentCapsule;
   }
 
   return props.items.find((item) => item.id === activeCapsuleId.value) ?? null;
 });
 const activeImages = computed(() =>
-  momentsStore.currentMoment?.id === activeCapsuleId.value ? momentsStore.currentImages : []
+  props.store.currentCapsule?.id === activeCapsuleId.value ? props.store.currentImages : []
 );
 const displayImage = computed<FeedItem | null>(() => activeImages.value[activeImageIndex.value] ?? activeCapsule.value?.coverImage ?? null);
 const totalImageCount = computed(() => Math.max(activeCapsule.value?.imageCount ?? activeImages.value.length, 1));
 const previousCapsule = computed(() => {
   const index = activeCapsuleIndex.value;
   return index > 0 ? props.items[index - 1] : null;
+});
+const nextCapsule = computed(() => {
+  const index = activeCapsuleIndex.value;
+  return index >= 0 ? props.items[index + 1] ?? null : null;
 });
 const nextCapsules = computed(() => {
   const index = activeCapsuleIndex.value;
@@ -276,8 +305,9 @@ const activeCapsuleMeta = computed(() => {
     return '';
   }
 
-  return `${activeCapsule.value.imageCount} posts · ${activeCapsule.value.dateContext}`;
+  return `${activeCapsule.value.imageCount} items · ${activeCapsule.value.dateContext}`;
 });
+const currentError = computed(() => props.store.currentError ?? null);
 const footerMeta = computed(() => {
   if (!displayImage.value) {
     return '';
@@ -294,7 +324,7 @@ const canGoNextImage = computed(
   () =>
     !transitionPending.value &&
     activeImages.value.length > 0 &&
-    (activeImageIndex.value < activeImages.value.length - 1 || momentsStore.currentHasMore)
+    (activeImageIndex.value < activeImages.value.length - 1 || props.store.currentHasMore || nextCapsule.value !== null)
 );
 const swipeNavigation = useHorizontalSwipe({
   canStart: canStartStageSwipe,
@@ -318,6 +348,9 @@ watch(
   () => [displayImage.value?.id ?? null, activeCapsuleId.value] as const,
   () => {
     syncAutoplayForCurrentImage();
+    void nextTick(() => {
+      syncMediaPlayback();
+    });
   }
 );
 
@@ -392,10 +425,12 @@ function togglePaused() {
 
   if (isPaused.value) {
     stopAutoplay();
+    syncMediaPlayback();
     return;
   }
 
   startAutoplay();
+  syncMediaPlayback();
 }
 
 function canStartStageSwipe(event: PointerEvent) {
@@ -436,7 +471,7 @@ async function loadCapsuleData(id: string, reset = true) {
   transitionPending.value = true;
 
   try {
-    await momentsStore.loadMoment(id, reset);
+    await props.store.loadCapsule(id, reset);
   } finally {
     transitionPending.value = false;
   }
@@ -511,13 +546,13 @@ async function showNextImageInternal(fromAutoplay: boolean) {
     return;
   }
 
-  if (momentsStore.currentHasMore) {
+  if (props.store.currentHasMore) {
     transitionPending.value = true;
     stopAutoplay();
     const previousLength = activeImages.value.length;
 
     try {
-      await momentsStore.loadMoment(activeCapsuleId.value, false);
+      await props.store.loadCapsule(activeCapsuleId.value, false);
     } finally {
       transitionPending.value = false;
     }
@@ -526,6 +561,11 @@ async function showNextImageInternal(fromAutoplay: boolean) {
       activeImageIndex.value = previousLength;
       return;
     }
+  }
+
+  if (nextCapsule.value) {
+    await openCapsule(nextCapsule.value.id, { fromPreview: true });
+    return;
   }
 
   if (fromAutoplay) {
@@ -541,6 +581,14 @@ async function showPreviousImage() {
   if (activeImageIndex.value > 0) {
     activeImageIndex.value -= 1;
   }
+}
+
+async function retryCurrentCapsule() {
+  if (transitionPending.value) {
+    return;
+  }
+
+  await loadCapsuleData(activeCapsuleId.value, activeImages.value.length === 0);
 }
 
 async function handleKeydown(event: KeyboardEvent) {
@@ -568,6 +616,24 @@ async function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function syncMediaPlayback() {
+  const player = videoElement.value;
+  if (!player || displayImage.value?.mediaType !== 'video') {
+    return;
+  }
+
+  player.muted = appStore.videoMuted;
+
+  if (isPaused.value) {
+    player.pause();
+    return;
+  }
+
+  void player.play().catch(() => {
+    // Ignore autoplay rejections so the viewer can continue advancing.
+  });
+}
+
 function lockBodyScroll() {
   previousBodyOverflow = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
@@ -581,6 +647,9 @@ onMounted(async () => {
   lockBodyScroll();
   window.addEventListener('keydown', handleKeydown);
   await ensureCapsuleLoaded(props.initialId, true);
+  await nextTick();
+  syncAutoplayForCurrentImage();
+  syncMediaPlayback();
 });
 
 onUnmounted(() => {
@@ -758,6 +827,12 @@ onUnmounted(() => {
   object-fit: contain;
 }
 
+.story-stage__video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .story-stage__empty {
   color: rgba(255, 255, 255, 0.62);
 }
@@ -882,6 +957,38 @@ onUnmounted(() => {
   z-index: 3;
   padding: 5rem 1rem 1rem;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.8) 44%, rgba(0, 0, 0, 0.96));
+}
+
+.story-stage__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(255, 122, 122, 0.3);
+  border-radius: 0.9rem;
+  background: rgba(133, 20, 20, 0.34);
+  color: rgba(255, 235, 235, 0.96);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.story-stage__error-button {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.story-stage__error-button:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 @media (max-width: 768px) {

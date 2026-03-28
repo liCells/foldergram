@@ -10,6 +10,7 @@ describe.sequential('auth route validation', () => {
   let tempRoot = '';
   let authRequestBodySchemas: ApiModule['authRequestBodySchemas'];
   let settingsRequestBodySchemas: ApiModule['settingsRequestBodySchemas'];
+  let routeParamSchemas: ApiModule['routeParamSchemas'];
 
   beforeAll(async () => {
     tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'insta-auth-route-validation-'));
@@ -27,7 +28,7 @@ describe.sequential('auth route validation', () => {
     await fs.mkdir(tempRoot, { recursive: true });
 
     vi.resetModules();
-    ({ authRequestBodySchemas, settingsRequestBodySchemas } = await import('../src/routes/api.js'));
+    ({ authRequestBodySchemas, settingsRequestBodySchemas, routeParamSchemas } = await import('../src/routes/api.js'));
   });
 
   afterAll(async () => {
@@ -113,6 +114,16 @@ describe.sequential('auth route validation', () => {
       })
     ).toEqual({
       defaultMode: 'recommended'
+    });
+  });
+
+  it('accepts long story ids up to the folder-slug route limit', () => {
+    expect(
+      routeParamSchemas.storyId.parse({
+        id: 'story-'.repeat(40)
+      })
+    ).toEqual({
+      id: 'story-'.repeat(40)
     });
   });
 });

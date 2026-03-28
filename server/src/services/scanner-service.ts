@@ -8,7 +8,8 @@ import pLimit from 'p-limit';
 import {
   LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY,
   LIBRARY_REBUILD_REQUIRED_SETTING_KEY,
-  PREVIOUS_GALLERY_ROOT_SETTING_KEY
+  PREVIOUS_GALLERY_ROOT_SETTING_KEY,
+  TREAT_STORIES_AS_FOLDERS_SETTING_KEY
 } from '../constants/app-setting-keys.js';
 import { appConfig } from '../config/env.js';
 import {
@@ -41,6 +42,11 @@ import {
   normalizePath
 } from '../utils/path-utils.js';
 import {
+  findReservedStoriesOwnerPath,
+  isStoriesFolderName,
+  parseTreatStoriesAsFoldersSetting
+} from '../utils/stories-utils.js';
+import {
   createFolderScanSignature,
   resolveFullScanOptions,
   shouldQueueDerivativeJobForStatus,
@@ -50,7 +56,7 @@ import {
   type IndexedFileStatus
 } from '../utils/scan-utils.js';
 import { resolveUniqueSlug, slugifyFolderPath } from '../utils/slug.js';
-import type { FolderRecord, FolderScanStateRecord, ScanRunRecord } from '../types/models.js';
+import type { FolderRecord, FolderRole, FolderScanStateRecord, ScanRunRecord } from '../types/models.js';
 
 interface ScanSummary {
   status: string;
@@ -89,6 +95,40 @@ interface SourceFolderCandidate {
 interface ResolvedFolderResult {
   folder: FolderRecord;
   wroteFolder: boolean;
+}
+
+interface ResolvedFolderOptions {
+  role?: FolderRole;
+  storyOwnerFolderId?: number | null;
+}
+
+interface IndexedFolderScanOptions {
+  folderPath: string;
+  scannedFileCount: number;
+  activeRelativePaths: string[];
+  discoveredFiles: IndexedFileCandidate[];
+  existingFolders: FolderRecord[];
+  usedSlugs: Set<string>;
+  folderScanStates: Map<string, FolderScanStateRecord>;
+  derivativeJobs: Map<string, DerivativeJob>;
+  errors: string[];
+  options: FullScanOptions;
+  context: ImageProcessingContext;
+  logLabel: string;
+  role?: FolderRole;
+  storyOwnerFolderId?: number | null;
+  folderHadErrors?: boolean;
+}
+
+interface IndexedFileReference {
+  absolutePath: string;
+  relativePath: string;
+}
+
+interface StatIndexedFilesResult {
+  activeRelativePaths: string[];
+  discoveredFiles: IndexedFileCandidate[];
+  folderHadErrors: boolean;
 }
 
 interface SourceFolderScanResult {
@@ -475,10 +515,15 @@ class ScannerService {
     return matchesRelativeRoot(relativePath, appConfig.managedGalleryRelativeIgnores);
   }
 
+  private shouldTreatStoriesAsFolders(): boolean {
+    return parseTreatStoriesAsFoldersSetting(appSettingsRepository.get(TREAT_STORIES_AS_FOLDERS_SETTING_KEY));
+  }
+
   private async walkMediaSourceFolders(
     currentAbsolutePath: string,
     onSourceFolder: (sourceFolder: SourceFolderCandidate) => Promise<void>,
-    currentRelativePath: string | null = null
+    currentRelativePath: string | null = null,
+    treatStoriesAsFolders = this.shouldTreatStoriesAsFolders()
   ): Promise<void> {
     this.setProgress({
       currentFolder: currentRelativePath ? normalizePath(currentRelativePath) : ROOT_DISCOVERY_LABEL
@@ -538,11 +583,15 @@ class ScannerService {
     }
 
     for (const childDirectory of childDirectories) {
-      await this.walkMediaSourceFolders(childDirectory.absolutePath, onSourceFolder, childDirectory.relativePath);
+      if (!treatStoriesAsFolders && currentRelativePath && hasDirectImages && isStoriesFolderName(path.basename(childDirectory.relativePath))) {
+        continue;
+      }
+
+      await this.walkMediaSourceFolders(childDirectory.absolutePath, onSourceFolder, childDirectory.relativePath, treatStoriesAsFolders);
     }
   }
 
-  private clearIndexedSourceFolder(sourceFolderPath: string, existingFolders: FolderRecord[]): SourceFolderScanResult {
+  private clearIndexedFolder(sourceFolderPath: string, existingFolders: FolderRecord[]): SourceFolderScanResult {
     const existingFolder = existingFolders.find(
       (folder) => normalizePath(folder.folder_path) === normalizePath(sourceFolderPath)
     );
@@ -594,7 +643,7 @@ class ScannerService {
       });
 
     if (!entries) {
-      return this.clearIndexedSourceFolder(sourceFolderPath, existingFolders);
+      return this.clearIndexedFolder(sourceFolderPath, existingFolders);
     }
 
     const imageFiles = entries.filter(
@@ -602,7 +651,7 @@ class ScannerService {
     );
 
     if (imageFiles.length === 0) {
-      return this.clearIndexedSourceFolder(sourceFolderPath, existingFolders);
+      return this.clearIndexedFolder(sourceFolderPath, existingFolders);
     }
 
     this.setProgress({
@@ -610,45 +659,348 @@ class ScannerService {
       discoveredImages: this.progress.discoveredImages + imageFiles.length
     });
 
+    const statResult = await this.statIndexedFiles(
+      imageFiles.map((entry) => {
+        const absolutePath = path.join(sourceFolder.absolutePath, entry.name);
+        return {
+          absolutePath,
+          relativePath: getRelativeGalleryPath(appConfig.galleryRoot, absolutePath)
+        };
+      }),
+      errors
+    );
+
+    const result = await this.scanIndexedFolderFiles({
+      folderPath: sourceFolderPath,
+      scannedFileCount: imageFiles.length,
+      activeRelativePaths: statResult.activeRelativePaths,
+      discoveredFiles: statResult.discoveredFiles,
+      existingFolders,
+      usedSlugs,
+      folderScanStates,
+      derivativeJobs,
+      errors,
+      options,
+      context,
+      logLabel: 'App folder indexed',
+      folderHadErrors: statResult.folderHadErrors
+    });
+
+    log.info(
+      joinLogParts([
+        'App folder indexed',
+        sourceFolderPath,
+        formatStep('scanned', imageFiles.length),
+        formatStep('new', result.newFiles),
+        formatStep('updated', result.updatedFiles),
+        formatStep('removed', result.removedFiles),
+        formatStep('unchanged', result.unchangedFiles),
+        formatStep('duration', formatDuration(elapsedMilliseconds(folderStartedAt)))
+      ])
+    );
+
+    return result;
+  }
+
+  private async statIndexedFiles(files: IndexedFileReference[], errors: string[]): Promise<StatIndexedFilesResult> {
+    const activeRelativePaths: string[] = [];
+    const discoveredFiles: IndexedFileCandidate[] = [];
+    let folderHadErrors = false;
+
+    await Promise.all(
+      files.map((file) =>
+        discoveryLimit(async () => {
+          activeRelativePaths.push(file.relativePath);
+
+          try {
+            const stats = await fs.stat(file.absolutePath);
+            discoveredFiles.push({
+              absolutePath: file.absolutePath,
+              relativePath: file.relativePath,
+              stats
+            });
+          } catch (error) {
+            folderHadErrors = true;
+            const message = error instanceof Error ? error.message : String(error);
+            errors.push(`${file.relativePath}: ${message}`);
+            this.setProgress({
+              processedImages: this.progress.processedImages + 1
+            });
+            log.error(joinLogParts(['Failed to stat media during discovery', formatStep('file', file.relativePath), message]));
+          }
+        })
+      )
+    );
+
+    return {
+      activeRelativePaths,
+      discoveredFiles,
+      folderHadErrors
+    };
+  }
+
+  private async collectRecursiveMediaFiles(currentAbsolutePath: string, currentRelativePath: string): Promise<IndexedFileReference[]> {
+    const entries = await fs
+      .readdir(currentAbsolutePath, { withFileTypes: true })
+      .catch((error: unknown) => {
+        const filesystemError = error as NodeJS.ErrnoException;
+        if (filesystemError.code === 'ENOENT') {
+          return null;
+        }
+
+        throw error;
+      });
+
+    if (!entries) {
+      return [];
+    }
+
+    const files: IndexedFileReference[] = [];
+
+    for (const entry of entries) {
+      const relativeEntryPath = normalizePath(`${currentRelativePath}/${entry.name}`);
+      if (isHiddenPath(relativeEntryPath)) {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        if (this.isManagedGalleryPath(relativeEntryPath)) {
+          continue;
+        }
+
+        files.push(...await this.collectRecursiveMediaFiles(path.join(currentAbsolutePath, entry.name), relativeEntryPath));
+        continue;
+      }
+
+      if (entry.isFile() && isSupportedMediaFile(entry.name)) {
+        files.push({
+          absolutePath: path.join(currentAbsolutePath, entry.name),
+          relativePath: relativeEntryPath
+        });
+      }
+    }
+
+    return files;
+  }
+
+  private async scanStoryFoldersForOwnerFolder(
+    ownerFolder: FolderRecord,
+    sourceFolder: SourceFolderCandidate,
+    existingFolders: FolderRecord[],
+    usedSlugs: Set<string>,
+    folderScanStates: Map<string, FolderScanStateRecord>,
+    derivativeJobs: Map<string, DerivativeJob>,
+    errors: string[],
+    options: FullScanOptions,
+    context: ImageProcessingContext
+  ): Promise<SourceFolderScanResult[]> {
+    const ownerEntries = await fs
+      .readdir(sourceFolder.absolutePath, { withFileTypes: true })
+      .catch((error: unknown) => {
+        const filesystemError = error as NodeJS.ErrnoException;
+        if (filesystemError.code === 'ENOENT') {
+          return null;
+        }
+
+        throw error;
+      });
+
+    if (!ownerEntries) {
+      return [];
+    }
+
+    const storiesDirectory = ownerEntries.find((entry) => {
+      if (!entry.isDirectory()) {
+        return false;
+      }
+
+      const relativeEntryPath = normalizePath(`${sourceFolder.relativePath}/${entry.name}`);
+      return !isHiddenPath(relativeEntryPath) && !this.isManagedGalleryPath(relativeEntryPath) && isStoriesFolderName(entry.name);
+    });
+
+    if (!storiesDirectory) {
+      return [];
+    }
+
+    const storiesAbsolutePath = path.join(sourceFolder.absolutePath, storiesDirectory.name);
+    const storiesRelativePath = normalizePath(`${sourceFolder.relativePath}/${storiesDirectory.name}`);
+    const storiesEntries = await fs
+      .readdir(storiesAbsolutePath, { withFileTypes: true })
+      .catch((error: unknown) => {
+        const filesystemError = error as NodeJS.ErrnoException;
+        if (filesystemError.code === 'ENOENT') {
+          return null;
+        }
+
+        throw error;
+      });
+
+    if (!storiesEntries) {
+      return [];
+    }
+
+    const storyResults: SourceFolderScanResult[] = [];
+    const directStoryFiles = storiesEntries
+      .filter((entry) => entry.isFile() && isSupportedMediaFile(entry.name) && !entry.name.startsWith('.'))
+      .map((entry) => ({
+        absolutePath: path.join(storiesAbsolutePath, entry.name),
+        relativePath: normalizePath(`${storiesRelativePath}/${entry.name}`)
+      }));
+
+    if (directStoryFiles.length > 0) {
+      const startedAt = performance.now();
+      this.setProgress({
+        currentFolder: storiesRelativePath,
+        discoveredImages: this.progress.discoveredImages + directStoryFiles.length
+      });
+      const statResult = await this.statIndexedFiles(directStoryFiles, errors);
+      const result = await this.scanIndexedFolderFiles({
+        folderPath: storiesRelativePath,
+        scannedFileCount: directStoryFiles.length,
+        activeRelativePaths: statResult.activeRelativePaths,
+        discoveredFiles: statResult.discoveredFiles,
+        existingFolders,
+        usedSlugs,
+        folderScanStates,
+        derivativeJobs,
+        errors,
+        options,
+        context,
+        logLabel: 'Story root indexed',
+        role: 'story_root',
+        storyOwnerFolderId: ownerFolder.id,
+        folderHadErrors: statResult.folderHadErrors
+      });
+
+      log.info(
+        joinLogParts([
+          'Story root indexed',
+          storiesRelativePath,
+          formatStep('scanned', directStoryFiles.length),
+          formatStep('new', result.newFiles),
+          formatStep('updated', result.updatedFiles),
+          formatStep('removed', result.removedFiles),
+          formatStep('unchanged', result.unchangedFiles),
+          formatStep('duration', formatDuration(elapsedMilliseconds(startedAt)))
+        ])
+      );
+
+      storyResults.push(result);
+    }
+
+    for (const entry of storiesEntries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      const capsuleRelativePath = normalizePath(`${storiesRelativePath}/${entry.name}`);
+      if (isHiddenPath(capsuleRelativePath) || this.isManagedGalleryPath(capsuleRelativePath)) {
+        continue;
+      }
+
+      const startedAt = performance.now();
+      const nestedFiles = await this.collectRecursiveMediaFiles(path.join(storiesAbsolutePath, entry.name), capsuleRelativePath);
+      if (nestedFiles.length === 0) {
+        continue;
+      }
+
+      this.setProgress({
+        currentFolder: capsuleRelativePath,
+        discoveredImages: this.progress.discoveredImages + nestedFiles.length
+      });
+      const statResult = await this.statIndexedFiles(nestedFiles, errors);
+      const result = await this.scanIndexedFolderFiles({
+        folderPath: capsuleRelativePath,
+        scannedFileCount: nestedFiles.length,
+        activeRelativePaths: statResult.activeRelativePaths,
+        discoveredFiles: statResult.discoveredFiles,
+        existingFolders,
+        usedSlugs,
+        folderScanStates,
+        derivativeJobs,
+        errors,
+        options,
+        context,
+        logLabel: 'Story capsule indexed',
+        role: 'story_capsule',
+        storyOwnerFolderId: ownerFolder.id,
+        folderHadErrors: statResult.folderHadErrors
+      });
+
+      log.info(
+        joinLogParts([
+          'Story capsule indexed',
+          capsuleRelativePath,
+          formatStep('scanned', nestedFiles.length),
+          formatStep('new', result.newFiles),
+          formatStep('updated', result.updatedFiles),
+          formatStep('removed', result.removedFiles),
+          formatStep('unchanged', result.unchangedFiles),
+          formatStep('duration', formatDuration(elapsedMilliseconds(startedAt)))
+        ])
+      );
+
+      storyResults.push(result);
+    }
+
+    return storyResults;
+  }
+
+  private async scanIndexedFolderFiles({
+    folderPath,
+    scannedFileCount,
+    activeRelativePaths,
+    discoveredFiles,
+    existingFolders,
+    usedSlugs,
+    folderScanStates,
+    derivativeJobs,
+    errors,
+    options,
+    context,
+    role = 'normal',
+    storyOwnerFolderId = null,
+    folderHadErrors = false
+  }: IndexedFolderScanOptions): Promise<SourceFolderScanResult> {
+    const normalizedFolderPath = normalizePath(folderPath);
+
+    if (discoveredFiles.length === 0) {
+      if (activeRelativePaths.length > 0) {
+        const resolvedFolder = this.resolveFolder(existingFolders, usedSlugs, normalizedFolderPath, {
+          role,
+          storyOwnerFolderId
+        });
+
+        return {
+          folder: resolvedFolder.folder,
+          sourceFolderPath: normalizedFolderPath,
+          discoveredDirectImages: true,
+          wroteFolder: resolvedFolder.wroteFolder,
+          scannedFiles: scannedFileCount,
+          newFiles: 0,
+          updatedFiles: 0,
+          removedFiles: 0,
+          unchangedFiles: 0,
+          refreshedUnchangedRows: 0,
+          skippedUnchangedRows: 0,
+          usedFolderShortcut: false
+        };
+      }
+
+      return this.clearIndexedFolder(normalizedFolderPath, existingFolders);
+    }
+
+    const resolvedFolder = this.resolveFolder(existingFolders, usedSlugs, normalizedFolderPath, {
+      role,
+      storyOwnerFolderId
+    });
+    const folder = resolvedFolder.folder;
     let unchangedFiles = 0;
     let newFiles = 0;
     let updatedFiles = 0;
     let refreshedUnchangedRows = 0;
     let skippedUnchangedRows = 0;
     let usedFolderShortcut = false;
-    let folderHadErrors = false;
-
-    const resolvedFolder = this.resolveFolder(existingFolders, usedSlugs, sourceFolderPath);
-    const folder = resolvedFolder.folder;
-    const activeRelativePaths: string[] = [];
-    const discoveredFiles: IndexedFileCandidate[] = [];
-
-    await Promise.all(
-      imageFiles.map((entry) =>
-        discoveryLimit(async () => {
-          const absolutePath = path.join(sourceFolder.absolutePath, entry.name);
-          const relativePath = getRelativeGalleryPath(appConfig.galleryRoot, absolutePath);
-          activeRelativePaths.push(relativePath);
-
-          try {
-            const stats = await fs.stat(absolutePath);
-            discoveredFiles.push({
-              absolutePath,
-              relativePath,
-              stats
-            });
-          } catch (error) {
-            folderHadErrors = true;
-            const message = error instanceof Error ? error.message : String(error);
-            errors.push(`${relativePath}: ${message}`);
-            this.setProgress({
-              processedImages: this.progress.processedImages + 1
-            });
-            log.error(joinLogParts(['Failed to stat media during discovery', formatStep('file', relativePath), message]));
-          }
-        })
-      )
-    );
 
     const folderSignature = createFolderScanSignature(
       discoveredFiles.map((file) => ({
@@ -657,7 +1009,7 @@ class ScannerService {
         mtimeMs: file.stats.mtimeMs
       }))
     );
-    const storedFolderState = folderScanStates.get(sourceFolderPath);
+    const storedFolderState = folderScanStates.get(normalizedFolderPath);
     const hasCompleteTakenAtMetadata = imageRepository.countMissingTimestampMetadataByFolder(folder.id) === 0;
     const hasCompletePlaybackStrategyMetadata = imageRepository.countMissingPlaybackStrategyByFolder(folder.id) === 0;
     const hasMatchingIndexedFiles =
@@ -688,10 +1040,10 @@ class ScannerService {
 
       return {
         folder,
-        sourceFolderPath,
+        sourceFolderPath: normalizedFolderPath,
         discoveredDirectImages: true,
         wroteFolder: resolvedFolder.wroteFolder,
-        scannedFiles: imageFiles.length,
+        scannedFiles: scannedFileCount,
         newFiles: 0,
         updatedFiles: 0,
         removedFiles: 0,
@@ -747,14 +1099,14 @@ class ScannerService {
 
     if (!folderHadErrors) {
       folderScanStateRepository.upsert({
-        folderPath: sourceFolderPath,
+        folderPath: normalizedFolderPath,
         signature: folderSignature.signature,
         fileCount: folderSignature.fileCount,
         maxMtimeMs: folderSignature.maxMtimeMs,
         totalSize: folderSignature.totalSize
       });
-      folderScanStates.set(sourceFolderPath, {
-        folder_path: sourceFolderPath,
+      folderScanStates.set(normalizedFolderPath, {
+        folder_path: normalizedFolderPath,
         signature: folderSignature.signature,
         file_count: folderSignature.fileCount,
         max_mtime_ms: folderSignature.maxMtimeMs,
@@ -763,25 +1115,12 @@ class ScannerService {
       });
     }
 
-    log.info(
-      joinLogParts([
-        'App folder indexed',
-        sourceFolderPath,
-        formatStep('scanned', imageFiles.length),
-        formatStep('new', newFiles),
-        formatStep('updated', updatedFiles),
-        formatStep('removed', removedFiles),
-        formatStep('unchanged', unchangedFiles),
-        formatStep('duration', formatDuration(elapsedMilliseconds(folderStartedAt)))
-      ])
-    );
-
     return {
       folder,
-      sourceFolderPath,
+      sourceFolderPath: normalizedFolderPath,
       discoveredDirectImages: true,
       wroteFolder: resolvedFolder.wroteFolder,
-      scannedFiles: imageFiles.length,
+      scannedFiles: scannedFileCount,
       newFiles,
       updatedFiles,
       removedFiles,
@@ -941,6 +1280,7 @@ class ScannerService {
       galleryRootChanged,
       hasStoredGalleryRoot
     };
+    const treatStoriesAsFolders = this.shouldTreatStoriesAsFolders();
 
     if (!storageService.refreshAvailability().libraryAvailable) {
       return this.finishUnavailableRun(runId, reason);
@@ -953,6 +1293,7 @@ class ScannerService {
         formatStep('repair-derivatives', formatToggle(options.repairUnchangedDerivatives)),
         formatStep('root-changed', formatToggle(galleryRootChanged)),
         formatStep('stored-root', formatToggle(hasStoredGalleryRoot)),
+        formatStep('stories-as-folders', formatToggle(treatStoriesAsFolders)),
         appConfig.managedGalleryRelativeIgnores.length > 0
           ? formatStep('ignored-managed-paths', appConfig.managedGalleryRelativeIgnores.join(','))
           : null,
@@ -982,19 +1323,7 @@ class ScannerService {
       const discoveryStartedAt = performance.now();
       let discoveredSourceFolders = 0;
 
-      await this.walkMediaSourceFolders(appConfig.galleryRoot, async (sourceFolder) => {
-        discoveredSourceFolders += 1;
-        const result = await this.scanSourceFolder(
-          sourceFolder,
-          existingFolders,
-          usedSlugs,
-          folderScanStates,
-          derivativeJobs,
-          errors,
-          options,
-          imageProcessingContext
-        );
-
+      const applyScanResult = (result: SourceFolderScanResult) => {
         summary.scanned_files += result.scannedFiles;
         summary.new_files += result.newFiles;
         summary.updated_files += result.updatedFiles;
@@ -1033,12 +1362,46 @@ class ScannerService {
             metrics.unchangedFilesSkippedDerivativeVerification += result.unchangedFiles;
           }
         }
+      };
+
+      await this.walkMediaSourceFolders(appConfig.galleryRoot, async (sourceFolder) => {
+        discoveredSourceFolders += 1;
+        const result = await this.scanSourceFolder(
+          sourceFolder,
+          existingFolders,
+          usedSlugs,
+          folderScanStates,
+          derivativeJobs,
+          errors,
+          options,
+          imageProcessingContext
+        );
+
+        applyScanResult(result);
+
+        if (!treatStoriesAsFolders && result.folder && result.discoveredDirectImages) {
+          const storyResults = await this.scanStoryFoldersForOwnerFolder(
+            result.folder,
+            sourceFolder,
+            existingFolders,
+            usedSlugs,
+            folderScanStates,
+            derivativeJobs,
+            errors,
+            options,
+            imageProcessingContext
+          );
+
+          for (const storyResult of storyResults) {
+            applyScanResult(storyResult);
+          }
+        }
 
         this.setProgress({
           processedFolders: this.progress.processedFolders + 1
         });
         this.logProgress('folder');
-      });
+      }, null, treatStoriesAsFolders);
 
       for (const folder of existingFolders) {
         if (!discoveredFolderIds.has(folder.id)) {
@@ -1110,6 +1473,7 @@ class ScannerService {
 
     const normalizedPaths = [...new Set(relativePaths.map((value) => normalizePath(value)).filter(Boolean))];
     const impactedSourceFolders = new Set<string>();
+    const treatStoriesAsFolders = this.shouldTreatStoriesAsFolders();
 
     for (const relativePath of normalizedPaths) {
       if (isHiddenPath(relativePath)) {
@@ -1122,6 +1486,11 @@ class ScannerService {
 
       if (!isSupportedMediaFile(path.basename(relativePath))) {
         continue;
+      }
+
+      if (!treatStoriesAsFolders && findReservedStoriesOwnerPath(relativePath)) {
+        fallbackReason = `${reason}:fallback`;
+        break;
       }
 
       const sourceFolderPath = getSourceFolderPathFromRelativePath(relativePath);
@@ -1331,12 +1700,19 @@ class ScannerService {
     return summary;
   }
 
-  private resolveFolder(existingFolders: FolderRecord[], usedSlugs: Set<string>, sourceFolderPath: string): ResolvedFolderResult {
+  private resolveFolder(
+    existingFolders: FolderRecord[],
+    usedSlugs: Set<string>,
+    sourceFolderPath: string,
+    options: ResolvedFolderOptions = {}
+  ): ResolvedFolderResult {
     const normalizedFolderPath = normalizePath(sourceFolderPath);
     const existingByFolder = existingFolders.find(
       (folder) => normalizePath(folder.folder_path) === normalizedFolderPath
     );
     const folderName = getFolderDisplayInfo(normalizedFolderPath).name;
+    const role = options.role ?? 'normal';
+    const storyOwnerFolderId = options.storyOwnerFolderId ?? null;
 
     if (existingByFolder) {
       usedSlugs.delete(existingByFolder.slug);
@@ -1346,7 +1722,9 @@ class ScannerService {
     const saved = folderRepository.save({
       slug,
       name: folderName,
-      folderPath: normalizedFolderPath
+      folderPath: normalizedFolderPath,
+      role,
+      storyOwnerFolderId
     });
     this.rememberFolder(existingFolders, saved.folder);
     return {

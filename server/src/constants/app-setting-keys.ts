@@ -1,6 +1,8 @@
 export const LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY = 'scanner.last_successful_gallery_root';
 export const LIBRARY_REBUILD_REQUIRED_SETTING_KEY = 'scanner.library_rebuild_required';
 export const PREVIOUS_GALLERY_ROOT_SETTING_KEY = 'scanner.previous_gallery_root';
+export const TREAT_STORIES_AS_FOLDERS_SETTING_KEY = 'library.treat_stories_as_folders';
+export const STORIES_MIGRATION_DECISION_SETTING_KEY = 'library.stories_migration_decision';
 export const HOME_FEED_DEFAULT_MODE_SETTING_KEY = 'feed.default_home_mode';
 export const REELS_FEED_DEFAULT_MODE_SETTING_KEY = 'feed.default_reels_mode';
 export const AUTH_PASSWORD_HASH_SETTING_KEY = 'auth.password_hash';

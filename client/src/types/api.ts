@@ -1,6 +1,7 @@
 export type FeedMode = 'recent' | 'rediscover' | 'random';
 export type ReelsFeedMode = 'recommended' | 'recent' | 'random';
 export type FeedRailKind = 'moments' | 'highlights';
+export type StoryCapsulePresentation = 'avatar' | 'highlight';
 
 export interface HomeFeedDefaultSetting {
   defaultMode: FeedMode;
@@ -8,6 +9,10 @@ export interface HomeFeedDefaultSetting {
 
 export interface ReelsFeedDefaultSetting {
   defaultMode: ReelsFeedMode;
+}
+
+export interface StoriesModeSetting {
+  treatStoriesAsFolders: boolean;
 }
 
 export interface FeedItem {
@@ -39,6 +44,7 @@ export interface FolderSummary {
   imageCount: number;
   videoCount: number;
   latestImageMtimeMs: number | null;
+  hasAvatarStory?: boolean;
   avatarImageId: number | null;
   avatarUrl: string | null;
 }
@@ -75,14 +81,17 @@ export interface PaginatedReels {
   hasMore: boolean;
 }
 
-export interface MomentCapsule {
+export interface RailCapsule {
   id: string;
   title: string;
   subtitle: string;
   dateContext: string;
   imageCount: number;
   coverImage: FeedItem;
+  presentation?: StoryCapsulePresentation;
 }
+
+export type MomentCapsule = RailCapsule;
 
 export interface MomentsPayload {
   railKind: FeedRailKind;
@@ -97,7 +106,26 @@ export interface MomentFeedPayload extends PaginatedFeed {
   railTitle: string;
   railDescription: string;
   railSingularLabel: string;
-  moment: MomentCapsule;
+  moment: RailCapsule;
+}
+
+export interface FolderStoriesPayload {
+  railKind: 'stories';
+  railTitle: string;
+  railDescription: string;
+  railSingularLabel: string;
+  hasAvatarStory: boolean;
+  avatarStoryId: string | null;
+  items: RailCapsule[];
+  highlights: RailCapsule[];
+}
+
+export interface FolderStoryFeedPayload extends PaginatedFeed {
+  railKind: 'stories';
+  railTitle: string;
+  railDescription: string;
+  railSingularLabel: string;
+  story: RailCapsule;
 }
 
 export interface FolderImagesPayload extends PaginatedFeed {
@@ -215,6 +243,11 @@ export interface AppStatus {
   preferences: {
     defaultHomeFeedMode: FeedMode;
     defaultReelsFeedMode: ReelsFeedMode;
+    treatStoriesAsFolders: boolean;
+  };
+  storiesMigration: {
+    hasLegacyStoriesCandidates: boolean;
+    decisionPending: boolean;
   };
 }
 
@@ -257,4 +290,12 @@ export interface AuthStatus {
 export interface AuthMutationResult {
   ok: boolean;
   auth: AuthStatus;
+}
+
+export interface RailViewerStoreContract {
+  currentCapsule: RailCapsule | null;
+  currentImages: FeedItem[];
+  currentHasMore: boolean;
+  currentError?: string | null;
+  loadCapsule(id: string, reset?: boolean): Promise<void>;
 }

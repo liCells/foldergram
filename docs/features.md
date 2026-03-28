@@ -14,7 +14,8 @@ The home view is the primary feed surface.
 It includes:
 
 - three feed modes: Recent, Rediscover, and Random
-- a top rail that can show Moments or Highlights
+- a top Moments or Highlights section
+- feed-card avatar rings that can open an App Folder's avatar story in place when that folder has stories
 - an active home-feed video player that promotes one visible video card at a time and gives that card play, mute, and fullscreen controls
 - a startup scan state when the first index is still being built
 - a rebuild notice when the configured gallery root changed
@@ -39,7 +40,7 @@ It includes:
 - a full-height scroll-snap deck
 - wheel, arrow-key, and page-up/page-down navigation in addition to direct scrolling
 - infinite loading with prefetch as you approach the end of the current queue
-- a desktop action rail for like/favorite toggle, details sidebar, folder shortcut, and original-video link
+- a desktop action bar for like/favorite toggle, details sidebar, folder shortcut, and original-video link
 - loading, empty, and error states
 - an app-wide default mode from Settings; the page itself does not expose an inline mode switch
 
@@ -91,14 +92,34 @@ A folder page is available at:
 
 Folder pages include:
 
-- a folder header with avatar, posts counts, and descriptions
+- a folder header with avatar, posts counts, descriptions, and optional avatar-story opening
 - editable folder name and description via an admin "Edit App Folder" flow
 - a posts grid
+- highlight circles above the posts and reels tabs when the folder has story capsules
 - a reels tab when the folder contains videos
 - infinite loading
 
 The reels tab is a filtered view backed by the same folder endpoint using
 `mediaType=video`.
+
+## Folder stories and highlights
+
+Foldergram can reserve `AppFolder/stories` as a story-style source for that
+folder.
+
+In the default reserved-stories mode:
+
+- direct media inside `AppFolder/stories` becomes the folder's avatar story set
+- each direct child folder inside `AppFolder/stories` becomes one highlight capsule
+- nested folders below a highlight are folded into that same capsule instead of becoming separate app folders
+- story media is hidden from normal folder, feed, search, and reels surfaces
+- the folder header avatar opens the avatar story when one exists
+- Home feed cards can open the same avatar story from the folder avatar ring
+- the shared stories modal is used for both the home-feed entry point and the folder-page entry points
+
+If the reserved root has no direct media but highlight capsules do exist,
+Foldergram can synthesize the avatar story from recent highlight media so the
+folder still has an avatar-story entry point.
 
 ## Post detail and modal flow
 
@@ -140,13 +161,16 @@ There is no shared social layer behind either mode.
 
 ## Moments
 
-The home rail and `/moments/:id` view expose either:
+Home and `/moments/:id` expose either:
 
 - date-driven Moments
 - fallback Highlights
 
-The selected rail depends on timestamp coverage in the current library. The UI
+The selected set depends on timestamp coverage in the current library. The UI
 uses the same route name for both and adapts to the returned payload labels.
+
+This is separate from folder stories and folder highlights sourced
+from reserved `stories/` folders.
 
 ## Settings
 
@@ -157,6 +181,7 @@ It exposes:
 - admin-password controls
 - viewer password and public access controls
 - home and reels default feed-mode controls
+- stories-folders mode controls, migration notices, and a save-and-rescan flow
 - live scan status
 - storage and index status
 - last completed scan details

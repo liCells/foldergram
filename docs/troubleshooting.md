@@ -74,6 +74,19 @@ Foldergram switches to Highlights unless it has:
 - at least `18` EXIF-backed posts
 - at least `30%` EXIF coverage
 
+## A folder named `stories` stopped appearing as a normal album
+
+That is expected when Foldergram is using the default reserved-stories mode.
+
+In that mode, `AppFolder/stories` is reinterpreted as folder-story data instead
+of a standalone app folder.
+
+If you want folders literally named `stories` to remain ordinary app folders:
+
+1. open Settings
+2. enable `Treat stories folders as normal app folders`
+3. save the change and let the library rescan
+
 ## Videos fail to index or generate previews
 
 Check that both tools are installed and available on `PATH`:

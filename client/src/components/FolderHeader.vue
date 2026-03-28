@@ -1,21 +1,34 @@
 <template>
   <section class="grid grid-cols-[10.75rem_minmax(0,1fr)] items-start gap-x-[2.65rem] pt-[0.6rem] pb-[2.4rem] max-md:grid-cols-[9rem_minmax(0,1fr)] max-md:gap-x-[2rem] max-sm:grid-cols-1 max-sm:gap-y-[1.35rem] max-sm:pb-[1.85rem] max-sm:text-center">
     <div class="grid place-items-center">
-      <RouterLink v-if="folder.avatarImageId" custom :to="buildAvatarRoute(folder.avatarImageId)" v-slot="{ href, navigate }">
+      <button
+        v-if="hasAvatarStory"
+        type="button"
+        class="block border-0 bg-transparent p-0 rounded-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text/55 focus-visible:ring-offset-4 focus-visible:ring-offset-bg"
+        aria-label="Open folder stories"
+        @click="emit('openAvatarStory')"
+      >
+        <div class="rounded-full p-[0.22rem] shadow-[0_16px_34px_rgba(246,106,61,0.12)] transition-transform duration-[180ms] hover:scale-[1.02]" style="background: var(--story-ring);">
+          <div class="rounded-full bg-bg p-[0.22rem]">
+            <Avatar class="w-[9.35rem] h-[9.35rem] max-md:w-[7.75rem] max-md:h-[7.75rem]" :name="folder.name" :src="folder.avatarUrl" />
+          </div>
+        </div>
+      </button>
+      <RouterLink v-else-if="folder.avatarImageId" custom :to="buildAvatarRoute(folder.avatarImageId)" v-slot="{ href, navigate }">
         <a
           :href="href"
           class="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text/55 focus-visible:ring-offset-4 focus-visible:ring-offset-bg"
           aria-label="Open folder avatar"
           @click="handleAvatarNavigation($event, navigate)"
         >
-          <div class="rounded-full p-[0.22rem] shadow-[0_16px_34px_rgba(246,106,61,0.12)] transition-transform duration-[180ms] hover:scale-[1.02]" style="background: var(--story-ring);">
+          <div class="rounded-full p-[0.22rem] shadow-[0_12px_24px_rgba(99,115,129,0.12)] transition-transform duration-[180ms] hover:scale-[1.02]" style="background: rgba(43, 48, 54, 0.8);">
             <div class="rounded-full bg-bg p-[0.22rem]">
               <Avatar class="w-[9.35rem] h-[9.35rem] max-md:w-[7.75rem] max-md:h-[7.75rem]" :name="folder.name" :src="folder.avatarUrl" />
             </div>
           </div>
         </a>
       </RouterLink>
-      <div v-else class="rounded-full p-[0.22rem] shadow-[0_16px_34px_rgba(246,106,61,0.12)]" style="background: var(--story-ring);">
+      <div v-else class="rounded-full p-[0.22rem] shadow-[0_12px_24px_rgba(99,115,129,0.12)]" style="background: rgba(43, 48, 54, 0.8);">
         <div class="rounded-full bg-bg p-[0.22rem]">
           <Avatar class="w-[9.35rem] h-[9.35rem] max-md:w-[7.75rem] max-md:h-[7.75rem]" :name="folder.name" :src="folder.avatarUrl" />
         </div>
@@ -74,6 +87,11 @@ import { useFoldersStore } from '../stores/folders';
 
 const props = defineProps<{
   folder: FolderSummary;
+  hasAvatarStory?: boolean;
+}>();
+
+const emit = defineEmits<{
+  openAvatarStory: [];
 }>();
 
 const appStore = useAppStore();

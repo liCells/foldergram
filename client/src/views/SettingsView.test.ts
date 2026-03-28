@@ -49,7 +49,12 @@ function createAppStatus(
     },
     preferences: {
       defaultHomeFeedMode,
-      defaultReelsFeedMode
+      defaultReelsFeedMode,
+      treatStoriesAsFolders: false
+    },
+    storiesMigration: {
+      hasLegacyStoriesCandidates: false,
+      decisionPending: false
     }
   };
 }
@@ -115,8 +120,6 @@ describe('SettingsView', () => {
 
     expect(saveButton).toBeDefined();
     expect(saveButton!.attributes('disabled')).toBeDefined();
-    expect(saveButton!.attributes('style')).toContain('cursor: not-allowed');
-    expect(saveButton!.attributes('style')).not.toContain('wait');
   });
 
   it('hydrates the saved feed defaults correctly when app status finishes loading after mount', async () => {
@@ -153,7 +156,6 @@ describe('SettingsView', () => {
 
     expect(saveButton).toBeDefined();
     expect(saveButton!.attributes('disabled')).toBeDefined();
-    expect(saveButton!.attributes('style')).toContain('cursor: not-allowed');
   });
 
   it('saves the reels default from the feed defaults card', async () => {

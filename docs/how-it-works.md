@@ -23,6 +23,24 @@ Foldergram recursively walks `GALLERY_ROOT` and applies these rules:
 - Any non-hidden folder that directly contains supported media becomes an indexed album.
 - Files directly in `GALLERY_ROOT` are ignored.
 - Nested folders are treated separately from their parent folders.
+- In the default reserved-stories mode, a child `stories/` folder beneath an indexed owner folder is withheld from normal album discovery and scanned separately as story data.
+
+## Reserved stories folders
+
+By default, Foldergram treats `AppFolder/stories` as a reserved subtree for
+that app folder.
+
+The scan model is:
+
+- direct media inside `AppFolder/stories` becomes a `story_root` folder used for the avatar story set
+- each direct child directory under `AppFolder/stories` becomes one `story_capsule`
+- nested media below that direct child directory is collected recursively into the same capsule
+- reserved story folders do not become normal app folders while this mode is enabled
+- if the reserved root has no direct media but highlight capsules exist, Foldergram synthesizes an avatar-story entry from recent highlight media
+
+This behavior is controlled by the Settings toggle `Treat stories folders as
+normal app folders`. When that legacy mode is enabled, `stories/` folders are
+discovered like ordinary app folders again.
 
 ## Storage layout
 
@@ -104,10 +122,11 @@ During a full scan, Foldergram:
 1. Walks the gallery tree to discover source folders.
 2. Stats supported files in those folders.
 3. Resolves folder records and stable slugs.
-4. Reads or refreshes media metadata.
-5. Marks missing indexed rows as deleted.
-6. Queues derivative work for changed or missing outputs.
-7. Writes scan status to `scan_runs`.
+4. Scans reserved `stories/` subtrees for owner folders when reserved-stories mode is active.
+5. Reads or refreshes media metadata.
+6. Marks missing indexed rows as deleted.
+7. Queues derivative work for changed or missing outputs.
+8. Writes scan status to `scan_runs`.
 
 ## Incremental scans and watching
 
@@ -146,9 +165,9 @@ provide an inline mode switch of its own.
 
 ## Moments and highlights
 
-`GET /api/feed/moments` can return either a Moments rail or a Highlights rail.
+`GET /api/feed/moments` can return either Moments or Highlights.
 
-### Moments rail
+### Moments
 
 Foldergram prefers date-based moments when the library has enough EXIF-backed
 timestamps:
@@ -163,7 +182,7 @@ The current date-driven capsules are:
 - This Week
 - Last Year Around Now
 
-### Highlights rail
+### Highlights
 
 When date coverage is too sparse, Foldergram falls back to curated sets:
 
@@ -171,6 +190,15 @@ When date coverage is too sparse, Foldergram falls back to curated sets:
 - Forgotten Favorites
 - Deep Cuts
 - Lucky Dip
+
+## Folder stories
+
+Folder stories use separate SQLite-backed queries from `GET /api/feed/moments`.
+
+- folder summaries expose whether a folder currently has an avatar-story entry point
+- `GET /api/folders/:slug/stories` returns the folder's avatar story and highlight capsules
+- `GET /api/folders/:slug/stories/:id` pages through the media for one story capsule
+- neither route walks the filesystem on request
 
 ## Folder rebuild requirement
 
@@ -186,6 +214,6 @@ Once data is indexed:
 - folder pages read from SQLite
 - feed pages read from SQLite
 - likes read from SQLite
-- moments and highlights read from SQLite
+- moments, highlights, and folder stories read from SQLite
 - thumbnails and previews are served as static files
 - originals are served by image ID only

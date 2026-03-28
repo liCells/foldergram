@@ -172,9 +172,9 @@ Notes:
 
 ### `GET /api/feed/moments`
 
-Returns the current home rail definition.
+Returns the current Home Moments or Highlights definition.
 
-The rail can be:
+The response can be:
 
 - `moments`
 - `highlights`
@@ -207,7 +207,7 @@ Query parameters:
 | `limit` | integer | `24` |
 
 Returns `404` with `{"message":"Feed capsule not found"}` when the ID does not
-exist in the currently selected rail.
+exist in the currently selected set.
 
 ### `GET /api/folders`
 
@@ -224,16 +224,23 @@ Each item is a folder summary with:
 - `id`
 - `slug`
 - `name`
+- `description`
 - `folderPath`
 - `breadcrumb`
 - `imageCount`
 - `videoCount`
 - `latestImageMtimeMs`
+- `hasAvatarStory`
+- `avatarImageId`
 - `avatarUrl`
 
 ### `GET /api/folders/:slug`
 
 Returns one folder summary.
+
+The response uses the same shape as folder items from `GET /api/folders`,
+including `hasAvatarStory` so the client can decide whether the folder avatar
+should open a story entry point.
 
 Errors:
 
@@ -257,11 +264,14 @@ Response shape:
     "id": 1,
     "slug": "oslo",
     "name": "oslo",
+    "description": null,
     "folderPath": "trips/oslo",
     "breadcrumb": "trips",
     "imageCount": 12,
     "videoCount": 3,
     "latestImageMtimeMs": 1700000000000,
+    "hasAvatarStory": false,
+    "avatarImageId": 42,
     "avatarUrl": "/thumbnails/trips/oslo/IMG_0001.webp?v=4"
   },
   "items": [],
@@ -275,6 +285,87 @@ Response shape:
 Errors:
 
 - `404` with `{"message":"Folder not found"}`
+
+### `GET /api/folders/:slug/stories`
+
+Returns the stories payload for one folder.
+
+Response shape:
+
+```json
+{
+  "railKind": "stories",
+  "railTitle": "Stories",
+  "railDescription": "Stories and highlights for AnimalPlanet.",
+  "railSingularLabel": "Story",
+  "hasAvatarStory": true,
+  "avatarStoryId": "animalplanet-stories",
+  "items": [],
+  "highlights": []
+}
+```
+
+Notes:
+
+- `items` contains the avatar story first when one exists, followed by highlight capsules.
+- `highlights` contains only highlight capsules.
+- each capsule item includes `id`, `title`, `subtitle`, `dateContext`, `imageCount`, `coverImage`, and `presentation`
+- `presentation` is `avatar` or `highlight`
+- `avatarStoryId` can be a synthetic fallback id when the folder has highlight media but no direct avatar-story files
+
+Errors:
+
+- `404` with `{"message":"Folder not found"}`
+
+### `GET /api/folders/:slug/stories/:id`
+
+Path parameters:
+
+| Param | Type |
+| --- | --- |
+| `slug` | string |
+| `id` | string |
+
+Query parameters:
+
+| Param | Type | Default |
+| --- | --- | --- |
+| `page` | integer | `1` |
+| `limit` | integer | `24` |
+
+Response shape:
+
+```json
+{
+  "railKind": "stories",
+  "railTitle": "Stories",
+  "railDescription": "Stories and highlights for AnimalPlanet.",
+  "railSingularLabel": "Story",
+  "story": {
+    "id": "animalplanet-stories",
+    "title": "AnimalPlanet",
+    "subtitle": "AnimalPlanet story set",
+    "dateContext": "Today",
+    "imageCount": 8,
+    "presentation": "avatar",
+    "coverImage": {}
+  },
+  "items": [],
+  "page": 1,
+  "limit": 24,
+  "total": 8,
+  "hasMore": false
+}
+```
+
+Notes:
+
+- the paginated `items` array contains normal feed-item payloads
+- if the requested avatar story is a fallback capsule, the server returns recent highlight media for that synthetic capsule
+
+Errors:
+
+- `404` with `{"message":"Story capsule not found"}`
 
 ### `GET /api/likes`
 
@@ -360,6 +451,8 @@ Notable fields:
 | `libraryIndex` | Rebuild requirement plus ignored root-media count. Gallery-root paths are omitted. |
 | `preferences.defaultHomeFeedMode` | Current app-wide default home feed mode. |
 | `preferences.defaultReelsFeedMode` | Current app-wide default reels mode used when `/reels` opens. |
+| `preferences.treatStoriesAsFolders` | Whether folders literally named `stories` are treated as ordinary app folders instead of reserved story sources. |
+| `storiesMigration` | Migration hint with `hasLegacyStoriesCandidates` and `decisionPending`. |
 
 ### `GET /api/admin/stats`
 
@@ -378,6 +471,9 @@ additional fields below:
 | `libraryIndex.previousGalleryRoot` | Prior configured gallery root when the root changed. |
 | `libraryIndex.lastSuccessfulGalleryRoot` | Gallery root from the last completed successful scan. |
 | `lastScan` | Last completed scan run. |
+
+The same `preferences.treatStoriesAsFolders` and `storiesMigration` fields from
+`GET /api/status` are also present here.
 
 ## Mutating endpoints
 
@@ -604,6 +700,32 @@ Success:
   "defaultMode": "recommended"
 }
 ```
+
+### `PUT /api/admin/settings/stories-mode`
+
+Sets how folders literally named `stories` are interpreted.
+
+Body:
+
+```json
+{
+  "treatStoriesAsFolders": false
+}
+```
+
+Success:
+
+```json
+{
+  "treatStoriesAsFolders": false
+}
+```
+
+Notes:
+
+- `false` enables the default reserved-stories mode
+- `true` keeps `stories/` folders behaving like ordinary app folders
+- the Settings UI immediately follows this write with `POST /api/admin/rescan`, but this endpoint itself only saves the setting
 
 ### `POST /api/images/:id/like`
 

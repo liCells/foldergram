@@ -1,14 +1,36 @@
 <template>
   <article class="bg-transparent">
     <div class="flex items-center justify-between gap-4 px-4 py-[0.55rem]">
-      <RouterLink class="feed-card__folder flex items-center gap-[0.72rem] min-w-0" :to="{ name: 'folder', params: { slug: item.folderSlug } }">
-        <Avatar class="w-8 h-8" :name="item.folderName" :src="avatarUrl" />
-        <div class="min-w-0">
-          <h3 class="m-0 text-[0.88rem] font-semibold truncate">
-            {{ item.folderName }}
-          </h3>
-        </div>
-      </RouterLink>
+      <div class="feed-card__folder flex items-center gap-[0.72rem] min-w-0">
+        <button
+          v-if="showHomeStoryAvatar"
+          class="block rounded-full border-0 bg-transparent p-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text/55 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          type="button"
+          :aria-label="`Open ${item.folderName} stories`"
+          @click="emit('openFolderStory', item.folderSlug)"
+        >
+          <div class="rounded-full p-[0.1rem] shadow-[0_10px_22px_rgba(246,106,61,0.16)]" style="background: var(--story-ring);">
+            <div class="rounded-full bg-bg p-[0.1rem]">
+              <Avatar class="w-8 h-8" :name="item.folderName" :src="avatarUrl" />
+            </div>
+          </div>
+        </button>
+        <RouterLink
+          v-else
+          class="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text/55 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          :to="{ name: 'folder', params: { slug: item.folderSlug } }"
+          :aria-label="`Open ${item.folderName}`"
+        >
+          <Avatar class="w-8 h-8" :name="item.folderName" :src="avatarUrl" />
+        </RouterLink>
+        <RouterLink class="min-w-0 text-inherit no-underline" :to="{ name: 'folder', params: { slug: item.folderSlug } }">
+          <div class="min-w-0">
+            <h3 class="m-0 text-[0.88rem] font-semibold truncate">
+              {{ item.folderName }}
+            </h3>
+          </div>
+        </RouterLink>
+      </div>
       <button
         class="inline-flex items-center justify-center w-8 h-8 p-0 border-0 text-muted bg-transparent cursor-pointer"
         type="button"
@@ -370,16 +392,19 @@ const props = withDefaults(
   defineProps<{
     item: FeedItem;
     avatarUrl: string | null;
+    hasAvatarStory?: boolean;
     context?: 'default' | 'home';
     isActiveVideo?: boolean;
   }>(),
   {
+    hasAvatarStory: false,
     context: 'default',
     isActiveVideo: false
   }
 );
 
 const emit = defineEmits<{
+  openFolderStory: [folderSlug: string];
   videoVisibilityChange: [payload: HomeVideoVisibilityChange];
 }>();
 
@@ -409,6 +434,7 @@ let removeHomePlayerEventListeners: (() => void) | null = null;
 
 const imageRoute = computed(() => `/image/${props.item.id}`);
 const isHomeContext = computed(() => props.context === 'home');
+const showHomeStoryAvatar = computed(() => isHomeContext.value && props.hasAvatarStory);
 const shouldOpenPostInModal = computed(() => props.context !== 'home');
 const caption = computed(() =>
   props.item.filename

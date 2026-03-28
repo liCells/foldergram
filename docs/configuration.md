@@ -48,6 +48,19 @@ Instead:
 The built-in auth model is a small role-based password gate for one app
 instance, not a multi-user account system.
 
+## Stories folders mode
+
+Reserved stories behavior is **not** configured in `.env`.
+
+Instead:
+
+- Foldergram stores the current stories-folders mode in SQLite `app_settings`
+- the Settings page exposes the toggle `Treat stories folders as normal app folders`
+- the default mode is reserved stories, where `AppFolder/stories` powers avatar stories and highlight capsules
+- turning the toggle on enables legacy behavior, where folders literally named `stories` remain ordinary app folders
+- changing this setting requires a rescan because the indexed folder structure changes
+- if the existing library already contains candidate `stories/` folders, Settings can show a migration decision card until you choose a mode
+
 ## Path resolution rules
 
 - `DATA_ROOT` is the common fallback parent for the app's storage directories.
@@ -165,6 +178,25 @@ gallery/
     berlin/
       notes.txt          # not indexed
 ```
+
+In the default reserved-stories mode, Foldergram also treats
+`AppFolder/stories` specially:
+
+```text
+gallery/
+  AnimalPlanet/
+    post-1.jpg          # indexed owner folder media
+    stories/
+      story-1.mp4       # avatar story set
+      Lions/
+        clip-1.mp4      # highlight capsule
+        nested-1/
+          clip-2.jpg    # still part of Lions
+```
+
+If you want folders literally named `stories` to remain ordinary app folders,
+enable `Treat stories folders as normal app folders` in Settings and rescan the
+library.
 
 ## Gallery root changes
 

@@ -44,6 +44,32 @@ The important rule is simple:
 - A non-hidden folder becomes an indexed album only when it directly contains supported media.
 - Nested folders become separate albums if they directly contain media.
 
+Optional: add folder stories and highlights with a reserved `stories/` folder:
+
+```text
+data/
+  gallery/
+    AnimalPlanet/
+      post-1.jpg
+      stories/
+        story-1.mp4
+        story-2.jpg
+        Lions/
+          clip-1.mp4
+          nested-1/
+            clip-2.jpg
+```
+
+In the default mode:
+
+- direct media inside `AppFolder/stories` powers the folder avatar story
+- each direct child folder under `stories/` becomes one highlight circle
+- nested folders stay inside that same highlight capsule
+
+If you need folders literally named `stories` to behave like normal app
+folders, enable `Treat stories folders as normal app folders` in Settings and
+run a rescan.
+
 ## 3. Start the container
 
 ```bash

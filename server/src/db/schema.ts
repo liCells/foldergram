@@ -6,12 +6,15 @@ CREATE TABLE IF NOT EXISTS folders (
   slug TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   folder_path TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'normal',
+  story_owner_folder_id INTEGER NULL,
   description TEXT NULL,
   avatar_image_id INTEGER NULL,
   avatar_source TEXT NOT NULL DEFAULT 'auto',
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (avatar_image_id) REFERENCES images(id)
+  FOREIGN KEY (avatar_image_id) REFERENCES images(id),
+  FOREIGN KEY (story_owner_folder_id) REFERENCES folders(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS images (
@@ -80,6 +83,8 @@ CREATE TABLE IF NOT EXISTS likes (
 
 CREATE INDEX IF NOT EXISTS idx_folders_slug ON folders(slug);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_folder_path ON folders(folder_path);
+CREATE INDEX IF NOT EXISTS idx_folders_role ON folders(role);
+CREATE INDEX IF NOT EXISTS idx_folders_story_owner_role ON folders(story_owner_folder_id, role, folder_path COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_images_folder_id ON images(folder_id);
 CREATE INDEX IF NOT EXISTS idx_images_sort_timestamp ON images(sort_timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_images_taken_at ON images(taken_at DESC);

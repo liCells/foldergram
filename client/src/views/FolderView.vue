@@ -24,7 +24,27 @@
     <template v-else-if="foldersStore.currentFolder">
       <div class="mx-auto grid w-full max-w-[69rem] gap-[0.15rem]">
         <div class="mx-auto w-[min(100%,54rem)]">
-          <FolderHeader :folder="foldersStore.currentFolder" />
+          <FolderHeader
+            :folder="foldersStore.currentFolder"
+            :has-avatar-story="folderStoriesStore.hasAvatarStory"
+            @open-avatar-story="openAvatarStory"
+          />
+        </div>
+        <div
+          v-if="folderStoriesStore.listError"
+          class="mx-auto mb-5 grid w-[min(100%,66.5625rem)] gap-[0.75rem] rounded-[1rem] border border-[rgba(214,48,49,0.24)] bg-[rgba(214,48,49,0.08)] px-4 py-[0.95rem] text-[#c0392b]"
+          role="alert"
+        >
+          <p class="m-0 text-[0.92rem]">{{ folderStoriesStore.listError }}</p>
+          <div>
+            <button
+              class="inline-flex min-h-9 items-center justify-center rounded-[0.8rem] border border-[rgba(192,57,43,0.18)] bg-white/65 px-3 text-[0.82rem] font-semibold text-[#a93226] transition-colors duration-180 hover:bg-white"
+              type="button"
+              @click="retryFolderStories"
+            >
+              Retry Stories
+            </button>
+          </div>
         </div>
         <EmptyState
           v-if="
@@ -45,6 +65,32 @@
         />
         <template v-else>
           <section class="mx-auto w-[min(100%,66.5625rem)]">
+            <div
+              v-if="folderStoriesStore.highlights.length"
+              class="mb-5 overflow-x-auto pb-3 pt-[0.12rem] [scrollbar-width:none]"
+              aria-label="Folder stories"
+            >
+              <div class="mx-auto flex w-max min-w-full justify-center gap-[0.95rem] px-1">
+                <button
+                  v-for="story in folderStoriesStore.highlights"
+                  :key="story.id"
+                  class="flex flex-col items-center gap-[0.48rem] min-w-[5.85rem] border-0 bg-transparent p-0 text-muted text-[0.74rem] text-center cursor-pointer transition-transform duration-180 hover:-translate-y-[1px]"
+                  :title="`${story.title} · ${story.subtitle}`"
+                  type="button"
+                  @click="openStoryViewer(story.id)"
+                >
+                  <div
+                    class="rounded-full p-[0.2rem] shadow-[0_14px_30px_rgba(246,106,61,0.18)]"
+                    style="background: var(--story-ring);"
+                  >
+                    <div class="rounded-full bg-bg p-[0.2rem]">
+                      <Avatar class="w-[4.625rem] h-[4.625rem]" :name="story.title" :src="story.coverImage.thumbnailUrl" />
+                    </div>
+                  </div>
+                  <span class="max-w-[5.75rem] overflow-hidden text-ellipsis whitespace-nowrap font-semibold leading-tight text-text">{{ story.title }}</span>
+                </button>
+              </div>
+            </div>
             <div class="flex justify-center border-b border-border" aria-label="Folder sections">
               <div class="flex items-center gap-40 pt-[0.2rem] max-sm:gap-[2.9rem] max-sm:pt-[0.12rem]">
                 <button
@@ -114,6 +160,15 @@
           </section>
         </template>
       </div>
+
+      <StoriesModal
+        v-if="activeStoryViewerId && folderStoriesStore.items.length"
+        :items="folderStoriesStore.items"
+        :initial-id="activeStoryViewerId"
+        :rail-singular-label="folderStoriesStore.railSingularLabel"
+        :store="folderStoriesStore"
+        @close="closeStoryViewer"
+      />
     </template>
     <EmptyState
       v-else-if="hasLoadedOnce && !foldersStore.loadingFolder"
@@ -133,7 +188,10 @@
   import InfiniteLoader from "../components/InfiniteLoader.vue"
   import FolderGrid from "../components/FolderGrid.vue"
   import FolderHeader from "../components/FolderHeader.vue"
+  import Avatar from "../components/Avatar.vue"
+  import StoriesModal from "../components/StoriesModal.vue"
   import { useAppStore } from "../stores/app"
+  import { useFolderStoriesStore } from "../stores/folder-stories"
   import { useFoldersStore } from "../stores/folders"
 
   const props = defineProps<{
@@ -141,10 +199,12 @@
   }>()
 
   const appStore = useAppStore()
+  const folderStoriesStore = useFolderStoriesStore()
   const foldersStore = useFoldersStore()
   const route = useRoute()
   const router = useRouter()
   const hasLoadedOnce = ref(false)
+  const activeStoryViewerId = ref<string | null>(null)
   const activeTab = computed(() =>
     route.query.tab === "reels" ? "reels" : "posts",
   )
@@ -158,11 +218,14 @@
       return
     }
 
-    await foldersStore.loadFolder(
-      props.slug,
-      true,
-      activeTab.value === "reels" ? "video" : undefined,
-    )
+    await Promise.all([
+      foldersStore.loadFolder(
+        props.slug,
+        true,
+        activeTab.value === "reels" ? "video" : undefined,
+      ),
+      folderStoriesStore.fetchStories(props.slug, folderStoriesStore.currentFolderSlug !== props.slug),
+    ])
 
     if (activeTab.value === "reels" && !hasReelsTab.value) {
       await router.replace({
@@ -207,11 +270,32 @@
     })
   }
 
+  function openAvatarStory() {
+    if (!folderStoriesStore.hasAvatarStory || !folderStoriesStore.avatarStoryId) {
+      return
+    }
+
+    activeStoryViewerId.value = folderStoriesStore.avatarStoryId
+  }
+
+  function openStoryViewer(id: string) {
+    activeStoryViewerId.value = id
+  }
+
+  function closeStoryViewer() {
+    activeStoryViewerId.value = null
+  }
+
+  async function retryFolderStories() {
+    await folderStoriesStore.fetchStories(props.slug, true)
+  }
+
   onMounted(loadFolder)
   watch(
     () => [props.slug, activeTab.value] as const,
     async () => {
       hasLoadedOnce.value = false
+      activeStoryViewerId.value = null
       await loadFolder()
     },
   )

@@ -7,17 +7,20 @@ import {
   LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY,
   LIBRARY_REBUILD_REQUIRED_SETTING_KEY,
   PREVIOUS_GALLERY_ROOT_SETTING_KEY,
-  REELS_FEED_DEFAULT_MODE_SETTING_KEY
+  REELS_FEED_DEFAULT_MODE_SETTING_KEY,
+  STORIES_MIGRATION_DECISION_SETTING_KEY,
+  TREAT_STORIES_AS_FOLDERS_SETTING_KEY
 } from '../constants/app-setting-keys.js';
 import { appConfig } from '../config/env.js';
 import { appSettingsRepository, folderRepository, folderScanStateRepository, imageRepository, likeRepository, scanRunRepository } from '../db/repositories.js';
-import type { FeedImage, ImageDetail, FolderSummaryRecord, MediaType, PlaybackStrategy, TrashImage } from '../types/models.js';
+import type { FeedImage, FolderRecord, FolderSummaryRecord, ImageDetail, MediaType, PlaybackStrategy, TrashImage } from '../types/models.js';
 import { deserializeImageExifData } from '../utils/exif-utils.js';
 import { buildMonthDayKey, countFeedBursts, diversifyFeedCandidates, groupFeedBursts, listMonthDayKeysAroundDate } from '../utils/feed-utils.js';
 import { shouldPreferMomentRail, type FeedRailKind } from '../utils/feed-rail-utils.js';
 import { countSupportedRootMediaFiles } from '../utils/gallery-root-utils.js';
 import { getPathBreadcrumb } from '../utils/path-utils.js';
 import { buildReelQueue, shuffleReelCandidates, type ReelAffinitySignals } from '../utils/reels-utils.js';
+import { parseTreatStoriesAsFoldersSetting, serializeTreatStoriesAsFoldersSetting } from '../utils/stories-utils.js';
 import { scannerService } from './scanner-service.js';
 import { storageService } from './storage-service.js';
 
@@ -46,6 +49,28 @@ interface DeleteFolderOptions {
   deleteSourceFolder?: boolean;
 }
 
+interface StoryRailCapsule {
+  id: string;
+  title: string;
+  subtitle: string;
+  dateContext: string;
+  imageCount: number;
+  coverImage: FeedImage;
+  presentation: 'avatar' | 'highlight';
+  latestActivityTimestamp: number;
+}
+
+interface StoryRailPayload {
+  railKind: 'stories';
+  railTitle: string;
+  railDescription: string;
+  railSingularLabel: string;
+  hasAvatarStory: boolean;
+  avatarStoryId: string | null;
+  items: StoryRailCapsule[];
+  highlights: StoryRailCapsule[];
+}
+
 const REDISCOVER_MIN_AGE_MS = 1000 * 60 * 60 * 24 * 180;
 const DIVERSIFIED_FETCH_BATCH_SIZE = 72;
 const MAX_DIVERSIFIED_CANDIDATES = 2400;
@@ -57,6 +82,8 @@ const HIGHLIGHT_CAPSULE_MAX_ITEMS = 30;
 // Keep the rail visually distinct from the first home-feed screen when enough alternatives exist.
 const HIGHLIGHT_FEED_OVERLAP_WINDOW = 18;
 const RAIL_COVER_CANDIDATE_LIMIT = 12;
+const FALLBACK_AVATAR_STORY_LIMIT = 10;
+const FALLBACK_AVATAR_STORY_ID = '__story-avatar-fallback__';
 
 type IndexedFeedImage = FeedImage & { playbackStrategy?: PlaybackStrategy | null };
 type IndexedImageDetail = ImageDetail & { playbackStrategy?: PlaybackStrategy | null; exifJson?: string | null };
@@ -92,6 +119,17 @@ function parseReelsFeedMode(value: string | null): ReelsFeedMode {
 
 function getDefaultReelsFeedMode(): ReelsFeedMode {
   return parseReelsFeedMode(appSettingsRepository.get(REELS_FEED_DEFAULT_MODE_SETTING_KEY));
+}
+
+function getTreatStoriesAsFolders(): boolean {
+  return parseTreatStoriesAsFoldersSetting(appSettingsRepository.get(TREAT_STORIES_AS_FOLDERS_SETTING_KEY));
+}
+
+function getStoriesMigrationStatus() {
+  return {
+    hasLegacyStoriesCandidates: folderRepository.hasLegacyStoriesCandidates(),
+    decisionPending: appSettingsRepository.get(STORIES_MIGRATION_DECISION_SETTING_KEY) === null
+  };
 }
 
 function getDerivativeAssetVersion(): string | null {
@@ -286,9 +324,37 @@ function buildFolderSummary(folder: FolderSummaryRecord) {
     imageCount: folder.image_count,
     videoCount: folder.video_count,
     latestImageMtimeMs: folder.latest_image_mtime_ms,
+    hasAvatarStory: Boolean(folder.has_avatar_story),
     avatarImageId: avatar?.id ?? null,
     avatarUrl: avatar ? mapImageDetail(avatar, derivativeVersion).thumbnailUrl : null
   };
+}
+
+function mapFeedImageForOwnerFolder(
+  image: IndexedFeedImage,
+  ownerFolder: ReturnType<typeof buildFolderSummary>,
+  derivativeVersion = getDerivativeAssetVersion()
+): FeedImage {
+  return {
+    ...mapFeedImage(image, derivativeVersion),
+    folderId: ownerFolder.id,
+    folderSlug: ownerFolder.slug,
+    folderName: ownerFolder.name,
+    folderPath: ownerFolder.folderPath,
+    folderBreadcrumb: ownerFolder.breadcrumb
+  };
+}
+
+function formatStoryDateContext(timestamp: number | null): string {
+  if (timestamp === null) {
+    return 'No recent activity';
+  }
+
+  return `Latest ${new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(new Date(timestamp))}`;
 }
 
 function formatMonthDay(date: Date): string {
@@ -519,9 +585,9 @@ function buildHighlightRailDefinition(now = new Date()): FeedRailDefinition {
 
   return {
     kind: 'highlights',
-    title: 'Highlights',
-    description: 'Curated sets from your library when capture dates are sparse or synthetic.',
-    singularLabel: 'Highlight',
+    title: 'Stories',
+    description: 'Curated story-style sets from your library when capture dates are sparse or synthetic.',
+    singularLabel: 'Story',
     capsules: [
       buildStaticCapsuleDefinition(
         {
@@ -617,6 +683,119 @@ function getSelectedFeedRail(now = new Date()) {
   }
 
   return momentRail.capsules.length > 0 ? momentRail : highlightRail;
+}
+
+function buildFolderStoryRail(folder: FolderSummaryRecord): StoryRailPayload {
+  const ownerFolder = buildFolderSummary(folder);
+  const derivativeVersion = getDerivativeAssetVersion();
+  const storyFolders = folderRepository.listOwnedStoryFolders(folder.id);
+  const rootStoryFolder = storyFolders.find((entry) => entry.role === 'story_root') ?? null;
+  const highlightStoryFolders = storyFolders.filter((entry) => entry.role === 'story_capsule');
+
+  const rootStoryCapsule = rootStoryFolder ? buildStoryRailCapsule(rootStoryFolder, ownerFolder, derivativeVersion) : null;
+  const highlightCapsules = highlightStoryFolders
+    .map((storyFolder) => buildStoryRailCapsule(storyFolder, ownerFolder, derivativeVersion))
+    .filter((capsule): capsule is StoryRailCapsule => capsule !== null)
+    .sort((left, right) => {
+      if (left.latestActivityTimestamp !== right.latestActivityTimestamp) {
+        return right.latestActivityTimestamp - left.latestActivityTimestamp;
+      }
+
+      return left.title.localeCompare(right.title, undefined, { sensitivity: 'base' });
+    });
+  const avatarStoryCapsule = rootStoryCapsule ?? buildFallbackAvatarStoryCapsule(ownerFolder, derivativeVersion);
+  const items = avatarStoryCapsule ? [avatarStoryCapsule, ...highlightCapsules] : highlightCapsules;
+
+  return {
+    railKind: 'stories',
+    railTitle: 'Stories',
+    railDescription: `Stories and highlights for ${folder.name}.`,
+    railSingularLabel: 'Story',
+    hasAvatarStory: avatarStoryCapsule !== null,
+    avatarStoryId: avatarStoryCapsule?.id ?? null,
+    items,
+    highlights: highlightCapsules
+  };
+}
+
+function buildStoryRailCapsule(
+  storyFolder: FolderRecord,
+  ownerFolder: ReturnType<typeof buildFolderSummary>,
+  derivativeVersion: string | null
+): StoryRailCapsule | null {
+  const imageCount = imageRepository.countStoryMediaByFolder(storyFolder.id);
+  if (imageCount === 0) {
+    return null;
+  }
+
+  const coverImage = imageRepository.listStoryFolderImages(storyFolder.id, 1, 1)[0];
+  if (!coverImage) {
+    return null;
+  }
+
+  const latestActivityTimestamp = imageRepository.getLatestEffectiveTimestampByFolder(storyFolder.id) ?? 0;
+  const presentation = storyFolder.role === 'story_root' ? 'avatar' as const : 'highlight' as const;
+
+  return {
+    id: storyFolder.slug,
+    title: presentation === 'avatar' ? ownerFolder.name : storyFolder.name,
+    subtitle: presentation === 'avatar' ? `${ownerFolder.name} story set` : 'Profile highlight',
+    dateContext: formatStoryDateContext(latestActivityTimestamp),
+    imageCount,
+    coverImage: mapFeedImageForOwnerFolder(coverImage, ownerFolder, derivativeVersion),
+    presentation,
+    latestActivityTimestamp
+  };
+}
+
+function buildFallbackAvatarStoryCapsule(
+  ownerFolder: ReturnType<typeof buildFolderSummary>,
+  derivativeVersion: string | null
+): StoryRailCapsule | null {
+  const imageCount = Math.min(imageRepository.countStoryCapsuleMediaByOwnerFolder(ownerFolder.id), FALLBACK_AVATAR_STORY_LIMIT);
+  if (imageCount === 0) {
+    return null;
+  }
+
+  const coverImage = imageRepository.listStoryCapsuleImagesByOwnerFolder(ownerFolder.id, 1, 1)[0];
+  if (!coverImage) {
+    return null;
+  }
+
+  const latestActivityTimestamp = coverImage.takenAt ?? coverImage.sortTimestamp;
+
+  return {
+    id: FALLBACK_AVATAR_STORY_ID,
+    title: ownerFolder.name,
+    subtitle: 'Latest from highlights',
+    dateContext: formatStoryDateContext(latestActivityTimestamp),
+    imageCount,
+    coverImage: mapFeedImageForOwnerFolder(coverImage, ownerFolder, derivativeVersion),
+    presentation: 'avatar',
+    latestActivityTimestamp
+  };
+}
+
+function listFallbackAvatarStoryItems(
+  ownerFolder: ReturnType<typeof buildFolderSummary>,
+  page: number,
+  limit: number,
+  derivativeVersion = getDerivativeAssetVersion()
+) {
+  const total = Math.min(imageRepository.countStoryCapsuleMediaByOwnerFolder(ownerFolder.id), FALLBACK_AVATAR_STORY_LIMIT);
+  const offset = (page - 1) * limit;
+  const remaining = Math.max(total - offset, 0);
+  const items =
+    remaining > 0
+      ? imageRepository
+          .listStoryCapsuleImagesByOwnerFolder(ownerFolder.id, page, Math.min(limit, remaining))
+          .map((image) => mapFeedImageForOwnerFolder(image, ownerFolder, derivativeVersion))
+      : [];
+
+  return {
+    total,
+    items
+  };
 }
 
 export const galleryService = {
@@ -836,7 +1015,7 @@ export const galleryService = {
       return null;
     }
 
-    const folder = folderRepository.getBySlug(slug);
+    const folder = folderRepository.getNormalBySlug(slug);
     if (!folder) {
       return null;
     }
@@ -848,6 +1027,70 @@ export const galleryService = {
 
     folderRepository.setAvatar(folder.id, imageId, 'manual');
     return true;
+  },
+
+  getFolderStories(slug: string) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const folder = folderRepository.getSummaryBySlug(slug);
+    if (!folder) {
+      return null;
+    }
+
+    return buildFolderStoryRail(folder);
+  },
+
+  getFolderStoryFeed(slug: string, storyId: string, page: number, limit: number) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const folder = folderRepository.getSummaryBySlug(slug);
+    if (!folder) {
+      return null;
+    }
+
+    const rail = buildFolderStoryRail(folder);
+    const capsule = rail.items.find((entry) => entry.id === storyId);
+    if (!capsule) {
+      return null;
+    }
+
+    const ownerFolder = buildFolderSummary(folder);
+    if (storyId === FALLBACK_AVATAR_STORY_ID) {
+      const fallbackFeed = listFallbackAvatarStoryItems(ownerFolder, page, limit);
+
+      return {
+        railKind: 'stories' as const,
+        railTitle: rail.railTitle,
+        railDescription: rail.railDescription,
+        railSingularLabel: rail.railSingularLabel,
+        story: capsule,
+        ...buildPaginatedPayload(fallbackFeed.items, page, limit, fallbackFeed.total)
+      };
+    }
+
+    const storyFolder = folderRepository.getOwnedStoryFolderBySlug(folder.id, storyId);
+    if (!storyFolder) {
+      return null;
+    }
+
+    const derivativeVersion = getDerivativeAssetVersion();
+    const total = imageRepository.countStoryMediaByFolder(storyFolder.id);
+    const items = imageRepository
+      .listStoryFolderImages(storyFolder.id, page, limit)
+      .map((image) => mapFeedImageForOwnerFolder(image, ownerFolder, derivativeVersion));
+
+    return {
+      railKind: 'stories' as const,
+      railTitle: rail.railTitle,
+      railDescription: rail.railDescription,
+      railSingularLabel: rail.railSingularLabel,
+      story: capsule,
+      ...buildPaginatedPayload(items, page, limit, total)
+    };
   },
 
   getFolderImages(slug: string, page: number, limit: number, mediaType?: MediaType) {
@@ -1016,6 +1259,8 @@ export const galleryService = {
     const rebuildRequired = appSettingsRepository.get(LIBRARY_REBUILD_REQUIRED_SETTING_KEY) === '1';
     const defaultHomeFeedMode = getDefaultHomeFeedMode();
     const defaultReelsFeedMode = getDefaultReelsFeedMode();
+    const treatStoriesAsFolders = getTreatStoriesAsFolders();
+    const storiesMigration = getStoriesMigrationStatus();
 
     return {
       folders: storageState.libraryAvailable ? folderRepository.count() : 0,
@@ -1037,8 +1282,10 @@ export const galleryService = {
       },
       preferences: {
         defaultHomeFeedMode,
-        defaultReelsFeedMode
-      }
+        defaultReelsFeedMode,
+        treatStoriesAsFolders
+      },
+      storiesMigration
     };
   },
 
@@ -1052,6 +1299,8 @@ export const galleryService = {
     const lastSuccessfulGalleryRoot = appSettingsRepository.get(LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY);
     const defaultHomeFeedMode = getDefaultHomeFeedMode();
     const defaultReelsFeedMode = getDefaultReelsFeedMode();
+    const treatStoriesAsFolders = getTreatStoriesAsFolders();
+    const storiesMigration = getStoriesMigrationStatus();
 
     return {
       folders: storageState.libraryAvailable ? folderRepository.count() : 0,
@@ -1080,8 +1329,10 @@ export const galleryService = {
       },
       preferences: {
         defaultHomeFeedMode,
-        defaultReelsFeedMode
-      }
+        defaultReelsFeedMode,
+        treatStoriesAsFolders
+      },
+      storiesMigration
     };
   },
 
@@ -1098,6 +1349,15 @@ export const galleryService = {
 
     return {
       defaultMode: mode
+    };
+  },
+
+  setTreatStoriesAsFolders(treatStoriesAsFolders: boolean) {
+    appSettingsRepository.set(TREAT_STORIES_AS_FOLDERS_SETTING_KEY, serializeTreatStoriesAsFoldersSetting(treatStoriesAsFolders));
+    appSettingsRepository.set(STORIES_MIGRATION_DECISION_SETTING_KEY, treatStoriesAsFolders ? 'legacy' : 'stories');
+
+    return {
+      treatStoriesAsFolders
     };
   },
 

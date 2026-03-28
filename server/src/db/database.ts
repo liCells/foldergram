@@ -55,6 +55,14 @@ class DatabaseManager {
       this.database.exec("ALTER TABLE folders ADD COLUMN avatar_source TEXT NOT NULL DEFAULT 'auto'");
     }
 
+    if (this.tableExists('folders') && !this.tableHasColumn('folders', 'role')) {
+      this.database.exec("ALTER TABLE folders ADD COLUMN role TEXT NOT NULL DEFAULT 'normal'");
+    }
+
+    if (this.tableExists('folders') && !this.tableHasColumn('folders', 'story_owner_folder_id')) {
+      this.database.exec('ALTER TABLE folders ADD COLUMN story_owner_folder_id INTEGER NULL');
+    }
+
     if (this.tableExists('images') && !this.tableHasColumn('images', 'media_type')) {
       this.database.exec("ALTER TABLE images ADD COLUMN media_type TEXT NOT NULL DEFAULT 'image'");
     }
@@ -105,6 +113,8 @@ class DatabaseManager {
   }
 
   private applyCompatIndexes(): void {
+    this.database.exec("CREATE INDEX IF NOT EXISTS idx_folders_role ON folders(role)");
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_folders_story_owner_role ON folders(story_owner_folder_id, role, folder_path COLLATE NOCASE)');
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_images_taken_at ON images(taken_at DESC)');
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_images_taken_at_source ON images(is_deleted, taken_at_source)');
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_images_media_type ON images(media_type, is_deleted, sort_timestamp DESC)');

@@ -2,6 +2,7 @@ export type MediaType = 'image' | 'video';
 export type TakenAtSource = 'exif' | 'mtime' | 'first_seen' | 'sort_timestamp';
 export type PlaybackStrategy = 'preview' | 'original';
 export type FolderAvatarSource = 'auto' | 'manual' | 'cover';
+export type FolderRole = 'normal' | 'story_root' | 'story_capsule';
 
 export interface ImageExifData {
   cameraMake?: string;
@@ -22,6 +23,8 @@ export interface FolderRecord {
   slug: string;
   name: string;
   folder_path: string;
+  role: FolderRole;
+  story_owner_folder_id: number | null;
   description: string | null;
   avatar_image_id: number | null;
   avatar_source: FolderAvatarSource;
@@ -33,6 +36,7 @@ export interface FolderSummaryRecord extends FolderRecord {
   image_count: number;
   video_count: number;
   latest_image_mtime_ms: number | null;
+  has_avatar_story?: number | null;
 }
 
 export interface ImageRecord {

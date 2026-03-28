@@ -351,6 +351,138 @@
 
         <!-- CATEGORY: LIBRARY -->
         <template v-if="currentCategory === 'library'">
+          <section
+            v-if="showStoriesMigrationNotice"
+            class="card grid gap-[1rem] p-6 border-[color-mix(in_srgb,#d2a133_42%,var(--border)_58%)]"
+            style="background: radial-gradient(circle at top right, rgba(210,161,51,0.18), transparent 40%), linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, #fff3cf 6%) 0%, color-mix(in srgb, var(--surface) 88%, #ffe6a6 12%) 100%);"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div class="grid gap-[0.3rem]">
+                <span class="eyebrow text-[#9f6a00]">Stories Migration</span>
+                <h2 class="m-0 text-[1.1rem]">This library may already use folders named stories</h2>
+                <p class="m-0 text-muted">
+                  Foldergram can now treat <code>stories/</code> as profile stories and highlights by default. Choose whether to keep legacy folder behavior or switch to the new reserved stories mode, then rescan the library.
+                </p>
+              </div>
+              <button
+                class="inline-flex h-9 w-9 items-center justify-center rounded-full border-0 bg-[rgba(159,106,0,0.08)] text-[#9f6a00] cursor-pointer transition-colors duration-180 hover:bg-[rgba(159,106,0,0.14)]"
+                type="button"
+                aria-label="Dismiss stories migration notice"
+                @click="dismissStoriesMigrationNotice"
+              >
+                <span class="i-fluent-dismiss-20-filled h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div class="flex flex-col md:flex-row items-center gap-3 max-sm:items-stretch">
+              <button class="btn-primary min-w-[13rem]" type="button" :disabled="storiesModeActionBusy || !authStore.canManageLibrary" @click="openStoriesModeConfirm(false)">
+                Use Stories Feature
+              </button>
+              <button
+                class="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] border border-border bg-transparent px-4 text-[0.92rem] font-semibold text-text transition-colors duration-180 hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                :disabled="storiesModeActionBusy || !authStore.canManageLibrary"
+                @click="openStoriesModeConfirm(true)"
+              >
+                Keep Legacy Behavior
+              </button>
+            </div>
+            <p class="m-0 text-muted">{{ storiesModeActionHelper }}</p>
+          </section>
+
+          <section
+            v-else-if="showStoriesAnnouncementCard"
+            class="card grid gap-[1rem] border-[color-mix(in_srgb,var(--border)_84%,#8cc8ff_16%)] p-6"
+            style="background: linear-gradient(135deg, color-mix(in srgb, var(--surface) 97%, #f7fbff 3%) 0%, color-mix(in srgb, var(--surface) 93%, #e6f3ff 7%) 100%);"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div class="grid gap-[0.3rem]">
+                <div class="flex items-center gap-2">
+                  <h2 class="m-0 text-xl">Stories</h2>
+                  <span class="eyebrow inline-flex w-fit self-start text-xs">New Feature</span>
+                </div>
+                <p class="m-0 text-[0.95rem] font-medium text-text">Reserved <code>stories/</code> folders can power App Folder stories</p>
+                <p class="m-0 text-muted">
+                  Drop direct media into <code>AppFolder/stories</code> for the avatar story set, and use direct child folders for highlight circles. Nested folders stay inside the same highlight capsule.
+                  <button
+                    class="ml-1 inline-flex border-0 bg-transparent p-0 text-[0.92em] font-semibold text-accent-strong underline underline-offset-[0.18em] cursor-pointer transition-opacity duration-180 hover:opacity-80"
+                    type="button"
+                    :aria-expanded="showStoriesAnnouncementStructure"
+                    @click="toggleStoriesAnnouncementStructure"
+                  >
+                    {{ showStoriesAnnouncementStructure ? 'Hide directory structure' : 'See directory structure' }}
+                  </button>
+                </p>
+              </div>
+              <button
+                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-0 bg-[rgba(24,119,242,0.08)] text-accent-strong cursor-pointer transition-colors duration-180 hover:bg-[rgba(24,119,242,0.14)]"
+                type="button"
+                aria-label="Dismiss stories announcement"
+                @click="dismissStoriesAnnouncement"
+              >
+                <span class="i-fluent-dismiss-20-filled h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            <pre v-if="showStoriesAnnouncementStructure" class="m-0 overflow-x-auto rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_82%,transparent_18%)] p-4 text-[0.78rem] leading-[1.55] text-muted"><code>gallery/
+└─ AnimalPlanet/
+   ├─ cover.jpg
+   ├─ post-1.jpg
+   └─ stories/
+      ├─ story-1.mp4
+      ├─ story-2.jpg
+      ├─ Lions/
+      │  ├─ clip-1.mp4
+      │  └─ nested-1/
+      │     └─ clip-2.jpg
+      └─ Tigers/
+         └─ tiger-1.jpg</code></pre>
+          </section>
+
+          <section class="card grid gap-[1.15rem] p-6">
+            <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
+              <div>
+                <h2 class="m-0 text-[1.18rem]">Stories folders</h2>
+                <p class="m-0 mt-[0.25rem] text-muted">
+                  {{ storiesModeDescription }}
+                </p>
+              </div>
+              <span class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap text-accent-strong bg-[color-mix(in_srgb,var(--accent-soft)_78%,transparent_22%)]">
+                {{ storiesMode ? 'Legacy folders' : 'Reserved stories' }}
+              </span>
+            </div>
+
+            <label class="flex items-start gap-3 rounded-[0.95rem] border border-border px-4 py-3 cursor-pointer">
+              <input
+                v-model="storiesMode"
+                class="mt-[0.2rem]"
+                type="checkbox"
+                :disabled="storiesModeActionBusy || waitingForInitialStatus"
+              />
+              <span class="grid gap-[0.15rem]">
+                <span class="text-[0.92rem] font-semibold text-text">Treat stories folders as normal app folders</span>
+                <span class="text-[0.84rem] text-muted">{{ storiesModeLabelDescription }}</span>
+              </span>
+            </label>
+
+            <div v-if="storiesModeFeedback" class="rounded-[0.95rem] px-4 py-3 text-[0.9rem]" :class="storiesModeFeedback.tone === 'error' ? 'border border-[rgba(214,48,49,0.24)] text-[#c0392b] bg-[rgba(214,48,49,0.08)]' : 'border border-[rgba(24,119,242,0.2)] text-accent-strong bg-[rgba(24,119,242,0.08)]'">
+              {{ storiesModeFeedback.message }}
+            </div>
+
+            <div class="flex flex-col md:flex-row items-center gap-3 max-sm:items-stretch">
+              <p class="m-0 flex-1 text-muted">{{ storiesModeActionNote }}</p>
+              <button
+                class="btn-primary min-w-[13rem]"
+                type="button"
+                :disabled="storiesModeActionDisabled"
+                :style="{ cursor: storiesModeActionBusy ? 'wait' : storiesModeActionDisabled ? 'not-allowed' : undefined }"
+                @click="openStoriesModeConfirm(storiesMode)"
+              >
+                {{ storiesModeButtonLabel }}
+              </button>
+            </div>
+          </section>
+
           <section class="card grid gap-[1.15rem] p-6">
             <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
               <div>
@@ -607,6 +739,16 @@
       @cancel="confirmThumbnailRebuildOpen = false"
       @confirm="runThumbnailRebuild"
     />
+    <ConfirmDialog
+      v-if="confirmStoriesModeOpen"
+      :title="storiesModeConfirmTitle"
+      :message="storiesModeConfirmMessage"
+      confirm-label="Save and Rescan"
+      loading-label="Saving..."
+      :loading="savingStoriesMode"
+      @cancel="confirmStoriesModeOpen = false"
+      @confirm="runStoriesModeSave"
+    />
   </section>
 </template>
 <script setup lang="ts">
@@ -614,7 +756,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import ConfirmDialog from '../components/ConfirmDialog.vue';
-import { fetchAdminStats, triggerLibraryRebuild, triggerManualScan, triggerThumbnailRebuild, updateHomeFeedDefault, updateReelsFeedDefault } from '../api/gallery';
+import { fetchAdminStats, triggerLibraryRebuild, triggerManualScan, triggerThumbnailRebuild, updateHomeFeedDefault, updateReelsFeedDefault, updateStoriesMode } from '../api/gallery';
 import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { useFeedStore } from '../stores/feed';
@@ -639,12 +781,15 @@ const thumbnailRebuildError = ref<string | null>(null);
 const requestingScan = ref(false);
 const rebuilding = ref(false);
 const rebuildingThumbnails = ref(false);
+const savingStoriesMode = ref(false);
 const savingFeedDefaults = ref(false);
 const confirmRebuildOpen = ref(false);
 const confirmThumbnailRebuildOpen = ref(false);
+const confirmStoriesModeOpen = ref(false);
 const authFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
 const viewerFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
 const feedDefaultsFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
+const storiesModeFeedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null);
 const adminStats = ref<AppStats | null>(null);
 const showChangePasswordForm = ref(false);
 const showDisablePasswordForm = ref(false);
@@ -656,7 +801,11 @@ const nextPasswordConfirmation = ref('');
 const disablePassword = ref('');
 const homeFeedDefaultMode = ref<FeedMode>('random');
 const reelsFeedDefaultMode = ref<ReelsFeedMode>('random');
+const storiesMode = ref(false);
 const feedDefaultsHydrated = ref(false);
+const storiesModeHydrated = ref(false);
+const pendingStoriesModeValue = ref<boolean | null>(null);
+const showStoriesAnnouncementStructure = ref(false);
 const viewerAccessMode = ref<ViewerAccessMode>(authStore.accessMode);
 const viewerPassword = ref('');
 const viewerPasswordConfirmation = ref('');
@@ -666,6 +815,8 @@ const NOTICE_DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 const MIN_PASSWORD_LENGTH = 8;
 const HOME_FEED_DEFAULT_GROUP_NAME = 'home-feed-default';
 const REELS_FEED_DEFAULT_GROUP_NAME = 'reels-feed-default';
+const STORIES_MIGRATION_NOTICE_STORAGE_KEY = 'foldergram-stories-migration-dismissed';
+const STORIES_ANNOUNCEMENT_STORAGE_KEY = 'foldergram-stories-announcement-dismissed';
 
 function loadDismissedScanErrorNotice(): { scanId: number; dismissedUntil: number } | null {
   if (typeof window === 'undefined') {
@@ -699,6 +850,8 @@ function loadDismissedScanErrorNotice(): { scanId: number; dismissedUntil: numbe
 
 const dismissedScanErrorNotice = ref(loadDismissedScanErrorNotice());
 const dismissedIgnoredRootMediaNotice = ref(loadDismissedIgnoredRootMediaNotice());
+const dismissedStoriesMigrationNotice = ref(loadDismissedStoriesNotice(STORIES_MIGRATION_NOTICE_STORAGE_KEY));
+const dismissedStoriesAnnouncement = ref(loadDismissedStoriesNotice(STORIES_ANNOUNCEMENT_STORAGE_KEY));
 
 function wait(milliseconds: number) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -731,6 +884,10 @@ function clearViewerFeedback() {
 
 function clearFeedDefaultsFeedback() {
   feedDefaultsFeedback.value = null;
+}
+
+function clearStoriesModeFeedback() {
+  storiesModeFeedback.value = null;
 }
 
 function setAuthError(message: string) {
@@ -814,6 +971,11 @@ function syncFeedDefaultsFromSaved() {
   feedDefaultsHydrated.value = true;
 }
 
+function syncStoriesModeFromSaved() {
+  storiesMode.value = appStore.treatStoriesAsFolders;
+  storiesModeHydrated.value = true;
+}
+
 const scan = computed(() => appStore.stats?.scan ?? null);
 const lastCompletedScan = computed(() => scan.value?.lastCompletedScan ?? adminStats.value?.lastScan ?? null);
 const activeScanReason = computed(() => scan.value?.scanReason ?? null);
@@ -863,6 +1025,8 @@ const highlightRebuildAction = computed(() => route.query.action === 'rebuild');
 const waitingForInitialStatus = computed(() => !appStore.stats || appStore.loadingStats);
 const savedHomeFeedDefaultMode = computed(() => appStore.defaultHomeFeedMode);
 const savedReelsFeedDefaultMode = computed(() => appStore.defaultReelsFeedMode);
+const savedStoriesMode = computed(() => appStore.treatStoriesAsFolders);
+const storiesModeRequiresDecision = computed(() => appStore.stats?.storiesMigration.decisionPending === true);
 const savedHomeFeedDefaultModeLabel = computed(
   () => homeFeedDefaultOptions.find((mode) => mode.id === savedHomeFeedDefaultMode.value)?.label ?? 'Random'
 );
@@ -876,8 +1040,19 @@ const reelsFeedDefaultDirty = computed(
   () => feedDefaultsHydrated.value && reelsFeedDefaultMode.value !== savedReelsFeedDefaultMode.value
 );
 const feedDefaultsDirty = computed(() => homeFeedDefaultDirty.value || reelsFeedDefaultDirty.value);
+const storiesModeDirty = computed(() => storiesModeHydrated.value && storiesMode.value !== savedStoriesMode.value);
 const feedDefaultsSaveDisabled = computed(
   () => waitingForInitialStatus.value || savingFeedDefaults.value || !feedDefaultsDirty.value
+);
+const storiesModeActionBusy = computed(
+  () => savingStoriesMode.value || requestingScan.value || rebuilding.value || rebuildingThumbnails.value || appStore.isScanning
+);
+const storiesModeActionDisabled = computed(
+  () =>
+    waitingForInitialStatus.value ||
+    appStore.isLibraryUnavailable ||
+    storiesModeActionBusy.value ||
+    (!storiesModeDirty.value && !storiesModeRequiresDecision.value)
 );
 const feedDefaultsButtonLabel = computed(() => {
   if (savingFeedDefaults.value) {
@@ -885,6 +1060,17 @@ const feedDefaultsButtonLabel = computed(() => {
   }
 
   return feedDefaultsDirty.value ? 'Save Feed Defaults' : 'Saved';
+});
+const storiesModeButtonLabel = computed(() => {
+  if (savingStoriesMode.value) {
+    return 'Saving...';
+  }
+
+  if (storiesModeDirty.value || storiesModeRequiresDecision.value) {
+    return 'Save and Rescan';
+  }
+
+  return 'Saved';
 });
 const feedDefaultsButtonStyle = computed(() =>
   feedDefaultsSaveDisabled.value ? { cursor: savingFeedDefaults.value ? 'wait' : 'not-allowed' } : undefined
@@ -908,6 +1094,73 @@ const feedDefaultsActionNote = computed(() => {
 
   return 'These are the current app-wide defaults for Home and Reels.';
 });
+const storiesModeDescription = computed(() =>
+  storiesMode.value
+    ? 'Folders named stories behave like ordinary app folders across the app.'
+    : 'Folders named stories become profile stories/highlights instead of standalone app folders.'
+);
+const storiesModeLabelDescription = computed(() =>
+  storiesMode.value
+    ? 'Legacy mode is enabled. stories folders remain ordinary app folders everywhere.'
+    : 'Reserved stories mode is enabled. AppFolder/stories powers avatar stories and highlight circles.'
+);
+const storiesModeActionNote = computed(() => {
+  if (waitingForInitialStatus.value) {
+    return 'Loading the current stories folders mode...';
+  }
+
+  if (appStore.isLibraryUnavailable) {
+    return appStore.libraryUnavailableReason;
+  }
+
+  if (storiesModeActionBusy.value) {
+    return 'Wait for the current library task to finish first.';
+  }
+
+  if (storiesModeRequiresDecision.value) {
+    return 'Save your choice and rescan so the indexed folder structure matches the stories mode.';
+  }
+
+  if (storiesModeDirty.value) {
+    return 'Changing this setting requires a rescan because stories paths are reinterpreted.';
+  }
+
+  return 'Reserved stories mode is the default. Enable legacy mode only if you rely on normal app folders literally named stories.';
+});
+const storiesModeActionHelper = computed(() => {
+  if (!authStore.canManageLibrary) {
+    return 'An admin session needs to confirm the stories folder mode and run the rescan.';
+  }
+
+  if (storiesModeActionBusy.value) {
+    return 'Wait for the current library task to finish first.';
+  }
+
+  return 'This saves the setting immediately and starts a full rescan so the library reflects the chosen mode.';
+});
+const showStoriesMigrationNotice = computed(
+  () =>
+    appStore.stats?.storiesMigration.hasLegacyStoriesCandidates === true &&
+    appStore.stats?.storiesMigration.decisionPending === true &&
+    !dismissedStoriesMigrationNotice.value
+);
+const showStoriesAnnouncementCard = computed(
+  () =>
+    appStore.stats?.storiesMigration.hasLegacyStoriesCandidates === false &&
+    appStore.stats?.storiesMigration.decisionPending === true &&
+    !dismissedStoriesAnnouncement.value
+);
+const storiesModeConfirmTarget = computed(() => pendingStoriesModeValue.value ?? storiesMode.value);
+const storiesModeConfirmTitle = computed(() =>
+  storiesModeConfirmTarget.value
+    ? 'Treat stories folders as normal app folders?'
+    : 'Enable reserved stories folders?'
+);
+const storiesModeConfirmMessage = computed(() =>
+  storiesModeConfirmTarget.value
+    ? 'This will keep folders named stories behaving like normal app folders everywhere in the app. A rescan will start immediately because the indexed folder structure may change.'
+    : 'This will reserve AppFolder/stories for avatar stories and highlight capsules by default. A rescan will start immediately because the indexed folder structure may change.'
+);
 const scanActionDisabled = computed(
   () =>
     waitingForInitialStatus.value ||
@@ -1302,6 +1555,33 @@ function dismissIgnoredRootMediaNotice() {
   }
 }
 
+function loadDismissedStoriesNotice(storageKey: string): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return window.localStorage.getItem(storageKey) === '1';
+}
+
+function dismissStoriesMigrationNotice() {
+  dismissedStoriesMigrationNotice.value = true;
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(STORIES_MIGRATION_NOTICE_STORAGE_KEY, '1');
+  }
+}
+
+function dismissStoriesAnnouncement() {
+  dismissedStoriesAnnouncement.value = true;
+  showStoriesAnnouncementStructure.value = false;
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(STORIES_ANNOUNCEMENT_STORAGE_KEY, '1');
+  }
+}
+
+function toggleStoriesAnnouncementStructure() {
+  showStoriesAnnouncementStructure.value = !showStoriesAnnouncementStructure.value;
+}
+
 async function enableAccessProtection() {
   if (authStore.loading) {
     return;
@@ -1480,6 +1760,17 @@ async function saveFeedDefaults() {
   }
 }
 
+function openStoriesModeConfirm(value: boolean) {
+  if (!authStore.canManageLibrary) {
+    return;
+  }
+
+  clearStoriesModeFeedback();
+  storiesMode.value = value;
+  pendingStoriesModeValue.value = value;
+  confirmStoriesModeOpen.value = true;
+}
+
 async function warmScanStatus() {
   for (let attempt = 0; attempt < 12; attempt += 1) {
     await wait(attempt === 0 ? 150 : 250);
@@ -1498,6 +1789,65 @@ async function warmScanStatus() {
 
 async function loadAdminStats() {
   adminStats.value = await fetchAdminStats();
+}
+
+async function runStoriesModeSave() {
+  if (!authStore.canManageLibrary || appStore.isLibraryUnavailable) {
+    return;
+  }
+
+  const targetValue = pendingStoriesModeValue.value ?? storiesMode.value;
+  let savedSetting = false;
+
+  savingStoriesMode.value = true;
+  clearStoriesModeFeedback();
+  confirmStoriesModeOpen.value = false;
+
+  try {
+    const payload = await updateStoriesMode(targetValue);
+    savedSetting = true;
+    storiesMode.value = payload.treatStoriesAsFolders;
+
+    if (appStore.stats) {
+      appStore.stats.preferences.treatStoriesAsFolders = payload.treatStoriesAsFolders;
+      appStore.stats.storiesMigration.decisionPending = false;
+    }
+
+    const request = triggerManualScan();
+    void warmScanStatus();
+    await request;
+    await appStore.fetchStats({ background: true });
+    await loadAdminStats().catch(() => {});
+    await Promise.all([
+      foldersStore.fetchFolders(true),
+      feedStore.loadInitial(true),
+      likesStore.initialize(true),
+      momentsStore.fetchMoments(true)
+    ]);
+
+    storiesModeFeedback.value = {
+      tone: 'success',
+      message: targetValue
+        ? 'stories folders now behave like normal app folders. The library was rescanned.'
+        : 'Reserved stories folders are now active. The library was rescanned.'
+    };
+  } catch (error) {
+    await appStore.fetchStats({ background: true }).catch(() => {});
+    await loadAdminStats().catch(() => {});
+    storiesModeFeedback.value = {
+      tone: 'error',
+      message: savedSetting
+        ? error instanceof Error
+          ? `The stories folders setting was saved, but the rescan failed: ${error.message}`
+          : 'The stories folders setting was saved, but the rescan failed.'
+        : error instanceof Error
+          ? error.message
+          : 'Unable to update the stories folders setting.'
+    };
+  } finally {
+    pendingStoriesModeValue.value = null;
+    savingStoriesMode.value = false;
+  }
 }
 
 async function runManualScan() {
@@ -1595,12 +1945,13 @@ onMounted(async () => {
 
   if (appStore.stats) {
     syncFeedDefaultsFromSaved();
+    syncStoriesModeFromSaved();
   }
   await loadAdminStats().catch(() => {});
 });
 
 watch(
-  () => [appStore.stats, appStore.loadingStats, savedHomeFeedDefaultMode.value, savedReelsFeedDefaultMode.value] as const,
+  () => [appStore.stats, appStore.loadingStats, savedHomeFeedDefaultMode.value, savedReelsFeedDefaultMode.value, savedStoriesMode.value] as const,
   ([stats, loadingStats]) => {
     if (!stats || loadingStats) {
       return;
@@ -1608,6 +1959,10 @@ watch(
 
     if (!feedDefaultsHydrated.value || savingFeedDefaults.value || !feedDefaultsDirty.value) {
       syncFeedDefaultsFromSaved();
+    }
+
+    if (!storiesModeHydrated.value || savingStoriesMode.value || !storiesModeDirty.value) {
+      syncStoriesModeFromSaved();
     }
   },
   {

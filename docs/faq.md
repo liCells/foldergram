@@ -34,6 +34,20 @@ If no explicit cover file is found, it falls back to the most recent (newest) su
 Admins can also use the "Set as Cover" action from the detail view of any image to set it as the cover without renaming files.
 Any explicit `cover.*` files, or any files manually set as the cover via the UI, are hidden from the normal folder grid so they don't appear as duplicate posts.
 
+## How do reserved stories folders work?
+
+In the default mode, `AppFolder/stories` is treated as a story source for that
+folder:
+
+- direct media inside `stories/` becomes the avatar story set
+- each direct child folder becomes one highlight capsule
+- nested folders stay inside that same highlight capsule
+- story media is hidden from normal folder, feed, and reels surfaces while this mode is active
+
+If you already rely on folders literally named `stories` as normal app folders,
+open Settings, enable `Treat stories folders as normal app folders`, and rescan
+the library.
+
 ## Are likes shared with other users?
 
 Admin and viewer sessions share SQLite likes for the current library.

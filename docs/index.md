@@ -31,7 +31,7 @@ features:
     details: Foldergram indexes supported image and video formats, generates thumbnails, creates previews eagerly or lazily, and can expose compatible original MP4 playback in the detail player.
   - icon: 🎯
     title: Honest scope
-    details: The current app includes home feed browsing, a dedicated reels route, explore, library, likes and favorites, moments, optional admin/viewer/public access control, and admin-only maintenance controls without cloud sync or social features.
+    details: The current app includes home feed browsing, folder stories and highlights, a dedicated reels route, explore, library, likes and favorites, moments, optional admin/viewer/public access control, and admin-only maintenance controls without cloud sync or social features.
 ---
 
 ## Foldergram at a Glance
@@ -40,7 +40,7 @@ features:
 
 <div class="cs-feature">
 <h3>🚀 What ships today</h3>
-<p>The current repository includes Home, Reels, Explore, Library, Likes and Favorites, Moments, Settings, folder pages, a post detail view and modal flow, shared SQLite likes, browser-local favorites in public mode, delete actions, optional admin/viewer/public access control, and local scan/rebuild tooling.</p>
+<p>The current repository includes Home, Reels, Explore, Library, Likes and Favorites, Moments, folder stories and highlights, Settings, folder pages, a post detail view and modal flow, shared SQLite likes, browser-local favorites in public mode, delete actions, optional admin/viewer/public access control, and local scan/rebuild tooling.</p>
 </div>
 
 <div class="cs-feature">
@@ -81,12 +81,12 @@ features:
 
 <div class="cs-feature">
 <h3>4. Serve fast reads</h3>
-<p>Feed, folders, likes, moments, and explore read from SQLite and derivative URLs instead of scanning the filesystem on request.</p>
+<p>Feed, folders, folder stories, likes, moments, and explore read from SQLite and derivative URLs instead of scanning the filesystem on request.</p>
 </div>
 
 <div class="cs-feature">
-<h3>5. Build moments and highlights</h3>
-<p>The home rail can surface date-based Moments when the library has enough EXIF-backed timestamps, or fall back to Highlights when capture-date coverage is sparse.</p>
+<h3>5. Build Moments, Highlights, and Stories</h3>
+<p>Home can surface date-based Moments when the library has enough EXIF-backed timestamps, or fall back to Highlights when capture-date coverage is sparse. Reserved <code>AppFolder/stories</code> folders can also power avatar stories and folder highlight circles.</p>
 </div>
 
 <div class="cs-feature">
