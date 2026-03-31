@@ -1,6 +1,6 @@
 <template>
   <section class="explore-grid" aria-label="Explore posts">
-    <RouterLink v-for="(item, index) in items" :key="item.id" custom :to="`/image/${item.id}`" v-slot="{ href, navigate }">
+    <RouterLink v-for="(item, index) in items" :key="item.id" custom :to="buildPostRoute(item.id)" v-slot="{ href, navigate }">
       <a
         :href="href"
         class="explore-grid__item group"
@@ -42,6 +42,14 @@ const route = useRoute();
 
 function getTileClass(index: number): string {
   return FEATURE_INDEXES.has(index % 15) ? 'explore-grid__item--feature' : '';
+}
+
+function buildPostRoute(id: number) {
+  return {
+    name: 'image',
+    params: { id: String(id) },
+    query: route.query
+  };
 }
 
 function handleImageNavigation(event: MouseEvent, item: FeedItem, navigate: () => void) {

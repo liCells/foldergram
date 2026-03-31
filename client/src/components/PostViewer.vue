@@ -134,8 +134,13 @@
       >
         <template v-if="image.mediaType === 'video'">
           <div
-            class="viewer__media-shell viewer__media-shell--video"
+            class="viewer__media-shell viewer__media-shell--video viewer__media-shell--video-interactive"
             :style="mediaShellStyle"
+            aria-label="Toggle playback"
+            role="button"
+            tabindex="0"
+            @click="handleVideoSurfaceClick"
+            @keydown="handleVideoSurfaceKeydown"
           >
             <media-player
               ref="playerElement"
@@ -148,8 +153,8 @@
               :loop.prop="true"
               load="eager"
               preload="metadata"
-            >
-              <media-provider />
+              >
+                <media-provider />
               <media-poster
                 class="viewer__player-poster"
                 :src.prop="image.thumbnailUrl"
@@ -226,6 +231,13 @@
                 </media-controls-group>
               </media-controls>
             </media-player>
+            <div
+              v-if="showVideoPausedIndicator"
+              class="viewer__pause-indicator"
+              aria-hidden="true"
+            >
+              <span class="viewer__pause-icon i-fluent-play-20-filled" />
+            </div>
           </div>
         </template>
         <div
@@ -319,7 +331,10 @@
             <strong class="mr-[0.35rem]">{{ image.folderName }}</strong>
             {{ readableFilename }}
           </p>
-          <p class="viewer__sidebar-path m-0 text-muted">{{ image.relativePath }}</p>
+          <p class="viewer__sidebar-path mt-3 text-muted">
+            <span class="viewer__sidebar-path-label">Folder Path</span>
+            <span class="viewer__sidebar-path-value">{{ image.relativePath }}</span>
+          </p>
         </div>
 
         <!-- Quick stats -->
@@ -411,7 +426,7 @@
           <div class="viewer__sidebar-actions-group flex items-center gap-4">
             <!-- Set as cover -->
             <button
-              v-if="authStore.canManageLibrary && image.mediaType === 'image'"
+              v-if="authStore.canManageLibrary"
               class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-text transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
               type="button"
               aria-label="Set as folder cover"
@@ -428,6 +443,7 @@
               target="_blank"
               rel="noreferrer"
               aria-label="Open original file"
+              title="Open original file"
             >
               <svg
                 class="w-[1.55rem] h-[1.55rem]"
@@ -536,6 +552,7 @@
   const isSidebarExpanded = ref(true)
   const isSidebarSheetDragging = ref(false)
   const isPlayingHd = ref(false)
+  const isVideoPaused = ref(false)
   const sidebarSheetDragOffset = ref(0)
   const settingCover = ref(false)
 
@@ -579,6 +596,9 @@
       props.image?.mediaType === 'video' &&
       props.image?.playbackStrategy === 'original' &&
       videoPreviewWouldDownscale(props.image.width, props.image.height),
+  )
+  const showVideoPausedIndicator = computed(
+    () => props.image?.mediaType === 'video' && isVideoPaused.value,
   )
 
   const videoSrc = computed(() => {
@@ -797,6 +817,36 @@
         videoMuteSyncToken = 0
       }
     })
+  }
+
+  function isPrimaryPlainClick(event: MouseEvent) {
+    return (
+      !event.defaultPrevented &&
+      event.button === 0 &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey
+    )
+  }
+
+  function isPlayerInteractiveTarget(target: EventTarget | null) {
+    return target instanceof HTMLElement && Boolean(
+      target.closest(
+        [
+          "a",
+          "button",
+          "input",
+          "select",
+          "textarea",
+          "label",
+          "media-play-button",
+          "media-mute-button",
+          "media-fullscreen-button",
+          "media-controls",
+        ].join(", "),
+      ),
+    )
   }
 
   function formatExifNumber(
@@ -1220,10 +1270,12 @@
 
     try {
       await player.play()
+      isVideoPaused.value = false
       return
     } catch {
       if (appStore.videoMuted) {
         // Ignore autoplay rejections and leave manual controls available.
+        isVideoPaused.value = true
         return
       }
     }
@@ -1232,8 +1284,26 @@
 
     try {
       await player.play()
+      isVideoPaused.value = false
     } catch {
       // Ignore autoplay rejections and leave manual controls available.
+      isVideoPaused.value = true
+    }
+  }
+
+  async function resumeVideoPlayback() {
+    const player = playerElement.value
+    if (!player || props.image?.mediaType !== "video") {
+      return
+    }
+
+    syncVideoMuted(player, appStore.videoMuted)
+
+    try {
+      await player.play()
+      isVideoPaused.value = false
+    } catch {
+      // Ignore playback rejections and leave manual controls available.
     }
   }
 
@@ -1272,6 +1342,8 @@
 
       if (!restoreState.wasPaused) {
         void player.play().catch(() => { /* ignore */ })
+      } else {
+        isVideoPaused.value = true
       }
 
       return
@@ -1291,17 +1363,27 @@
     const handleReady = () => {
       void handlePlayerReadyForPlayback()
     }
+    const handlePlay = () => {
+      isVideoPaused.value = false
+    }
+    const handlePause = () => {
+      isVideoPaused.value = props.image?.mediaType === "video"
+    }
     const handleVolume = () => {
       handlePlayerVolumeChange()
     }
 
     player.addEventListener("loaded-metadata", handleReady)
     player.addEventListener("can-play", handleReady)
+    player.addEventListener("play", handlePlay)
+    player.addEventListener("pause", handlePause)
     player.addEventListener("volume-change", handleVolume)
 
     removePlayerEventListeners = () => {
       player.removeEventListener("loaded-metadata", handleReady)
       player.removeEventListener("can-play", handleReady)
+      player.removeEventListener("play", handlePlay)
+      player.removeEventListener("pause", handlePause)
       player.removeEventListener("volume-change", handleVolume)
     }
 
@@ -1318,6 +1400,7 @@
       resetSidebarSheetGesture()
       resetMediaSheetRevealGesture()
       isPlayingHd.value = false
+      isVideoPaused.value = false
       pendingVideoRestore = null
       void attemptVideoPlayback()
     },
@@ -1427,6 +1510,44 @@
     event.preventDefault()
     wheelDeltaAccumulator.value = 0
     void navigateByDirection(direction)
+  }
+
+  async function toggleVideoSurfacePlayback() {
+    const player = playerElement.value
+    if (!player || props.image?.mediaType !== "video") {
+      return
+    }
+
+    if (player.paused) {
+      await resumeVideoPlayback()
+      return
+    }
+
+    isVideoPaused.value = true
+    void player.pause().catch(() => {
+      // Ignore pause rejections before the provider is ready.
+    })
+  }
+
+  async function handleVideoSurfaceClick(event: MouseEvent) {
+    if (!isPrimaryPlainClick(event) || isPlayerInteractiveTarget(event.target)) {
+      return
+    }
+
+    await toggleVideoSurfacePlayback()
+  }
+
+  function handleVideoSurfaceKeydown(event: KeyboardEvent) {
+    if (isPlayerInteractiveTarget(event.target)) {
+      return
+    }
+
+    if (event.key !== "Enter" && event.key !== " ") {
+      return
+    }
+
+    event.preventDefault()
+    void toggleVideoSurfacePlayback()
   }
 
   async function handleSetCover() {

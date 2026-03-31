@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router';
 
 import HomeView from '../views/HomeView.vue';
-import ImageView from '../views/ImageView.vue';
+import PostView from '../views/PostView.vue';
 import LibraryView from '../views/LibraryView.vue';
 import LikesView from '../views/LikesView.vue';
 import ExploreView from '../views/ExploreView.vue';
@@ -41,9 +41,10 @@ export const router = createRouter({
       component: HomeView
     },
     {
-      path: '/image/:id',
+      path: '/post/:id',
+      alias: '/image/:id',
       name: 'image',
-      component: ImageView,
+      component: PostView,
       props: true
     },
     {
@@ -98,8 +99,8 @@ export const router = createRouter({
       props: true
     },
     {
-      path: '/folders/:slug',
-      alias: '/:slug',
+      path: '/f/:slug',
+      alias: '/folders/:slug',
       name: 'folder',
       component: FolderView,
       props: true

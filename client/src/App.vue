@@ -14,7 +14,7 @@
   <AppShell v-else>
     <RouterView :route="displayRoute" />
     <div v-if="showImageModal" class="app__image-modal-layer" @click.self="closeImageModal">
-      <ImageView :id="String(route.params.id ?? '')" modal @close="closeImageModal" />
+      <PostView :id="String(route.params.id ?? '')" modal @close="closeImageModal" />
     </div>
   </AppShell>
   <AdminUnlockDialog v-if="authStore.unlockDialogOpen" />
@@ -28,7 +28,7 @@ import AppShell from './components/AppShell.vue';
 import AdminUnlockDialog from './components/AdminUnlockDialog.vue';
 import AuthGate from './components/AuthGate.vue';
 import { canAccessRoute } from './router';
-import ImageView from './views/ImageView.vue';
+import PostView from './views/PostView.vue';
 import { useAppStore } from './stores/app';
 import { useAuthStore } from './stores/auth';
 import { useExploreStore } from './stores/explore';

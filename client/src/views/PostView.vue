@@ -1,9 +1,9 @@
 <template>
   <div :class="modal ? 'image-view image-view--modal' : 'image-view image-view--page'" @click.stop>
     <ErrorState v-if="viewerStore.error" title="Could not load post" :message="viewerStore.error" />
-    <ImageModal
-      v-else-if="viewerStore.image"
-      :image="viewerStore.image"
+    <PostViewer
+      v-else-if="activeImage"
+      :image="activeImage"
       :folder="folder"
       :is-modal="modal"
       :deleting="viewerStore.deleting"
@@ -53,12 +53,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorState from '../components/ErrorState.vue';
-import ImageModal from '../components/ImageModal.vue';
+import PostViewer from '../components/PostViewer.vue';
 import { useAppStore } from '../stores/app';
 import { useFeedStore } from '../stores/feed';
 import { useLikesStore } from '../stores/likes';
@@ -89,8 +89,9 @@ const deleteError = ref<string | null>(null);
 
 const imageId = computed(() => Number(props.id));
 const activeMediaType = computed(() => (route.query.tab === 'reels' ? 'video' : undefined));
+const activeImage = computed(() => (viewerStore.image?.id === imageId.value ? viewerStore.image : null));
 const folder = computed(() =>
-  viewerStore.image ? foldersStore.items.find((entry) => entry.slug === viewerStore.image?.folderSlug) ?? null : null
+  activeImage.value ? foldersStore.items.find((entry) => entry.slug === activeImage.value?.folderSlug) ?? null : null
 );
 const deleteDialogMessage = computed(() =>
   deleteOriginalFromDisk.value
@@ -105,8 +106,7 @@ async function loadImage() {
   }
 }
 
-onMounted(loadImage);
-watch(() => [imageId.value, activeMediaType.value] as const, loadImage);
+watch(() => [imageId.value, activeMediaType.value] as const, loadImage, { immediate: true });
 
 function openDeleteDialog() {
   deleteOriginalFromDisk.value = false;

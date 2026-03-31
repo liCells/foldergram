@@ -1021,7 +1021,7 @@ export const galleryService = {
     }
 
     const image = imageRepository.getById(imageId);
-    if (!image || image.folder_id !== folder.id || image.is_deleted !== 0 || image.is_trashed !== 0 || image.media_type !== 'image') {
+    if (!image || image.folder_id !== folder.id || image.is_deleted !== 0 || image.is_trashed !== 0) {
       return null;
     }
 

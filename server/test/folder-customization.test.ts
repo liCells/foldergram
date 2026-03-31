@@ -178,6 +178,46 @@ describe.sequential('folder customization', () => {
       expect(DBFolder?.avatar_source).toBe('manual');
     });
 
+    it('allows a video thumbnail to be used as the folder cover avatar', () => {
+      const folder = folderRepository.upsert({ slug: 'test-folder-video', name: 'Test Video', folderPath: 'test-video' });
+      const video = imageRepository.upsert({
+        folderId: folder.id,
+        filename: 'clip1.mp4',
+        relativePath: 'test-video/clip1.mp4',
+        absolutePath: '/dummy/test-video/clip1.mp4',
+        fileSize: 8_192,
+        mtimeMs: 2_000,
+        width: 1920,
+        height: 1080,
+        mediaType: 'video',
+        mimeType: 'video/mp4',
+        fingerprint: 'test-fingerprint-video',
+        sortTimestamp: 2_000,
+        takenAt: 2_000,
+        takenAtSource: 'mtime',
+        extension: '.mp4',
+        firstSeenAt: new Date().toISOString(),
+        thumbnailPath: 't/clip1.webp',
+        previewPath: 'p/clip1.mp4',
+        playbackStrategy: 'original',
+        durationMs: 5_000,
+        exifJson: null
+      });
+
+      expect(galleryService.setFolderAvatar('test-folder-video', video.id)).toBe(true);
+
+      // Manual avatar selection is revalidated during sync/rescan paths.
+      folderRepository.syncAvatarSelection(folder.id);
+
+      const dbFolder = folderRepository.getBySlug('test-folder-video');
+      expect(dbFolder?.avatar_image_id).toBe(video.id);
+      expect(dbFolder?.avatar_source).toBe('manual');
+
+      const folderSummary = galleryService.getFolderBySlug('test-folder-video');
+      expect(folderSummary?.avatarImageId).toBe(video.id);
+      expect(folderSummary?.avatarUrl).toBe('/thumbnails/t/clip1.webp');
+    });
+
     it('returns null when setting cover for non-existent items', () => {
       expect(galleryService.setFolderAvatar('non-existent', 123)).toBeNull();
       

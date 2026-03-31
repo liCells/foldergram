@@ -449,8 +449,7 @@ export const folderRepository = {
         manualImage &&
         manualImage.folder_id === folderId &&
         manualImage.is_deleted === 0 &&
-        manualImage.is_trashed === 0 &&
-        manualImage.media_type === 'image'
+        manualImage.is_trashed === 0
       ) {
         return {
           imageId: manualImage.id,

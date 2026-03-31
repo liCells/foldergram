@@ -16,13 +16,13 @@ vi.mock('../views/HomeView.vue', async () => {
   };
 });
 
-vi.mock('../views/ImageView.vue', async () => {
+vi.mock('../views/PostView.vue', async () => {
   const { defineComponent } = await import('vue');
 
   return {
     default: defineComponent({
-      name: 'ImageView',
-      template: '<div data-test="image-view">image-view</div>'
+      name: 'PostView',
+      template: '<div data-test="post-view">post-view</div>'
     })
   };
 });
@@ -118,6 +118,44 @@ vi.mock('../views/SettingsView.vue', async () => {
 import { router } from './index';
 
 describe('router', () => {
+  it('uses /post/:id as the canonical post route while keeping /image/:id as a legacy alias', async () => {
+    const resolved = router.resolve({
+      name: 'image',
+      params: {
+        id: '214'
+      }
+    });
+
+    expect(resolved.fullPath).toBe('/post/214');
+
+    await router.replace('/image/214');
+    await router.isReady();
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe('image');
+    expect(router.currentRoute.value.params.id).toBe('214');
+    expect(router.currentRoute.value.fullPath).toBe('/image/214');
+  });
+
+  it('uses /f/:slug as the canonical folder route while keeping /folders/:slug as a legacy alias', async () => {
+    const resolved = router.resolve({
+      name: 'folder',
+      params: {
+        slug: 'animalplanet'
+      }
+    });
+
+    expect(resolved.fullPath).toBe('/f/animalplanet');
+
+    await router.replace('/folders/animalplanet');
+    await router.isReady();
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe('folder');
+    expect(router.currentRoute.value.params.slug).toBe('animalplanet');
+    expect(router.currentRoute.value.fullPath).toBe('/folders/animalplanet');
+  });
+
   it('renders the reels route and preserves the reels shell meta', async () => {
     await router.replace('/reels');
     await router.isReady();

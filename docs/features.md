@@ -87,8 +87,8 @@ Library supports two delete flows:
 
 A folder page is available at:
 
-- `/folders/:slug`
-- `/:slug` as an alias
+- `/f/:slug`
+- `/folders/:slug` as a legacy alias
 
 Folder pages include:
 
@@ -123,7 +123,9 @@ folder still has an avatar-story entry point.
 
 ## Post detail and modal flow
 
-The post detail route is `/image/:id`.
+The canonical post detail route is `/post/:id`.
+
+`/image/:id` remains available as a legacy alias.
 
 Behavior depends on how the route is opened:
 

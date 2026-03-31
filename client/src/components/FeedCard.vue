@@ -6,7 +6,8 @@
           v-if="showHomeStoryAvatar"
           class="block rounded-full border-0 bg-transparent p-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text/55 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           type="button"
-          :aria-label="`Open ${item.folderName} stories`"
+          :aria-label="folderStoriesLabel"
+          :title="folderStoriesLabel"
           @click="emit('openFolderStory', item.folderSlug)"
         >
           <div class="rounded-full p-[0.1rem] shadow-[0_10px_22px_rgba(246,106,61,0.16)]" style="background: var(--story-ring);">
@@ -19,7 +20,8 @@
           v-else
           class="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text/55 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           :to="{ name: 'folder', params: { slug: item.folderSlug } }"
-          :aria-label="`Open ${item.folderName}`"
+          :aria-label="folderAvatarLabel"
+          :title="folderAvatarLabel"
         >
           <Avatar class="w-8 h-8" :name="item.folderName" :src="avatarUrl" />
         </RouterLink>
@@ -35,6 +37,7 @@
         class="inline-flex items-center justify-center w-8 h-8 p-0 border-0 text-muted bg-transparent cursor-pointer"
         type="button"
         aria-label="More options"
+        title="More options"
         @click="menuOpen = true"
       >
         <svg class="w-[1.15rem] h-[1.15rem]" viewBox="0 0 24 24" role="presentation">
@@ -193,8 +196,9 @@
             class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-50 disabled:cursor-wait disabled:transform-none"
             :class="{ 'text-[#e5484d]': likesStore.isLiked(item.id) }"
             type="button"
-            :aria-label="likesStore.toggleAriaLabel(likesStore.isLiked(item.id))"
+            :aria-label="likeActionLabel"
             :aria-pressed="likesStore.isLiked(item.id)"
+            :title="likeActionLabel"
             :disabled="likesStore.isPending(item.id)"
             @click="handleLike"
           >
@@ -208,7 +212,8 @@
             <a
               :href="href"
               class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer color-inherit transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
-              :aria-label="item.mediaType === 'video' ? 'Open reel' : 'Open post'"
+              :aria-label="openMediaLabel"
+              :title="openMediaLabel"
               @click="handleImageNavigation($event, navigate)"
             >
               <svg class="w-[1.45rem] h-[1.45rem]" viewBox="0 0 24 24" role="presentation">
@@ -228,16 +233,18 @@
             class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer color-inherit transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
             :to="{ name: 'folder', params: { slug: item.folderSlug } }"
             aria-label="Open folder"
+            title="Open folder"
           >
             <span class="i-fluent-folder-16-regular w-[1.30rem] h-[1.30rem]" aria-hidden="true" />
           </RouterLink>
         </div>
         <a
           class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer color-inherit transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
-          :href="item.previewUrl"
+          :href="originalMediaUrl"
           target="_blank"
           rel="noreferrer"
-          aria-label="Open preview"
+          aria-label="Open original file"
+          title="Open original file"
         >
           <svg class="w-[1.45rem] h-[1.45rem]" viewBox="0 0 24 24" role="presentation">
             <path
@@ -432,10 +439,18 @@ let homeVideoObserver: IntersectionObserver | null = null;
 let homeVideoMuteSyncToken = 0;
 let removeHomePlayerEventListeners: (() => void) | null = null;
 
-const imageRoute = computed(() => `/image/${props.item.id}`);
+const imageRoute = computed(() => ({
+  name: 'image',
+  params: { id: String(props.item.id) },
+  query: route.query
+}));
 const isHomeContext = computed(() => props.context === 'home');
 const showHomeStoryAvatar = computed(() => isHomeContext.value && props.hasAvatarStory);
 const shouldOpenPostInModal = computed(() => props.context !== 'home');
+const folderStoriesLabel = computed(() => `Open ${props.item.folderName} stories`);
+const folderAvatarLabel = computed(() => `Open ${props.item.folderName}`);
+const likeActionLabel = computed(() => likesStore.toggleAriaLabel(likesStore.isLiked(props.item.id)));
+const openMediaLabel = computed(() => (props.item.mediaType === 'video' ? 'Open reel' : 'Open post'));
 const caption = computed(() =>
   props.item.filename
     .replace(/\.[^.]+$/, '')
@@ -454,6 +469,7 @@ const formattedDuration = computed(() => formatMediaDuration(props.item.duration
 const mediaAspectRatio = computed(() => resolveFeedAspectRatio(props.item.width, props.item.height));
 const homeVideoAspectRatio = computed(() => loadedHomeVideoAspectRatio.value ?? mediaAspectRatio.value);
 const homeImageSrc = computed(() => (props.item.isAnimated ? props.item.previewUrl : props.item.thumbnailUrl));
+const originalMediaUrl = computed(() => `/api/originals/${props.item.id}`);
 const homeVideoSource = computed<PlayerSrc>(() => ({
   src: props.item.previewUrl,
   type: 'video/mp4'

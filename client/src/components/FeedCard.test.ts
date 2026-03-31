@@ -12,7 +12,8 @@ vi.mock('vue-router', async () => {
   return {
     ...actual,
     useRoute: () => ({
-      fullPath: '/'
+      fullPath: '/',
+      query: {}
     })
   };
 });
@@ -94,6 +95,26 @@ function createVideoItem(id: number): FeedItem {
   };
 }
 
+function createImageItem(id: number): FeedItem {
+  return {
+    id,
+    folderId: 15,
+    folderSlug: 'phone-clips',
+    folderName: 'Phone Clips',
+    folderPath: 'phone-clips',
+    folderBreadcrumb: null,
+    filename: `photo-${id}.jpg`,
+    width: 1200,
+    height: 1500,
+    mediaType: 'image',
+    durationMs: null,
+    thumbnailUrl: `/thumbs/${id}.webp`,
+    previewUrl: `/previews/${id}.webp`,
+    sortTimestamp: 1_777_000_000_000 + id,
+    takenAt: 1_777_000_000_000 + id
+  };
+}
+
 const globalStubs = {
   Avatar: {
     template: '<div data-test="avatar" />'
@@ -105,12 +126,14 @@ const globalStubs = {
     template: '<img data-test="resilient-image" />'
   },
   RouterLink: {
-    props: ['custom'],
+    props: ['custom', 'to'],
     template: `
       <template v-if="custom">
-        <slot href="#" :navigate="() => {}" />
+        <span class="router-link-stub" :data-to="typeof to === 'string' ? to : JSON.stringify(to)">
+          <slot href="#" :navigate="() => {}" />
+        </span>
       </template>
-      <a v-else><slot /></a>
+      <a v-else v-bind="$attrs" :data-to="typeof to === 'string' ? to : JSON.stringify(to)"><slot /></a>
     `
   }
 };
@@ -218,9 +241,42 @@ describe('FeedCard', () => {
 
     const avatarButton = wrapper.get('button[aria-label="Open Phone Clips stories"]');
     expect(avatarButton.exists()).toBe(true);
+    expect(avatarButton.attributes('title')).toBe('Open Phone Clips stories');
 
     await avatarButton.trigger('click');
 
     expect(wrapper.emitted('openFolderStory')).toEqual([['phone-clips']]);
+  });
+
+  it('exposes native tooltip titles on the feed card icon controls', async () => {
+    const wrapper = mount(FeedCard, {
+      props: {
+        item: createImageItem(807),
+        avatarUrl: null,
+        context: 'home',
+        isActiveVideo: false
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get('button[aria-label="More options"]').attributes('title')).toBe('More options');
+    expect(wrapper.get('button[aria-label="Like post"]').attributes('title')).toBe('Like post');
+    expect(wrapper.get('a[aria-label="Open post"]').attributes('title')).toBe('Open post');
+    const postRouteLink = wrapper
+      .findAll('a[data-to]')
+      .find((candidate) => candidate.attributes('data-to')?.includes('"name":"image"'));
+
+    expect(postRouteLink?.attributes('data-to')).toContain('"name":"image"');
+    expect(postRouteLink?.attributes('data-to')).toContain('"id":"807"');
+    expect(wrapper.get('a[aria-label="Open folder"]').attributes('title')).toBe('Open folder');
+
+    const originalLink = wrapper.get('a[aria-label="Open original file"]');
+
+    expect(originalLink.attributes('href')).toBe('/api/originals/807');
+    expect(originalLink.attributes('title')).toBe('Open original file');
   });
 });
