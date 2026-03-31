@@ -4,8 +4,8 @@ title: Foldergram
 titleTemplate: false
 hero:
   name: "Foldergram"
-  text: "Local-first photo and video gallery for folders"
-  tagline: Browse folders you already own through a fast feed-style interface backed by SQLite, generated thumbnails and previews, and a local-only runtime.
+  text: "Local-first photo and video gallery"
+  tagline: Point it at your folders, browse everything through a fast feed-style interface. No cloud, no accounts — just your files and SQLite.
   image:
     src: /logo.svg
     alt: Foldergram Logo
@@ -20,18 +20,30 @@ hero:
       text: Live Demo
       link: https://foldergram.intentdeep.com/
 features:
-  - icon: 🗂️
+  - icon:
+      src: /icons/local-first.svg
+      width: "36"
+      height: "36"
     title: Local-first
-    details: Originals stay in your configured gallery root. Indexed metadata lives in SQLite and derivatives stay on disk next to the app's local storage paths.
-  - icon: ⚡
+    details: Originals stay in your gallery folder, untouched. Indexed metadata lives in SQLite on disk. No cloud sync, no external API, no accounts needed.
+  - icon:
+      src: /icons/fast-feed.svg
+      width: "36"
+      height: "36"
     title: Fast feed-style browsing
-    details: Runtime reads come from SQLite and generated derivatives instead of filesystem walks during every request.
-  - icon: 🖼️
+    details: Runtime reads come from SQLite and pre-generated derivatives instead of live filesystem walks. Pagination, lazy loading, and three feed modes keep browsing snappy.
+  - icon:
+      src: /icons/media.svg
+      width: "36"
+      height: "36"
     title: Photos and videos
-    details: Foldergram indexes supported image and video formats, generates thumbnails, creates previews eagerly or lazily, and can expose compatible original MP4 playback in the detail player.
-  - icon: 🎯
-    title: Honest scope
-    details: The current app includes home feed browsing, folder stories and highlights, a dedicated reels route, explore, library, likes and favorites, moments, optional admin/viewer/public access control, and admin-only maintenance controls without cloud sync or social features.
+    details: Indexes JPEG, PNG, WebP, GIF, MP4, MOV, M4V, WebM, and MKV. Thumbnails and previews are generated automatically. Videos get a full reels view with scroll-snap playback.
+  - icon:
+      src: /icons/access-control.svg
+      width: "36"
+      height: "36"
+    title: Optional access control
+    details: Runs open by default. Enable an admin password, a viewer password, or anonymous public mode from Settings. Non-admin sessions can browse but cannot scan, delete, or rebuild.
 ---
 
 ## Foldergram at a Glance
@@ -39,23 +51,35 @@ features:
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 1rem; margin: 2rem 0;">
 
 <div class="cs-feature">
-<h3>🚀 What ships today</h3>
-<p>The current repository includes Home, Reels, Explore, Library, Likes and Favorites, Moments, folder stories and highlights, Settings, folder pages, a post detail view and modal flow, shared SQLite likes, browser-local favorites in public mode, delete actions, optional admin/viewer/public access control, and local scan/rebuild tooling.</p>
+<div class="cs-feature-icon">
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+</div>
+<h3>What ships today</h3>
+<p>Home (Recent, Rediscover, Random feed modes), Reels, Explore, Library, Folder pages, Post detail and modal, Likes, Favorites, Moments, Highlights, Folder stories, Settings, and local scan and rebuild tooling.</p>
 </div>
 
 <div class="cs-feature">
-<h3>🔍 How indexing behaves</h3>
-<p>Foldergram recursively discovers non-hidden folders under <code>GALLERY_ROOT</code>. Any folder that directly contains supported media becomes an indexed album. Files placed directly in the gallery root are ignored.</p>
+<div class="cs-feature-icon">
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+</div>
+<h3>How indexing works</h3>
+<p>Foldergram walks <code>GALLERY_ROOT</code> recursively, skipping hidden paths. Any folder that directly contains supported media becomes an indexed album. Files at the gallery root and nested folders each become their own album.</p>
 </div>
 
 <div class="cs-feature">
-<h3>💾 Formats and storage</h3>
-<p>Foldergram indexes images like <code>.jpg</code>, <code>.png</code>, <code>.webp</code>, and <code>.gif</code>, plus videos like <code>.mp4</code>, <code>.mov</code>, <code>.m4v</code>, <code>.webm</code>, and <code>.mkv</code>. Originals stay in the gallery root, SQLite stores indexed metadata, thumbnails are written under <code>thumbnails/</code>, and previews under <code>previews/</code>.</p>
+<div class="cs-feature-icon">
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+</div>
+<h3>Formats and storage</h3>
+<p>Images: <code>.jpg</code>, <code>.png</code>, <code>.webp</code>, <code>.gif</code>. Videos: <code>.mp4</code>, <code>.mov</code>, <code>.m4v</code>, <code>.webm</code>, <code>.mkv</code>. Originals are never moved. SQLite stores metadata. Thumbnails and previews are written under <code>thumbnails/</code> and <code>previews/</code>.</p>
 </div>
 
 <div class="cs-feature">
-<h3>🔐 Access modes</h3>
-<p>Foldergram starts without a password gate by default. Settings can enable admin-only access, a separate viewer password, or anonymous public browsing. Once protection is enabled, only admins can open Settings or use Trash, scans, rebuilds, and delete actions.</p>
+<div class="cs-feature-icon">
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+</div>
+<h3>Access modes</h3>
+<p>No password gate by default. Settings can enable admin-only access, a separate viewer password, or anonymous public mode. Admin sessions can run scans, rebuild indexes, delete posts, and manage access credentials.</p>
 </div>
 
 </div>
@@ -65,33 +89,39 @@ features:
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem; margin: 2rem 0;">
 
 <div class="cs-feature">
-<h3>1. Discover folders</h3>
-<p>Walk the gallery tree, skip hidden paths, and ignore managed storage paths that would otherwise re-enter the scan.</p>
+<div class="cs-feature-step">1</div>
+<h3>Discover folders</h3>
+<p>Walk the gallery tree, skip hidden paths, and collect every non-hidden folder that directly contains supported media files.</p>
 </div>
 
 <div class="cs-feature">
-<h3>2. Index posts</h3>
-<p>Store normalized paths, media metadata, timestamps, stable sort order, and playback strategy in SQLite.</p>
+<div class="cs-feature-step">2</div>
+<h3>Index posts</h3>
+<p>Store normalized paths, media metadata, EXIF timestamps, stable sort order, and playback strategy in SQLite. Missing files are soft-deleted rather than hard-removed.</p>
 </div>
 
 <div class="cs-feature">
-<h3>3. Generate derivatives</h3>
-<p>Create `640px` thumbnails, up to `1500px` image previews, and 720p-class video previews. Derivatives can be generated during scans or lazily on first request.</p>
+<div class="cs-feature-step">3</div>
+<h3>Generate derivatives</h3>
+<p>Create 640 px thumbnails, up to 1500 px image previews, and 720p-class video previews. Derivatives can be generated eagerly during scans or lazily on first request.</p>
 </div>
 
 <div class="cs-feature">
-<h3>4. Serve fast reads</h3>
-<p>Feed, folders, folder stories, likes, moments, and explore read from SQLite and derivative URLs instead of scanning the filesystem on request.</p>
+<div class="cs-feature-step">4</div>
+<h3>Serve fast reads</h3>
+<p>Feed, folder, reels, explore, likes, and moments pages all read from SQLite and serve derivative URLs — no filesystem walk per request.</p>
 </div>
 
 <div class="cs-feature">
-<h3>5. Build Moments, Highlights, and Stories</h3>
-<p>Home can surface date-based Moments when the library has enough EXIF-backed timestamps, or fall back to Highlights when capture-date coverage is sparse. Reserved <code>AppFolder/stories</code> folders can also power avatar stories and folder highlight circles.</p>
+<div class="cs-feature-step">5</div>
+<h3>Build Moments and Stories</h3>
+<p>Home surfaces date-based Moments when EXIF timestamps are available, or Highlights otherwise. Reserved <code>AppFolder/stories</code> subfolders power avatar stories and highlight rings on folder pages.</p>
 </div>
 
 <div class="cs-feature">
-<h3>6. Maintain the library locally</h3>
-<p>Admins can enable access protection and run manual scans, thumbnail rebuilds, and library-index rebuilds from Settings. If protection is still off, those controls are available immediately to whoever can reach the app.</p>
+<div class="cs-feature-step">6</div>
+<h3>Maintain locally</h3>
+<p>Admins can run a manual scan, rebuild thumbnails only, or do a full library-index rebuild from Settings. All controls are local — no remote calls involved.</p>
 </div>
 
 </div>

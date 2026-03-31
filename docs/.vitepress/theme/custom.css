@@ -15,6 +15,15 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Constrain image-based feature icons — VPImage is a direct child of .box, no .icon wrapper */
+.VPFeature .box > .VPImage {
+  width: 28px !important;
+  height: 28px !important;
+  max-width: 28px !important;
+  object-fit: contain;
+  margin-bottom: 20px;
+}
+
 .VPHero .text {
   font-size: 2.2rem !important;
   line-height: 1.3 !important;
@@ -85,31 +94,64 @@ html {
 
 .cs-feature {
   background: var(--vp-c-bg-soft);
-  border: 1px solid var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
   border-radius: 12px;
-  padding: 2rem;
-  transition: border-color 0.25s, background-color 0.25s;
+  padding: 1.5rem;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  position: relative;
+}
+
+.cs-feature:hover {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 4px 24px rgba(99, 102, 241, 0.08);
+}
+
+.cs-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+  margin-bottom: 0.875rem;
+}
+
+.cs-feature-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-bottom: 0.875rem;
 }
 
 .cs-feature h3 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .cs-feature p {
-  padding-top: 8px;
+  padding-top: 6px;
   margin-bottom: 0;
-  line-height: 24px;
+  line-height: 1.65;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--vp-c-text-2);
 }
 
 .cs-feature li {
   line-height: 24px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--vp-c-text-2);
 }
 
