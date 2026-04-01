@@ -67,8 +67,8 @@ In the default mode:
 - nested folders stay inside that same highlight capsule
 
 If you need folders literally named `stories` to behave like normal app
-folders, enable `Treat stories folders as normal app folders` in Settings and
-run a rescan.
+folders, open `Settings -> General Settings`, enable `Treat stories folders as
+normal app folders`, then run a rescan from `Settings -> Scan & Library`.
 
 ## 3. Start the container
 
@@ -91,6 +91,13 @@ production defaults plus the mounted `./data/...` volumes. The source-install
 
 The shipped Compose file sets `IMAGE_DETAIL_SOURCE=preview` and
 `DERIVATIVE_MODE=eager`.
+
+If you want Docker to skip specific source folders from the start, also add
+`GALLERY_EXCLUDED_FOLDERS` in `docker-compose.yml`, for example:
+
+```yaml
+GALLERY_EXCLUDED_FOLDERS: "@eaDir,thumbnails,Archive/cache"
+```
 
 For an optional read-only public demo in Docker, add
 `PUBLIC_DEMO_MODE="1"` under the Compose `environment:` block. If the
@@ -124,6 +131,11 @@ thumbnails or previews only when they are first requested.
 If you plan to expose Foldergram on a homelab or LAN, open Settings after the
 first load and enable the admin password. From there, you can keep admin-only
 access, add a separate viewer password, or switch to public browse mode.
+
+Inside Settings:
+
+- `General Settings` contains stories mode, excluded folders, and Home/Reels defaults
+- `Scan & Library` contains manual scan plus rebuild actions
 
 Until you enable password protection, Foldergram starts without an auth gate,
 so Settings and the library-maintenance controls are available immediately to

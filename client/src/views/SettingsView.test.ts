@@ -65,6 +65,11 @@ function createAppStats(): AppStats {
     deletedImages: 0,
     thumbnailCount: 18,
     previewCount: 6,
+    excludedFolders: {
+      envExcludedFolders: [],
+      customExcludedFolders: [],
+      effectiveExcludedFolders: []
+    },
     storage: {
       available: true,
       reason: null,
@@ -82,6 +87,27 @@ function createAppStats(): AppStats {
   };
 }
 
+function mountSettingsView() {
+  return mount(SettingsView, {
+    global: {
+      stubs: {
+        ConfirmDialog: true
+      }
+    }
+  });
+}
+
+async function openGeneralSettingsSidebarTab(wrapper: ReturnType<typeof mountSettingsView>) {
+  const generalSettingsButton = wrapper
+    .findAll('button')
+    .find((button) => button.text().includes('General Settings'));
+
+  expect(generalSettingsButton).toBeDefined();
+
+  await generalSettingsButton!.trigger('click');
+  await flushPromises();
+}
+
 describe('SettingsView', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -95,24 +121,23 @@ describe('SettingsView', () => {
       stats: createAppStatus()
     });
 
-    const wrapper = mount(SettingsView, {
-      global: {
-        stubs: {
-          ConfirmDialog: true
-        }
-      }
-    });
+    const wrapper = mountSettingsView();
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Feed Defaults');
-    expect(wrapper.text()).toContain('Home feed default');
-    expect(wrapper.text()).toContain('Reels feed default');
-    expect(wrapper.findAll('input[type="radio"]')).toHaveLength(6);
-    expect(wrapper.text()).not.toContain('Save Home Feed Default');
-    expect(wrapper.text()).not.toContain('Save Reels Feed Default');
-    expect((wrapper.get('input[name="home-feed-default"][value="rediscover"]').element as HTMLInputElement).checked).toBe(true);
-    expect((wrapper.get('input[name="reels-feed-default"][value="random"]').element as HTMLInputElement).checked).toBe(true);
+    expect(wrapper.text()).toContain('Scan & Library');
+    expect(wrapper.text()).toContain('General Settings');
+    expect(wrapper.text()).not.toContain('Home feed sort order');
+
+    await openGeneralSettingsSidebarTab(wrapper);
+
+    expect(wrapper.text()).toContain('Home feed sort order');
+    expect(wrapper.text()).toContain('Reels feed sort order');
+    expect(wrapper.text()).toContain('Excluded source folders');
+
+    const [homeButton, reelsButton] = wrapper.findAll('button[aria-expanded]');
+    expect(homeButton?.text()).toContain('Rediscover');
+    expect(reelsButton?.text()).toContain('Random');
 
     const saveButton = wrapper
       .findAll('button')
@@ -129,15 +154,11 @@ describe('SettingsView', () => {
       loadingStats: true
     });
 
-    const wrapper = mount(SettingsView, {
-      global: {
-        stubs: {
-          ConfirmDialog: true
-        }
-      }
-    });
+    const wrapper = mountSettingsView();
 
     await flushPromises();
+
+    await openGeneralSettingsSidebarTab(wrapper);
 
     appStore.$patch({
       loadingStats: false,
@@ -146,9 +167,9 @@ describe('SettingsView', () => {
 
     await flushPromises();
 
-    expect((wrapper.get('input[name="home-feed-default"][value="recent"]').element as HTMLInputElement).checked).toBe(true);
-    expect((wrapper.get('input[name="home-feed-default"][value="random"]').element as HTMLInputElement).checked).toBe(false);
-    expect((wrapper.get('input[name="reels-feed-default"][value="random"]').element as HTMLInputElement).checked).toBe(true);
+    const [homeButton, reelsButton] = wrapper.findAll('button[aria-expanded]');
+    expect(homeButton?.text()).toContain('Recent');
+    expect(reelsButton?.text()).toContain('Random');
 
     const saveButton = wrapper
       .findAll('button')
@@ -158,7 +179,7 @@ describe('SettingsView', () => {
     expect(saveButton!.attributes('disabled')).toBeDefined();
   });
 
-  it('saves the reels default from the feed defaults card', async () => {
+  it('saves the reels default from the general settings card', async () => {
     const appStore = useAppStore();
     appStore.$patch({
       stats: createAppStatus()
@@ -169,23 +190,26 @@ describe('SettingsView', () => {
       defaultMode: 'recommended'
     });
 
-    const wrapper = mount(SettingsView, {
-      global: {
-        stubs: {
-          ConfirmDialog: true
-        }
-      }
-    });
+    const wrapper = mountSettingsView();
 
     await flushPromises();
+    await openGeneralSettingsSidebarTab(wrapper);
 
-    await wrapper.get('input[value="recommended"]').setValue(true);
+    const [, reelsButton] = wrapper.findAll('button[aria-expanded]');
+    expect(reelsButton).toBeDefined();
+
+    await reelsButton!.trigger('click');
+    await flushPromises();
+    const recommendedOption = wrapper.findAll('button').find((button) => button.text().includes('Recommended'));
+    expect(recommendedOption).toBeDefined();
+    await recommendedOption!.trigger('click');
     await flushPromises();
 
     const updateHomeFeedDefaultSpy = vi.spyOn(galleryApi, 'updateHomeFeedDefault');
+    const updateExcludedFoldersSpy = vi.spyOn(galleryApi, 'updateExcludedFolders');
     const saveButton = wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Save Feed Defaults');
+      .find((button) => button.text() === 'Save changes');
 
     expect(saveButton).toBeDefined();
 
@@ -194,7 +218,42 @@ describe('SettingsView', () => {
 
     expect(updateReelsFeedDefaultSpy).toHaveBeenCalledWith('recommended');
     expect(updateHomeFeedDefaultSpy).not.toHaveBeenCalled();
+    expect(updateExcludedFoldersSpy).not.toHaveBeenCalled();
     expect(appStore.stats?.preferences.defaultReelsFeedMode).toBe('recommended');
     expect(wrapper.text()).toContain('Reels now opens with Recommended.');
+  });
+
+  it('saves custom excluded folder rules from the settings textarea', async () => {
+    const appStore = useAppStore();
+    appStore.$patch({
+      stats: createAppStatus()
+    });
+
+    vi.spyOn(appStore, 'fetchStats').mockResolvedValue();
+    const updateExcludedFoldersSpy = vi.spyOn(galleryApi, 'updateExcludedFolders').mockResolvedValue({
+      envExcludedFolders: ['@eaDir'],
+      customExcludedFolders: ['Archive/cache', 'thumbnails'],
+      effectiveExcludedFolders: ['@eaDir', 'Archive/cache', 'thumbnails'],
+      requiresScan: true
+    });
+
+    const wrapper = mountSettingsView();
+    await flushPromises();
+    await openGeneralSettingsSidebarTab(wrapper);
+
+    await wrapper.get('textarea').setValue('Archive/cache\nthumbnails');
+    await flushPromises();
+
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Save changes');
+
+    expect(saveButton).toBeDefined();
+
+    await saveButton!.trigger('click');
+    await flushPromises();
+
+    expect(updateExcludedFoldersSpy).toHaveBeenCalledWith(['Archive/cache', 'thumbnails']);
+    expect(wrapper.text()).toContain('Excluded folders were saved. Run a library scan to apply them.');
   });
 });

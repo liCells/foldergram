@@ -121,7 +121,7 @@ features:
 <div class="cs-feature">
 <div class="cs-feature-step">6</div>
 <h3>Maintain locally</h3>
-<p>Admins can run a manual scan, rebuild thumbnails only, or do a full library-index rebuild from Settings. All controls are local — no remote calls involved.</p>
+<p>Admins manage stories mode, excluded folders, and Home/Reels defaults from <code>General Settings</code>, then run scans or rebuilds from <code>Scan &amp; Library</code>. All controls are local — no remote calls involved.</p>
 </div>
 
 </div>

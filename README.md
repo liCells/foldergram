@@ -42,7 +42,7 @@ Foldergram indexes supported media from a configured `GALLERY_ROOT`, stores meta
 - Image and video support with configurable eager or lazy derivative generation for fast browsing.
 - Original-media download controls on home feed cards, post detail, and stories, alongside open-original actions.
 - Optional role-based local access with admin, viewer, and public browse modes.
-- Settings actions for Home/Reels default modes, manual scan, thumbnail rebuild, and library-index rebuild.
+- Settings split into `General Settings` for Home/Reels defaults, stories mode, and excluded folders, plus `Scan & Library` for scan and rebuild actions.
 - A web app manifest plus production service worker registration.
 - A debounced filesystem watcher in development mode only.
 - No multi-user accounts, cloud sync, uploads, comments, messaging, notifications, or remote APIs.
@@ -112,6 +112,13 @@ The shipped Compose file includes `IMAGE_DETAIL_SOURCE: preview` and
 
 If you want lazy derivatives or original-backed image detail pages in Docker,
 edit those values in `docker-compose.yml` before starting the container.
+
+If you want Docker to skip unwanted source folders from the first scan, add
+`GALLERY_EXCLUDED_FOLDERS` under the Compose `environment:` block. For example:
+
+```yaml
+GALLERY_EXCLUDED_FOLDERS: "@eaDir,thumbnails,Archive/cache"
+```
 
 For an optional read-only public demo in Docker, add `PUBLIC_DEMO_MODE: "1"`
 under the Compose `environment:` block. If the browser-visible origin differs
@@ -219,6 +226,7 @@ data/
 | `DEV_CLIENT_PORT`             | `4141`              | Base Vite client port during `pnpm dev`. The client may use up to `4144`. |
 | `DATA_ROOT`                   | `./data`            | Root directory for app-managed storage.                                   |
 | `GALLERY_ROOT`                | `./data/gallery`    | Root directory scanned for App Folders.                                   |
+| `GALLERY_EXCLUDED_FOLDERS`    | empty               | Comma-separated folder exclusion rules such as `@eaDir,Archive/cache`.    |
 | `DB_DIR`                      | `./data/db`         | SQLite database directory.                                                |
 | `THUMBNAILS_DIR`              | `./data/thumbnails` | Generated thumbnail output directory.                                     |
 | `PREVIEWS_DIR`                | `./data/previews`   | Generated preview output directory.                                       |
@@ -243,6 +251,15 @@ image.
 For the default Docker Compose setup, runtime variables are defined in
 [`docker-compose.yml`](docker-compose.yml). The source-install `.env` file is
 not read directly by the container.
+
+### Excluded Folders
+
+- Use `GALLERY_EXCLUDED_FOLDERS` to skip unwanted source folders during discovery and rescans.
+- Rules without a slash match a folder name anywhere in the gallery tree, such as `@eaDir` or `thumbnails`.
+- Rules with a slash match one exact relative folder path beneath `GALLERY_ROOT`, such as `Archive/cache`.
+- The Settings sidebar now separates app-wide preferences into `General Settings`. That section includes the stories-folders toggle, Home/Reels defaults, and the excluded-folder editor.
+- `General Settings` can add or remove custom exclusion rules at runtime. Env-backed rules stay read-only there and still require a restart to change.
+- After changing excluded folders or stories mode in `General Settings`, run a full library scan from `Scan & Library` so previously indexed folders are soft-removed or reclassified correctly.
 
 ### Detail Media and Derivative Timing
 

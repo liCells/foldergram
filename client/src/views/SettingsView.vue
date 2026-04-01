@@ -4,7 +4,7 @@
       <div>
         <span class="eyebrow">Settings</span>
         <h1 class="mt-[0.15rem] mb-0 text-[clamp(1.55rem,2.4vw,2rem)] font-medium tracking-[-0.04em]">Library Controls</h1>
-        <p class="m-0 text-muted">Manage feed defaults, access, scans, and the library index.</p>
+        <p class="m-0 text-muted">Manage scans, app defaults, access, and the library index.</p>
       </div>
     </header>
 
@@ -66,7 +66,19 @@
           <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'library' ? 'i-fluent-folder-sync-20-filled' : 'i-fluent-folder-sync-20-regular'" aria-hidden="true"></span>
           <span class="flex flex-col gap-[0.1rem]">
             <span>Scan & Library</span>
-            <span class="text-[0.75rem] font-normal text-muted">Index media, rebuild derivatives, and set feed defaults</span>
+            <span class="text-[0.75rem] font-normal text-muted">Index media, rebuild thumbnails, and maintain the library index</span>
+          </span>
+        </button>
+        <button
+          @click="currentCategory = 'general'"
+          class="flex items-start gap-3 px-4 py-[0.85rem] rounded-[0.85rem] border-0 text-left transition-colors duration-150 cursor-pointer"
+          :class="currentCategory === 'general' ? 'bg-surface-alt font-bold text-text' : 'bg-transparent text-muted hover:bg-surface-hover hover:text-text'"
+        >
+          <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'general' ? 'i-fluent-settings-20-filled' : 'i-fluent-settings-20-regular'" aria-hidden="true"></span>
+          <span class="flex flex-col gap-[0.1rem] min-w-0">
+
+              <span class="truncate">General Settings</span>
+            <span class="text-[0.75rem] font-normal text-muted">Stories mode, excluded folders, and feed defaults</span>
           </span>
         </button>
         <button
@@ -349,8 +361,8 @@
           </div>
         </template>
 
-        <!-- CATEGORY: LIBRARY -->
-        <template v-if="currentCategory === 'library'">
+        <!-- CATEGORY: GENERAL -->
+        <template v-if="currentCategory === 'general'">
           <section
             v-if="showStoriesMigrationNotice"
             class="card grid gap-[1rem] p-6 border-[color-mix(in_srgb,#d2a133_42%,var(--border)_58%)]"
@@ -448,7 +460,7 @@
             <div class="border-b border-border px-6 py-5">
               <div>
                 <h2 class="m-0 text-[1.18rem]">General Settings</h2>
-                <p class="m-0 mt-[0.25rem] text-muted">App-wide defaults for stories folders, Home, and Reels.</p>
+                <p class="m-0 mt-[0.25rem] text-muted">App-wide defaults for stories folders, excluded folders, Home, and Reels.</p>
               </div>
             </div>
 
@@ -465,6 +477,9 @@
                 <div class="min-w-0">
                   <div class="flex flex-wrap items-center gap-2">
                     <p class="m-0 text-[0.96rem] font-semibold text-text">Treat stories folders as normal app folders</p>
+                    <span class="inline-flex items-center rounded-full bg-surface-alt px-2 py-[0.2rem] text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-muted">
+                      Scan required
+                    </span>
                     <div class="group relative inline-flex">
                       <button
                         class="inline-flex h-6 w-6 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted cursor-help transition-colors duration-150 hover:text-text focus-visible:text-text"
@@ -500,6 +515,65 @@
                     />
                   </span>
                 </button>
+              </div>
+
+              <div class="grid gap-4 px-6 py-4">
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p class="m-0 text-[0.96rem] font-semibold text-text">Excluded source folders</p>
+                    <span class="inline-flex items-center rounded-full bg-surface-alt px-2 py-[0.2rem] text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-muted">
+                      Scan required
+                    </span>
+                  </div>
+                  <p class="m-0 mt-[0.25rem] text-[0.84rem] text-muted">
+                    Skip matching folders anywhere by name or by exact relative path under the gallery root. Hidden paths and app-managed storage stay excluded automatically.
+                  </p>
+                </div>
+
+                <label class="grid gap-[0.45rem]">
+                  <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Custom rules</span>
+                  <textarea
+                    v-model="customExcludedFoldersDraft"
+                    class="min-h-[10rem] rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 py-3 text-[0.95rem] leading-[1.55] text-text outline-none transition-[border-color,box-shadow] duration-180 placeholder:text-muted focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                    :disabled="savingGeneralSettings || adminStats === null"
+                    rows="5"
+                    placeholder="@eaDir&#10;thumbnails&#10;Archive/cache"
+                    spellcheck="false"
+                    @input="clearGeneralSettingsFeedback"
+                  />
+                </label>
+
+                <div class="grid gap-3 lg:grid-cols-2">
+                  <div class="rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_78%,transparent_22%)] px-4 py-4">
+                    <p class="m-0 text-[0.82rem] font-semibold uppercase tracking-[0.08em] text-muted">Read-only env rules</p>
+                    <p class="m-0 mt-[0.35rem] text-[0.82rem] text-muted">Change <code>GALLERY_EXCLUDED_FOLDERS</code> in <code>.env</code> or Docker and restart the app to update these.</p>
+                    <div v-if="envExcludedFolders.length > 0" class="mt-3 flex flex-wrap gap-2">
+                      <span
+                        v-for="rule in envExcludedFolders"
+                        :key="`env-${rule}`"
+                        class="inline-flex items-center rounded-full bg-[rgba(24,119,242,0.08)] px-3 py-[0.35rem] text-[0.78rem] font-medium text-accent-strong"
+                      >
+                        {{ rule }}
+                      </span>
+                    </div>
+                    <p v-else class="m-0 mt-3 text-[0.84rem] text-muted">No env-backed folder exclusions are configured.</p>
+                  </div>
+
+                  <div class="rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_78%,transparent_22%)] px-4 py-4">
+                    <p class="m-0 text-[0.82rem] font-semibold uppercase tracking-[0.08em] text-muted">Currently active saved rules</p>
+                    <p class="m-0 mt-[0.35rem] text-[0.82rem] text-muted">This combines the saved textarea rules with any env-backed entries. New textarea edits appear here after you save them.</p>
+                    <div v-if="effectiveExcludedFolders.length > 0" class="mt-3 flex flex-wrap gap-2">
+                      <span
+                        v-for="rule in effectiveExcludedFolders"
+                        :key="`effective-${rule}`"
+                        class="inline-flex items-center rounded-full bg-surface px-3 py-[0.35rem] text-[0.78rem] font-medium text-text"
+                      >
+                        {{ rule }}
+                      </span>
+                    </div>
+                    <p v-else class="m-0 mt-3 text-[0.84rem] text-muted">No saved custom or env-backed folder exclusions are active.</p>
+                  </div>
+                </div>
               </div>
 
               <div class="grid gap-3 px-6 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
@@ -626,12 +700,12 @@
 
             </div>
 
-            <div class="border-t border-border bg-[color-mix(in_srgb,var(--surface)_96%,var(--accent-soft)_4%)] px-6 py-5">
+            <div class="rounded-b-[1.05rem] border-t border-border bg-[color-mix(in_srgb,var(--surface)_96%,var(--accent-soft)_4%)] px-6 py-5">
               <div
-                v-if="showStoriesRescanNotice"
+                v-if="showGeneralSettingsRescanNotice"
                 class="mb-4 rounded-[0.95rem] border border-[rgba(210,161,51,0.28)] bg-[rgba(210,161,51,0.08)] px-4 py-3 text-[0.88rem] text-[#9f6a00]"
               >
-                Save this change, then run a library scan before expecting stories folders, avatar stories, or highlights to update.
+                {{ generalSettingsRescanNotice }}
               </div>
 
               <div class="flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch">
@@ -649,6 +723,10 @@
             </div>
           </section>
 
+        </template>
+
+        <!-- CATEGORY: LIBRARY -->
+        <template v-if="currentCategory === 'library'">
           <section class="card grid gap-[1.15rem] p-8">
             <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
               <div>
@@ -827,7 +905,16 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import ConfirmDialog from '../components/ConfirmDialog.vue';
-import { fetchAdminStats, triggerLibraryRebuild, triggerManualScan, triggerThumbnailRebuild, updateHomeFeedDefault, updateReelsFeedDefault, updateStoriesMode } from '../api/gallery';
+import {
+  fetchAdminStats,
+  triggerLibraryRebuild,
+  triggerManualScan,
+  triggerThumbnailRebuild,
+  updateExcludedFolders,
+  updateHomeFeedDefault,
+  updateReelsFeedDefault,
+  updateStoriesMode
+} from '../api/gallery';
 import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { useFeedStore } from '../stores/feed';
@@ -845,7 +932,7 @@ const likesStore = useLikesStore();
 const momentsStore = useMomentsStore();
 const viewerStore = useViewerStore();
 const route = useRoute();
-const currentCategory = ref<'library' | 'access' | 'status'>('library');
+const currentCategory = ref<'library' | 'general' | 'access' | 'status'>('library');
 const scanError = ref<string | null>(null);
 const rebuildError = ref<string | null>(null);
 const thumbnailRebuildError = ref<string | null>(null);
@@ -877,12 +964,61 @@ const showStoriesAnnouncementStructure = ref(false);
 const viewerAccessMode = ref<ViewerAccessMode>(authStore.accessMode);
 const viewerPassword = ref('');
 const viewerPasswordConfirmation = ref('');
+const customExcludedFoldersDraft = ref('');
 const SCAN_ERROR_NOTICE_STORAGE_KEY = 'foldergram-scan-error-notice-dismissal';
 const IGNORED_ROOT_MEDIA_NOTICE_STORAGE_KEY = 'foldergram-ignored-root-media-notice-dismissal';
 const NOTICE_DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 const MIN_PASSWORD_LENGTH = 8;
 const STORIES_MIGRATION_NOTICE_STORAGE_KEY = 'foldergram-stories-migration-dismissed';
 const STORIES_ANNOUNCEMENT_STORAGE_KEY = 'foldergram-stories-announcement-dismissed';
+const EXCLUDED_FOLDER_EDGE_SLASH_PATTERN = /^\/+|\/+$/g;
+const EXCLUDED_FOLDER_UNSUPPORTED_PATTERN = /[*?]/;
+const excludedFoldersHydrated = ref(false);
+
+function normalizeExcludedFolderRuleInput(rule: string): string {
+  const segments = rule
+    .replace(/\\/g, '/')
+    .trim()
+    .replace(EXCLUDED_FOLDER_EDGE_SLASH_PATTERN, '')
+    .split('/')
+    .filter(Boolean);
+
+  if (segments.length === 0) {
+    throw new Error('Excluded folder rules cannot be empty.');
+  }
+
+  if (segments.some((segment) => segment === '.' || segment === '..')) {
+    throw new Error(`Invalid excluded folder rule: ${rule}`);
+  }
+
+  if (segments.some((segment) => EXCLUDED_FOLDER_UNSUPPORTED_PATTERN.test(segment))) {
+    throw new Error(`Unsupported excluded folder rule: ${rule}`);
+  }
+
+  return segments.join('/');
+}
+
+function parseExcludedFolderRulesDraft(value: string): string[] {
+  const normalized: string[] = [];
+
+  for (const entry of value.split(/\r?\n/u)) {
+    const trimmedEntry = entry.trim();
+    if (trimmedEntry.length === 0) {
+      continue;
+    }
+
+    const normalizedEntry = normalizeExcludedFolderRuleInput(trimmedEntry);
+    if (!normalized.includes(normalizedEntry)) {
+      normalized.push(normalizedEntry);
+    }
+  }
+
+  return normalized;
+}
+
+function formatExcludedFolderRules(rules: string[]): string {
+  return rules.join('\n');
+}
 
 function loadDismissedScanErrorNotice(): { scanId: number; dismissedUntil: number } | null {
   if (typeof window === 'undefined') {
@@ -1038,6 +1174,11 @@ function syncStoriesModeFromSaved() {
   storiesModeHydrated.value = true;
 }
 
+function syncExcludedFoldersFromSaved() {
+  customExcludedFoldersDraft.value = formatExcludedFolderRules(adminStats.value?.excludedFolders.customExcludedFolders ?? []);
+  excludedFoldersHydrated.value = true;
+}
+
 const scan = computed(() => appStore.stats?.scan ?? null);
 const lastCompletedScan = computed(() => scan.value?.lastCompletedScan ?? adminStats.value?.lastScan ?? null);
 const activeScanReason = computed(() => scan.value?.scanReason ?? null);
@@ -1088,6 +1229,9 @@ const waitingForInitialStatus = computed(() => !appStore.stats || appStore.loadi
 const savedHomeFeedDefaultMode = computed(() => appStore.defaultHomeFeedMode);
 const savedReelsFeedDefaultMode = computed(() => appStore.defaultReelsFeedMode);
 const savedStoriesMode = computed(() => appStore.treatStoriesAsFolders);
+const savedCustomExcludedFolders = computed(() => adminStats.value?.excludedFolders.customExcludedFolders ?? []);
+const envExcludedFolders = computed(() => adminStats.value?.excludedFolders.envExcludedFolders ?? []);
+const effectiveExcludedFolders = computed(() => adminStats.value?.excludedFolders.effectiveExcludedFolders ?? []);
 const storiesModeRequiresDecision = computed(() => appStore.stats?.storiesMigration.decisionPending === true);
 const savedHomeFeedDefaultModeLabel = computed(
   () => homeFeedDefaultOptions.find((mode) => mode.id === savedHomeFeedDefaultMode.value)?.label ?? 'Random'
@@ -1109,10 +1253,24 @@ const reelsFeedDefaultDirty = computed(
 );
 const feedDefaultsDirty = computed(() => homeFeedDefaultDirty.value || reelsFeedDefaultDirty.value);
 const storiesModeDirty = computed(() => storiesModeHydrated.value && storiesMode.value !== savedStoriesMode.value);
+const excludedFoldersDirty = computed(() => {
+  if (!excludedFoldersHydrated.value) {
+    return false;
+  }
+
+  try {
+    const currentRules = parseExcludedFolderRulesDraft(customExcludedFoldersDraft.value);
+    return JSON.stringify(currentRules) !== JSON.stringify(savedCustomExcludedFolders.value);
+  } catch {
+    return true;
+  }
+});
 const generalSettingsDirty = computed(
-  () => feedDefaultsDirty.value || storiesModeDirty.value || storiesModeRequiresDecision.value
+  () => feedDefaultsDirty.value || storiesModeDirty.value || excludedFoldersDirty.value || storiesModeRequiresDecision.value
 );
-const showStoriesRescanNotice = computed(() => storiesModeDirty.value || storiesModeRequiresDecision.value);
+const showGeneralSettingsRescanNotice = computed(
+  () => storiesModeDirty.value || storiesModeRequiresDecision.value || excludedFoldersDirty.value
+);
 const generalSettingsSaveDisabled = computed(
   () => waitingForInitialStatus.value || savingGeneralSettings.value || !generalSettingsDirty.value
 );
@@ -1129,6 +1287,14 @@ const generalSettingsButtonStyle = computed(() =>
 const generalSettingsActionNote = computed(() => {
   if (waitingForInitialStatus.value) {
     return 'Loading the current app preferences...';
+  }
+
+  if (excludedFoldersDirty.value && (storiesModeDirty.value || storiesModeRequiresDecision.value || feedDefaultsDirty.value)) {
+    return 'Save the folder exclusion rules with the other app-wide changes. Run a library scan afterward so stories and excluded folders reindex correctly.';
+  }
+
+  if (excludedFoldersDirty.value) {
+    return 'This saves the custom excluded folders only. Run a library scan afterward so those folders disappear from the index.';
   }
 
   if (storiesModeDirty.value && feedDefaultsDirty.value) {
@@ -1151,7 +1317,18 @@ const generalSettingsActionNote = computed(() => {
     return 'This updates the queue style used when Reels opens for this app. Visitors cannot switch modes from the reels page.';
   }
 
-  return 'These are the current app-wide defaults for Home, Reels, and stories folders.';
+  return 'These are the current app-wide defaults for Home, Reels, stories folders, and excluded folders.';
+});
+const generalSettingsRescanNotice = computed(() => {
+  if (excludedFoldersDirty.value && (storiesModeDirty.value || storiesModeRequiresDecision.value)) {
+    return 'Save these changes, then run a library scan before expecting stories folders and excluded folders to update.';
+  }
+
+  if (excludedFoldersDirty.value) {
+    return 'Save this change, then run a library scan before excluded folders disappear from the index.';
+  }
+
+  return 'Save this change, then run a library scan before expecting stories folders, avatar stories, or highlights to update.';
 });
 const storiesModeLabelDescription = computed(() =>
   storiesMode.value
@@ -1761,16 +1938,44 @@ async function saveGeneralSettings() {
     return;
   }
 
+  const shouldSaveExcludedFolders = excludedFoldersDirty.value;
   const shouldSaveStories = storiesModeDirty.value || storiesModeRequiresDecision.value;
   const shouldSaveHome = homeFeedDefaultDirty.value;
   const shouldSaveReels = reelsFeedDefaultDirty.value;
   const savedParts: string[] = [];
+  let nextExcludedFolders: string[] = [];
+
+  if (shouldSaveExcludedFolders) {
+    try {
+      nextExcludedFolders = parseExcludedFolderRulesDraft(customExcludedFoldersDraft.value);
+    } catch (error) {
+      setGeneralSettingsFeedback('error', error instanceof Error ? error.message : 'Unable to validate the excluded folder rules.');
+      return;
+    }
+  }
 
   savingGeneralSettings.value = true;
   closeGeneralSettingsMenu();
   clearGeneralSettingsFeedback();
 
   try {
+    if (shouldSaveExcludedFolders) {
+      const payload = await updateExcludedFolders(nextExcludedFolders);
+      savedParts.push('excluded folders');
+      customExcludedFoldersDraft.value = formatExcludedFolderRules(payload.customExcludedFolders);
+
+      if (adminStats.value) {
+        adminStats.value = {
+          ...adminStats.value,
+          excludedFolders: {
+            envExcludedFolders: payload.envExcludedFolders,
+            customExcludedFolders: payload.customExcludedFolders,
+            effectiveExcludedFolders: payload.effectiveExcludedFolders
+          }
+        };
+      }
+    }
+
     if (shouldSaveStories) {
       const payload = await updateStoriesMode(storiesMode.value);
       savedParts.push('stories folder handling');
@@ -1802,11 +2007,17 @@ async function saveGeneralSettings() {
 
     await appStore.fetchStats({ background: true });
 
-    if (shouldSaveStories) {
+    if (shouldSaveStories || shouldSaveExcludedFolders) {
       await loadAdminStats().catch(() => {});
     }
 
-    if (shouldSaveStories && (shouldSaveHome || shouldSaveReels)) {
+    if ((shouldSaveStories || shouldSaveExcludedFolders) && (shouldSaveHome || shouldSaveReels)) {
+      setGeneralSettingsFeedback('success', 'Settings were saved. Run a library scan to apply the folder rule changes.');
+    } else if (shouldSaveExcludedFolders && shouldSaveStories) {
+      setGeneralSettingsFeedback('success', 'Folder exclusion rules and stories folder behavior were saved. Run a library scan to apply them.');
+    } else if (shouldSaveExcludedFolders) {
+      setGeneralSettingsFeedback('success', 'Excluded folders were saved. Run a library scan to apply them.');
+    } else if (shouldSaveStories && (shouldSaveHome || shouldSaveReels)) {
       setGeneralSettingsFeedback('success', 'Settings were saved. Run a library scan to apply the stories folder change.');
     } else if (shouldSaveStories) {
       setGeneralSettingsFeedback('success', 'Stories folder behavior was saved. Run a library scan to apply it.');
@@ -1825,7 +2036,7 @@ async function saveGeneralSettings() {
     }
   } catch (error) {
     await appStore.fetchStats({ background: true }).catch(() => {});
-    if (shouldSaveStories) {
+    if (shouldSaveStories || shouldSaveExcludedFolders) {
       await loadAdminStats().catch(() => {});
     }
 
@@ -1861,6 +2072,10 @@ async function warmScanStatus() {
 
 async function loadAdminStats() {
   adminStats.value = await fetchAdminStats();
+
+  if (!excludedFoldersHydrated.value || savingGeneralSettings.value || !excludedFoldersDirty.value) {
+    syncExcludedFoldersFromSaved();
+  }
 }
 
 async function runManualScan() {

@@ -45,8 +45,25 @@ folder:
 - story media is hidden from normal folder, feed, and reels surfaces while this mode is active
 
 If you already rely on folders literally named `stories` as normal app folders,
-open Settings, enable `Treat stories folders as normal app folders`, and rescan
-the library.
+open `Settings -> General Settings`, enable `Treat stories folders as normal
+app folders`, then rescan from `Settings -> Scan & Library`.
+
+## Can I exclude source folders from scanning?
+
+Yes.
+
+Foldergram supports two sources of exclusion rules:
+
+- `GALLERY_EXCLUDED_FOLDERS` in `.env` or Docker Compose
+- custom rules in `Settings -> General Settings`
+
+Rules without a slash match folder names anywhere in the gallery tree, such as
+`@eaDir` or `thumbnails`. Rules with a slash match one exact relative path
+under `GALLERY_ROOT`, such as `Archive/cache`.
+
+Changing env-backed rules requires a restart. Changing custom rules in
+`General Settings` requires saving the change and then running a scan from
+`Scan & Library`.
 
 ## Are likes shared with other users?
 

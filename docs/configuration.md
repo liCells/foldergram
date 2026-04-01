@@ -1,6 +1,6 @@
 ---
 title: Configuration
-description: Environment variables, path rules, and scan concurrency controls in Foldergram.
+description: Environment variables, excluded-folder rules, path behavior, and scan controls in Foldergram.
 ---
 
 # Configuration
@@ -24,6 +24,7 @@ yourself.
 | `DATA_ROOT` | `./data` | Base directory for app-managed storage. Other storage paths default under it unless overridden. |
 | `DATA_DIR` | unset | Optional alias that falls back into `DATA_ROOT` resolution when `DATA_ROOT` is absent. |
 | `GALLERY_ROOT` | `./data/gallery` | Source media root. Foldergram scans below this path. |
+| `GALLERY_EXCLUDED_FOLDERS` | unset | Comma-separated folder exclusion rules. Names match anywhere in the gallery tree; values with a slash match one exact relative path below `GALLERY_ROOT`. |
 | `DB_DIR` | `./data/db` | SQLite directory. Database file is `gallery.sqlite`. |
 | `THUMBNAILS_DIR` | `./data/thumbnails` | Generated thumbnail output root. |
 | `PREVIEWS_DIR` | `./data/previews` | Generated preview output root. |
@@ -60,6 +61,30 @@ Instead:
 - turning the toggle on enables legacy behavior, where folders literally named `stories` remain ordinary app folders
 - changing this setting requires a rescan because the indexed folder structure changes
 - if the existing library already contains candidate `stories/` folders, Settings can show a migration decision card until you choose a mode
+
+## Excluded folders
+
+Folder exclusions can come from two places:
+
+- `GALLERY_EXCLUDED_FOLDERS` in `.env` or Docker Compose
+- custom rules saved from `Settings -> General Settings`
+
+Behavior:
+
+- rules without a slash match folder names anywhere in the gallery tree, such as `@eaDir` or `thumbnails`
+- rules with a slash match one exact relative folder path under `GALLERY_ROOT`, such as `Archive/cache`
+- env-backed rules appear read-only in `General Settings`
+- custom rules are stored in SQLite `app_settings` and can be changed at runtime
+- after changing custom rules, run a full scan from `Settings -> Scan & Library` so already-indexed matches are soft-removed from the library
+
+## Settings sections
+
+The Settings sidebar is split into:
+
+- `Scan & Library` for manual scans, thumbnail rebuilds, and library-index rebuilds
+- `General Settings` for Home/Reels defaults, stories-folders mode, excluded folders, and any save-and-rescan notices tied to those app-wide rules
+- `Security & Access` for admin, viewer, and public-mode controls
+- `System Status` for storage, index, and last-scan details
 
 ## Path resolution rules
 
@@ -120,6 +145,7 @@ Behavior:
 - `Rebuild Library Index` resets and rebuilds the SQLite-backed index, then reuses any matching derivatives already on disk.
 - In `DERIVATIVE_MODE=lazy`, neither a normal scan nor `Rebuild Library Index` pre-generates missing thumbnails or previews.
 - `Regenerate Thumbnails` remains a manual thumbnail and video-poster rebuild only. It does not rebuild previews.
+- Runtime-only app-wide controls such as stories mode and excluded folders live under `Settings -> General Settings`, while the scan and rebuild actions live under `Settings -> Scan & Library`.
 
 ## Managed path ignores
 
@@ -140,6 +166,7 @@ DEV_SERVER_PORT=4140
 DEV_CLIENT_PORT=4141
 DATA_ROOT=./data
 GALLERY_ROOT=./data/gallery
+GALLERY_EXCLUDED_FOLDERS=
 DB_DIR=./data/db
 THUMBNAILS_DIR=./data/thumbnails
 PREVIEWS_DIR=./data/previews

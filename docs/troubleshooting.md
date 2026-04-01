@@ -83,9 +83,27 @@ of a standalone app folder.
 
 If you want folders literally named `stories` to remain ordinary app folders:
 
-1. open Settings
+1. open `Settings -> General Settings`
 2. enable `Treat stories folders as normal app folders`
-3. save the change and let the library rescan
+3. save the change
+4. run a scan from `Settings -> Scan & Library`
+
+## A folder is still showing up after I excluded it
+
+Folder exclusions can come from:
+
+- `GALLERY_EXCLUDED_FOLDERS` in `.env` or Docker Compose
+- custom rules in `Settings -> General Settings`
+
+Check:
+
+- rules without a slash match folder names anywhere in the gallery tree
+- rules with a slash match one exact relative path below `GALLERY_ROOT`
+- env-backed rules require a restart to change
+- custom rules require `Save changes`, then a full scan from `Settings -> Scan & Library`
+
+If the folder was already indexed before the rule existed, it will stay visible
+until that scan finishes and soft-removes it from the index.
 
 ## Videos fail to index or generate previews
 

@@ -45,12 +45,39 @@ describe.sequential('derivative mode env config', () => {
 
     expect(appConfig.imageDetailSource).toBe('preview');
     expect(appConfig.derivativeMode).toBe('eager');
+    expect(appConfig.galleryExcludedFolders).toEqual([]);
+  });
+
+  it('parses excluded folder env rules with trimming and dedupe', async () => {
+    await stubBaseEnv();
+    vi.stubEnv('GALLERY_EXCLUDED_FOLDERS', ' @eaDir , thumbnails , Archive/cache , @eaDir ');
+    vi.doMock('dotenv', () => ({
+      default: {
+        config: vi.fn()
+      }
+    }));
+
+    const { appConfig } = await import('../src/config/env.js') as EnvModule;
+
+    expect(appConfig.galleryExcludedFolders).toEqual(['@eaDir', 'thumbnails', 'Archive/cache']);
   });
 
   it('rejects invalid enum values for derivative-related env vars', async () => {
     await stubBaseEnv();
     vi.stubEnv('IMAGE_DETAIL_SOURCE', 'fullres');
     vi.stubEnv('DERIVATIVE_MODE', 'background');
+    vi.doMock('dotenv', () => ({
+      default: {
+        config: vi.fn()
+      }
+    }));
+
+    await expect(import('../src/config/env.js')).rejects.toThrow();
+  });
+
+  it('rejects invalid excluded folder env rules', async () => {
+    await stubBaseEnv();
+    vi.stubEnv('GALLERY_EXCLUDED_FOLDERS', '../outside,*/cache');
     vi.doMock('dotenv', () => ({
       default: {
         config: vi.fn()

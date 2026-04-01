@@ -1,16 +1,26 @@
 import chokidar, { type FSWatcher } from 'chokidar';
 
 import { appConfig } from '../config/env.js';
+import { getEffectiveExcludedFolderRules, matchesExcludedFolder, parseExcludedFolderRulesFromSetting } from '../utils/excluded-folder-rules.js';
+import { EXCLUDED_FOLDERS_SETTING_KEY } from '../constants/app-setting-keys.js';
+import { appSettingsRepository } from '../db/repositories.js';
 import { scannerService } from './scanner-service.js';
 import { log } from './log-service.js';
 import { storageService } from './storage-service.js';
-import { getRelativeGalleryPath, isHiddenPath, matchesRelativeRoot } from '../utils/path-utils.js';
+import { getRelativeGalleryPath, getSourceFolderPathFromRelativePath, isHiddenPath, matchesRelativeRoot } from '../utils/path-utils.js';
 
 class WatcherService {
   private watcher: FSWatcher | null = null;
   private pendingPaths = new Set<string>();
   private debounceTimer: NodeJS.Timeout | null = null;
   private fullRescanRequested = false;
+
+  private getEffectiveExcludedFolderRules(): string[] {
+    return getEffectiveExcludedFolderRules({
+      envRules: appConfig.galleryExcludedFolders,
+      customRules: parseExcludedFolderRulesFromSetting(appSettingsRepository.get(EXCLUDED_FOLDERS_SETTING_KEY))
+    });
+  }
 
   async start(): Promise<void> {
     if (this.watcher || !appConfig.isDevelopment) {
@@ -36,6 +46,15 @@ class WatcherService {
       }
 
       if (matchesRelativeRoot(relativePath, appConfig.managedGalleryRelativeIgnores)) {
+        return;
+      }
+
+      const excludedFolderRules = this.getEffectiveExcludedFolderRules();
+      const exclusionTargetPath =
+        eventName === 'addDir' || eventName === 'unlinkDir'
+          ? relativePath
+          : (getSourceFolderPathFromRelativePath(relativePath) ?? relativePath);
+      if (matchesExcludedFolder(exclusionTargetPath, excludedFolderRules)) {
         return;
       }
 

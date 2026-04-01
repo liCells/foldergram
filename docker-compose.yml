@@ -6,6 +6,8 @@ services:
     environment:
       IMAGE_DETAIL_SOURCE: preview
       DERIVATIVE_MODE: eager
+      # Optional: skip specific source folders by name or by exact relative path.
+      # GALLERY_EXCLUDED_FOLDERS: "@eaDir,thumbnails,Archive/cache"
       # Optional: enable read-only public demo behavior.
       # PUBLIC_DEMO_MODE: "1"
       # Optional when the browser-visible origin differs from the upstream Node host.

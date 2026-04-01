@@ -74,6 +74,9 @@ const reelsFeedDefaultBodySchema = z.object({
 const storiesModeBodySchema = z.object({
   treatStoriesAsFolders: z.boolean()
 });
+const excludedFoldersBodySchema = z.object({
+  rules: z.array(z.string()).default([])
+});
 
 const slugSchema = z.object({
   slug: z.string().min(1).max(240)
@@ -150,7 +153,8 @@ export const authRequestBodySchemas = {
 export const settingsRequestBodySchemas = {
   homeFeedDefault: homeFeedDefaultBodySchema,
   reelsFeedDefault: reelsFeedDefaultBodySchema,
-  storiesMode: storiesModeBodySchema
+  storiesMode: storiesModeBodySchema,
+  excludedFolders: excludedFoldersBodySchema
 };
 
 export const routeParamSchemas = {
@@ -373,6 +377,15 @@ router.put(
   (request, response) => {
     const body = storiesModeBodySchema.parse(request.body);
     response.json(galleryService.setTreatStoriesAsFolders(body.treatStoriesAsFolders));
+  }
+);
+
+router.put(
+  '/admin/settings/excluded-folders',
+  requireCapability('canAccessSettings', 'Admin access is required.'),
+  (request, response) => {
+    const body = excludedFoldersBodySchema.parse(request.body);
+    response.json(galleryService.setExcludedFolders(body.rules));
   }
 );
 

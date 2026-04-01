@@ -6,6 +6,7 @@ import type {
   FolderStoriesPayload,
   FolderStoryFeedPayload,
   HomeFeedDefaultSetting,
+  UpdateExcludedFoldersSettingResult,
   ReelsFeedDefaultSetting,
   StoriesModeSetting,
   ViewerAccessMode,
@@ -322,5 +323,13 @@ export function updateStoriesMode(treatStoriesAsFolders: boolean) {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ treatStoriesAsFolders })
+  });
+}
+
+export function updateExcludedFolders(rules: string[]) {
+  return requestJson<UpdateExcludedFoldersSettingResult>('/api/admin/settings/excluded-folders', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ rules })
   });
 }

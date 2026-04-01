@@ -6,6 +6,7 @@ import path from 'node:path';
 import pLimit from 'p-limit';
 
 import {
+  EXCLUDED_FOLDERS_SETTING_KEY,
   LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY,
   LIBRARY_REBUILD_REQUIRED_SETTING_KEY,
   PREVIOUS_GALLERY_ROOT_SETTING_KEY,
@@ -41,6 +42,11 @@ import {
   isHiddenPath,
   normalizePath
 } from '../utils/path-utils.js';
+import {
+  getEffectiveExcludedFolderRules,
+  matchesExcludedFolder,
+  parseExcludedFolderRulesFromSetting
+} from '../utils/excluded-folder-rules.js';
 import {
   findReservedStoriesOwnerPath,
   isStoriesFolderName,
@@ -515,6 +521,17 @@ class ScannerService {
     return matchesRelativeRoot(relativePath, appConfig.managedGalleryRelativeIgnores);
   }
 
+  private getCustomExcludedFolderRules(): string[] {
+    return parseExcludedFolderRulesFromSetting(appSettingsRepository.get(EXCLUDED_FOLDERS_SETTING_KEY));
+  }
+
+  private getEffectiveExcludedFolderRules(): string[] {
+    return getEffectiveExcludedFolderRules({
+      envRules: appConfig.galleryExcludedFolders,
+      customRules: this.getCustomExcludedFolderRules()
+    });
+  }
+
   private shouldTreatStoriesAsFolders(): boolean {
     return parseTreatStoriesAsFoldersSetting(appSettingsRepository.get(TREAT_STORIES_AS_FOLDERS_SETTING_KEY));
   }
@@ -523,8 +540,13 @@ class ScannerService {
     currentAbsolutePath: string,
     onSourceFolder: (sourceFolder: SourceFolderCandidate) => Promise<void>,
     currentRelativePath: string | null = null,
-    treatStoriesAsFolders = this.shouldTreatStoriesAsFolders()
+    treatStoriesAsFolders = this.shouldTreatStoriesAsFolders(),
+    excludedFolderRules = this.getEffectiveExcludedFolderRules()
   ): Promise<void> {
+    if (currentRelativePath && matchesExcludedFolder(currentRelativePath, excludedFolderRules)) {
+      return;
+    }
+
     this.setProgress({
       currentFolder: currentRelativePath ? normalizePath(currentRelativePath) : ROOT_DISCOVERY_LABEL
     });
@@ -554,7 +576,7 @@ class ScannerService {
       }
 
       if (entry.isDirectory()) {
-        if (this.isManagedGalleryPath(relativeEntryPath)) {
+        if (this.isManagedGalleryPath(relativeEntryPath) || matchesExcludedFolder(relativeEntryPath, excludedFolderRules)) {
           continue;
         }
 
@@ -587,7 +609,13 @@ class ScannerService {
         continue;
       }
 
-      await this.walkMediaSourceFolders(childDirectory.absolutePath, onSourceFolder, childDirectory.relativePath, treatStoriesAsFolders);
+      await this.walkMediaSourceFolders(
+        childDirectory.absolutePath,
+        onSourceFolder,
+        childDirectory.relativePath,
+        treatStoriesAsFolders,
+        excludedFolderRules
+      );
     }
   }
 
@@ -739,7 +767,15 @@ class ScannerService {
     };
   }
 
-  private async collectRecursiveMediaFiles(currentAbsolutePath: string, currentRelativePath: string): Promise<IndexedFileReference[]> {
+  private async collectRecursiveMediaFiles(
+    currentAbsolutePath: string,
+    currentRelativePath: string,
+    excludedFolderRules: string[]
+  ): Promise<IndexedFileReference[]> {
+    if (matchesExcludedFolder(currentRelativePath, excludedFolderRules)) {
+      return [];
+    }
+
     const entries = await fs
       .readdir(currentAbsolutePath, { withFileTypes: true })
       .catch((error: unknown) => {
@@ -764,11 +800,11 @@ class ScannerService {
       }
 
       if (entry.isDirectory()) {
-        if (this.isManagedGalleryPath(relativeEntryPath)) {
+        if (this.isManagedGalleryPath(relativeEntryPath) || matchesExcludedFolder(relativeEntryPath, excludedFolderRules)) {
           continue;
         }
 
-        files.push(...await this.collectRecursiveMediaFiles(path.join(currentAbsolutePath, entry.name), relativeEntryPath));
+        files.push(...await this.collectRecursiveMediaFiles(path.join(currentAbsolutePath, entry.name), relativeEntryPath, excludedFolderRules));
         continue;
       }
 
@@ -792,7 +828,8 @@ class ScannerService {
     derivativeJobs: Map<string, DerivativeJob>,
     errors: string[],
     options: FullScanOptions,
-    context: ImageProcessingContext
+    context: ImageProcessingContext,
+    excludedFolderRules: string[]
   ): Promise<SourceFolderScanResult[]> {
     const ownerEntries = await fs
       .readdir(sourceFolder.absolutePath, { withFileTypes: true })
@@ -815,7 +852,12 @@ class ScannerService {
       }
 
       const relativeEntryPath = normalizePath(`${sourceFolder.relativePath}/${entry.name}`);
-      return !isHiddenPath(relativeEntryPath) && !this.isManagedGalleryPath(relativeEntryPath) && isStoriesFolderName(entry.name);
+      return (
+        !isHiddenPath(relativeEntryPath) &&
+        !this.isManagedGalleryPath(relativeEntryPath) &&
+        !matchesExcludedFolder(relativeEntryPath, excludedFolderRules) &&
+        isStoriesFolderName(entry.name)
+      );
     });
 
     if (!storiesDirectory) {
@@ -894,12 +936,20 @@ class ScannerService {
       }
 
       const capsuleRelativePath = normalizePath(`${storiesRelativePath}/${entry.name}`);
-      if (isHiddenPath(capsuleRelativePath) || this.isManagedGalleryPath(capsuleRelativePath)) {
+      if (
+        isHiddenPath(capsuleRelativePath) ||
+        this.isManagedGalleryPath(capsuleRelativePath) ||
+        matchesExcludedFolder(capsuleRelativePath, excludedFolderRules)
+      ) {
         continue;
       }
 
       const startedAt = performance.now();
-      const nestedFiles = await this.collectRecursiveMediaFiles(path.join(storiesAbsolutePath, entry.name), capsuleRelativePath);
+      const nestedFiles = await this.collectRecursiveMediaFiles(
+        path.join(storiesAbsolutePath, entry.name),
+        capsuleRelativePath,
+        excludedFolderRules
+      );
       if (nestedFiles.length === 0) {
         continue;
       }
@@ -1281,6 +1331,7 @@ class ScannerService {
       hasStoredGalleryRoot
     };
     const treatStoriesAsFolders = this.shouldTreatStoriesAsFolders();
+    const excludedFolderRules = this.getEffectiveExcludedFolderRules();
 
     if (!storageService.refreshAvailability().libraryAvailable) {
       return this.finishUnavailableRun(runId, reason);
@@ -1294,6 +1345,7 @@ class ScannerService {
         formatStep('root-changed', formatToggle(galleryRootChanged)),
         formatStep('stored-root', formatToggle(hasStoredGalleryRoot)),
         formatStep('stories-as-folders', formatToggle(treatStoriesAsFolders)),
+        excludedFolderRules.length > 0 ? formatStep('excluded-folders', excludedFolderRules.join(',')) : null,
         appConfig.managedGalleryRelativeIgnores.length > 0
           ? formatStep('ignored-managed-paths', appConfig.managedGalleryRelativeIgnores.join(','))
           : null,
@@ -1389,7 +1441,8 @@ class ScannerService {
             derivativeJobs,
             errors,
             options,
-            imageProcessingContext
+            imageProcessingContext,
+            excludedFolderRules
           );
 
           for (const storyResult of storyResults) {
@@ -1401,7 +1454,7 @@ class ScannerService {
           processedFolders: this.progress.processedFolders + 1
         });
         this.logProgress('folder');
-      }, null, treatStoriesAsFolders);
+      }, null, treatStoriesAsFolders, excludedFolderRules);
 
       for (const folder of existingFolders) {
         if (!discoveredFolderIds.has(folder.id)) {
@@ -1474,6 +1527,7 @@ class ScannerService {
     const normalizedPaths = [...new Set(relativePaths.map((value) => normalizePath(value)).filter(Boolean))];
     const impactedSourceFolders = new Set<string>();
     const treatStoriesAsFolders = this.shouldTreatStoriesAsFolders();
+    const excludedFolderRules = this.getEffectiveExcludedFolderRules();
 
     for (const relativePath of normalizedPaths) {
       if (isHiddenPath(relativePath)) {
@@ -1488,12 +1542,17 @@ class ScannerService {
         continue;
       }
 
+      const sourceFolderPath = getSourceFolderPathFromRelativePath(relativePath);
+      const exclusionTargetPath = sourceFolderPath ?? relativePath;
+      if (matchesExcludedFolder(exclusionTargetPath, excludedFolderRules)) {
+        continue;
+      }
+
       if (!treatStoriesAsFolders && findReservedStoriesOwnerPath(relativePath)) {
         fallbackReason = `${reason}:fallback`;
         break;
       }
 
-      const sourceFolderPath = getSourceFolderPathFromRelativePath(relativePath);
       if (!sourceFolderPath) {
         fallbackReason = `${reason}:fallback`;
         break;

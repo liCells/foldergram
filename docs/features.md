@@ -181,18 +181,18 @@ from reserved `stories/` folders.
 
 Settings is the operational control surface for the library.
 
-It exposes:
+Its left sidebar is split into:
 
-- admin-password controls
-- viewer password and public access controls
-- home and reels default feed-mode controls
-- stories-folders mode controls, migration notices, and a save-and-rescan flow
-- live scan status
-- storage and index status
-- last completed scan details
-- manual scan
-- thumbnail-only rebuild
-- library-index rebuild
+| Section | What it contains |
+| --- | --- |
+| `Scan & Library` | Live scan state, manual scan, thumbnail-only rebuild, and library-index rebuild actions. |
+| `General Settings` | Home and Reels default feed modes, stories-folders mode, excluded-folder rules, migration notices, and save-and-rescan prompts for those app-wide changes. |
+| `Security & Access` | Admin password, viewer password, public mode, sign-out, and related auth controls. |
+| `System Status` | Storage and index state plus last completed scan details. |
+
+In `General Settings`, env-backed excluded-folder rules are shown read-only and
+custom rules are saved at runtime. Changing stories mode or excluded folders
+still requires a follow-up scan from `Scan & Library`.
 
 ### Access protection
 

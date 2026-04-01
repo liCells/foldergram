@@ -3,6 +3,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 
 import {
+  EXCLUDED_FOLDERS_SETTING_KEY,
   HOME_FEED_DEFAULT_MODE_SETTING_KEY,
   LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY,
   LIBRARY_REBUILD_REQUIRED_SETTING_KEY,
@@ -14,6 +15,11 @@ import {
 import { appConfig } from '../config/env.js';
 import { appSettingsRepository, folderRepository, folderScanStateRepository, imageRepository, likeRepository, scanRunRepository } from '../db/repositories.js';
 import type { FeedImage, FolderRecord, FolderSummaryRecord, ImageDetail, MediaType, PlaybackStrategy, TrashImage } from '../types/models.js';
+import {
+  getEffectiveExcludedFolderRules,
+  parseExcludedFolderRulesFromSetting,
+  serializeExcludedFolderRulesForSetting
+} from '../utils/excluded-folder-rules.js';
 import { deserializeImageExifData } from '../utils/exif-utils.js';
 import { buildMonthDayKey, countFeedBursts, diversifyFeedCandidates, groupFeedBursts, listMonthDayKeysAroundDate } from '../utils/feed-utils.js';
 import { shouldPreferMomentRail, type FeedRailKind } from '../utils/feed-rail-utils.js';
@@ -123,6 +129,24 @@ function getDefaultReelsFeedMode(): ReelsFeedMode {
 
 function getTreatStoriesAsFolders(): boolean {
   return parseTreatStoriesAsFoldersSetting(appSettingsRepository.get(TREAT_STORIES_AS_FOLDERS_SETTING_KEY));
+}
+
+function getCustomExcludedFolders(): string[] {
+  return parseExcludedFolderRulesFromSetting(appSettingsRepository.get(EXCLUDED_FOLDERS_SETTING_KEY));
+}
+
+function getExcludedFolderSettings() {
+  const envExcludedFolders = [...appConfig.galleryExcludedFolders];
+  const customExcludedFolders = getCustomExcludedFolders();
+
+  return {
+    envExcludedFolders,
+    customExcludedFolders,
+    effectiveExcludedFolders: getEffectiveExcludedFolderRules({
+      envRules: envExcludedFolders,
+      customRules: customExcludedFolders
+    })
+  };
 }
 
 function getStoriesMigrationStatus() {
@@ -1322,6 +1346,7 @@ export const galleryService = {
     const defaultReelsFeedMode = getDefaultReelsFeedMode();
     const treatStoriesAsFolders = getTreatStoriesAsFolders();
     const storiesMigration = getStoriesMigrationStatus();
+    const excludedFolders = getExcludedFolderSettings();
 
     return {
       folders: storageState.libraryAvailable ? folderRepository.count() : 0,
@@ -1353,7 +1378,8 @@ export const galleryService = {
         defaultReelsFeedMode,
         treatStoriesAsFolders
       },
-      storiesMigration
+      storiesMigration,
+      excludedFolders
     };
   },
 
@@ -1379,6 +1405,21 @@ export const galleryService = {
 
     return {
       treatStoriesAsFolders
+    };
+  },
+
+  setExcludedFolders(rules: string[]) {
+    const serializedRules = serializeExcludedFolderRulesForSetting(rules);
+
+    if (serializedRules.length > 0) {
+      appSettingsRepository.set(EXCLUDED_FOLDERS_SETTING_KEY, serializedRules);
+    } else {
+      appSettingsRepository.remove(EXCLUDED_FOLDERS_SETTING_KEY);
+    }
+
+    return {
+      ...getExcludedFolderSettings(),
+      requiresScan: true
     };
   },
 

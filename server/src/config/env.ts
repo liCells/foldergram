@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
+import { parseExcludedFolderRulesFromEnv } from '../utils/excluded-folder-rules.js';
 import { getRelativePathWithinRoot, isSameOrWithinPath, normalizePath } from '../utils/path-utils.js';
 
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -26,6 +27,7 @@ const envSchema = z.object({
   SCAN_DERIVATIVE_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
   PUBLIC_DEMO_MODE: z.string().optional(),
   CSRF_TRUSTED_ORIGINS: z.string().optional(),
+  GALLERY_EXCLUDED_FOLDERS: z.string().optional(),
   IMAGE_DETAIL_SOURCE: z.enum(['preview', 'original']).default('preview'),
   DERIVATIVE_MODE: z.enum(['eager', 'lazy']).default('eager'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development')
@@ -97,6 +99,7 @@ const previewsDir = resolveConfiguredPath(parsed.PREVIEWS_DIR, path.join(dataRoo
 const logVerbose = parseBooleanFlag(parsed.LOG_VERBOSE);
 const publicDemoMode = parseBooleanFlag(parsed.PUBLIC_DEMO_MODE);
 const csrfTrustedOrigins = parseConfiguredOrigins(parsed.CSRF_TRUSTED_ORIGINS);
+const galleryExcludedFolders = parseExcludedFolderRulesFromEnv(parsed.GALLERY_EXCLUDED_FOLDERS);
 
 const derivativeDirectoriesOverlap =
   isSameOrWithinPath(thumbnailsDir, previewsDir) || isSameOrWithinPath(previewsDir, thumbnailsDir);
@@ -132,6 +135,7 @@ export const appConfig = {
   thumbnailsDir,
   previewsDir,
   managedGalleryRelativeIgnores,
+  galleryExcludedFolders,
   logVerbose,
   publicDemoMode,
   csrfTrustedOrigins,

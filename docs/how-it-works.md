@@ -20,6 +20,7 @@ Foldergram recursively walks `GALLERY_ROOT` and applies these rules:
 
 - Hidden paths are skipped.
 - Managed storage paths under the gallery root are skipped.
+- Folder exclusions from `GALLERY_EXCLUDED_FOLDERS` and saved `General Settings` rules are skipped.
 - Any non-hidden folder that directly contains supported media becomes an indexed album.
 - Files directly in `GALLERY_ROOT` are ignored.
 - Nested folders are treated separately from their parent folders.
@@ -41,6 +42,23 @@ The scan model is:
 This behavior is controlled by the Settings toggle `Treat stories folders as
 normal app folders`. When that legacy mode is enabled, `stories/` folders are
 discovered like ordinary app folders again.
+
+## Excluded folders
+
+Foldergram merges exclusion rules from:
+
+- `GALLERY_EXCLUDED_FOLDERS`
+- custom rules saved from `Settings -> General Settings`
+
+Rule semantics are intentionally simple:
+
+- values without a slash match folder names anywhere in the gallery tree
+- values with a slash match one exact relative path below `GALLERY_ROOT`
+
+Excluded folders are skipped during startup scans, rescans, and watcher-driven
+discovery work. Changing the saved runtime rules updates `app_settings`
+immediately, but a follow-up scan from `Settings -> Scan & Library` is still
+required so already-indexed matches can be soft-removed from the library.
 
 ## Storage layout
 

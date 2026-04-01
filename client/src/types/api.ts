@@ -15,6 +15,16 @@ export interface StoriesModeSetting {
   treatStoriesAsFolders: boolean;
 }
 
+export interface ExcludedFoldersSettings {
+  envExcludedFolders: string[];
+  customExcludedFolders: string[];
+  effectiveExcludedFolders: string[];
+}
+
+export interface UpdateExcludedFoldersSettingResult extends ExcludedFoldersSettings {
+  requiresScan: boolean;
+}
+
 export interface FeedItem {
   id: number;
   folderId: number;
@@ -255,6 +265,7 @@ export interface AppStats extends AppStatus {
   deletedImages: number;
   thumbnailCount: number;
   previewCount: number;
+  excludedFolders: ExcludedFoldersSettings;
   storage: AppStatus['storage'] & {
     usingInMemoryDatabase: boolean;
   };

@@ -99,6 +99,13 @@ The shipped Compose file includes `IMAGE_DETAIL_SOURCE: preview` and
 If you want lazy derivatives or original-backed image detail pages, edit those
 values in `docker-compose.yml` before starting the container.
 
+To skip specific source folders from the first scan in Docker, add
+`GALLERY_EXCLUDED_FOLDERS` under the Compose `environment:` block. For example:
+
+```yaml
+GALLERY_EXCLUDED_FOLDERS: "@eaDir,thumbnails,Archive/cache"
+```
+
 For an optional read-only public demo in Docker, add `PUBLIC_DEMO_MODE: "1"`
 under the Compose `environment:` block. If the browser-visible origin differs
 from the upstream Node host, also set `CSRF_TRUSTED_ORIGINS` to that public
@@ -108,6 +115,11 @@ If the app will be reachable from other devices on your network, enable the
 admin password from the Settings page after first startup. You can then keep
 the app admin-only, add a separate viewer password, or switch to public browse
 mode with admin unlock.
+
+The Settings sidebar separates app-wide preferences from maintenance actions:
+
+- `General Settings` contains stories mode, excluded folders, and Home/Reels defaults
+- `Scan & Library` contains manual scan plus rebuild actions
 
 ## If you already cloned this repository
 
@@ -167,7 +179,7 @@ The shipped `.env.example` keeps the development ports aligned like this:
 - `.webm`
 - `.mkv`
 
-## Default local paths
+## Default local paths and scan rules
 
 The shipped `.env.example` points at:
 
@@ -175,6 +187,7 @@ The shipped `.env.example` points at:
 | --- | --- |
 | `DATA_ROOT` | `./data` |
 | `GALLERY_ROOT` | `./data/gallery` |
+| `GALLERY_EXCLUDED_FOLDERS` | empty |
 | `DB_DIR` | `./data/db` |
 | `THUMBNAILS_DIR` | `./data/thumbnails` |
 | `PREVIEWS_DIR` | `./data/previews` |
@@ -182,6 +195,10 @@ The shipped `.env.example` points at:
 `DATA_ROOT` is the base path for this layout. If you change only `DATA_ROOT`,
 Foldergram will look for `gallery`, `db`, `thumbnails`, and `previews`
 under that directory unless you override those paths individually.
+
+`GALLERY_EXCLUDED_FOLDERS` accepts comma-separated folder rules. Names match
+any folder with that name anywhere in the gallery tree; values with a slash
+match one exact relative path below `GALLERY_ROOT`.
 
 Foldergram resolves relative paths from the repository root.
 
