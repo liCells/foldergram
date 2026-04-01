@@ -436,10 +436,33 @@
             >
               <span :class="[isCurrentCover ? 'i-fluent-folder-add-20-filled text-accent' : 'i-fluent-folder-add-20-regular', 'w-[1.5rem] h-[1.5rem]']" aria-hidden="true" />
             </button>
+            <!-- Download original -->
+            <a
+              class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-text transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
+              :href="downloadOriginalMediaUrl"
+              download
+              aria-label="Download original file"
+              title="Download original file"
+            >
+              <svg
+                class="w-[1.55rem] h-[1.55rem]"
+                viewBox="0 0 24 24"
+                role="presentation"
+              >
+                <path
+                  d="M12 4.75v9.5m0 0 3.5-3.5M12 14.25l-3.5-3.5M5.75 16.75v1.5A1.75 1.75 0 0 0 7.5 20h9a1.75 1.75 0 0 0 1.75-1.75v-1.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.4"
+                />
+              </svg>
+            </a>
             <!-- Open original -->
             <a
               class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-text transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
-              :href="image.originalUrl"
+              :href="originalMediaUrl"
               target="_blank"
               rel="noreferrer"
               aria-label="Open original file"
@@ -520,6 +543,7 @@
   import { useAuthStore } from "../stores/auth"
   import { useLikesStore } from "../stores/likes"
   import { useFoldersStore } from "../stores/folders"
+  import { getOriginalMediaDownloadUrl, getOriginalMediaUrl } from "../utils/original-media"
   import Avatar from "./Avatar.vue"
   import ResilientImage from "./ResilientImage.vue"
   import { formatMediaDuration, videoPreviewWouldDownscale } from "../utils/media"
@@ -558,6 +582,8 @@
 
   const WHEEL_NAVIGATION_THRESHOLD = 72
   const NAVIGATION_COOLDOWN_MS = 320
+  const originalMediaUrl = computed(() => (props.image ? getOriginalMediaUrl(props.image.id) : ""))
+  const downloadOriginalMediaUrl = computed(() => (props.image ? getOriginalMediaDownloadUrl(props.image.id) : ""))
   const MODAL_SIDEBAR_COLLAPSE_BREAKPOINT = 960
   const SHEET_SWIPE_MIN_DISTANCE = 56
   const SHEET_SWIPE_MAX_HORIZONTAL_DISTANCE = 96

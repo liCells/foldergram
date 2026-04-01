@@ -18,6 +18,23 @@ const paginationQuerySchema = z.object({
 const mediaTypeQuerySchema = z.object({
   mediaType: z.enum(['image', 'video']).optional()
 });
+const originalMediaQuerySchema = z.object({
+  download: z.preprocess((value) => {
+    if (value === undefined) {
+      return false;
+    }
+
+    if (value === true || value === 1 || value === '1' || value === 'true') {
+      return true;
+    }
+
+    if (value === false || value === 0 || value === '0' || value === 'false') {
+      return false;
+    }
+
+    return value;
+  }, z.boolean())
+});
 const deleteFolderQuerySchema = z.object({
   deleteSourceFolder: z.preprocess((value) => {
     if (value === undefined) {
@@ -575,14 +592,20 @@ router.delete('/images/:id', requireCapability('canDeleteMedia', 'Admin access i
 
 router.get('/originals/:id', (request, response) => {
   const params = imageIdSchema.parse(request.params);
-  const originalPath = galleryService.getOriginalImagePath(params.id);
+  const query = originalMediaQuerySchema.parse(request.query);
+  const originalMedia = galleryService.getOriginalMediaFile(params.id);
 
-  if (!originalPath) {
+  if (!originalMedia) {
     response.status(404).json({ message: 'Original media not found' });
     return;
   }
 
-  response.sendFile(originalPath);
+  if (query.download) {
+    response.download(originalMedia.path, originalMedia.filename);
+    return;
+  }
+
+  response.sendFile(originalMedia.path);
 });
 
 const adminMutationRateLimiter = createRateLimiter({

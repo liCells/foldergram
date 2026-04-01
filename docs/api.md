@@ -420,11 +420,19 @@ Errors:
 
 Serves the original file from disk by image ID only.
 
+Query parameters:
+
+| Param | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `download` | `1` | unset | When set to `1`, the server responds with an attachment using the indexed original filename. |
+
 Rules:
 
 - the indexed path must still exist
 - the resolved path must stay within `GALLERY_ROOT`
 - deleted posts do not resolve
+- without `download=1`, the route streams the original inline/open behavior
+- with `download=1`, the route serves the same file as a download attachment
 
 Errors:
 

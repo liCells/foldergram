@@ -104,6 +104,45 @@ describe('StoriesModal', () => {
     expect(wrapper.find('img[data-test="resilient-image"]').exists()).toBe(false);
   });
 
+  it('renders a download-original control and updates it when the active capsule changes', async () => {
+    const firstItem = createVideoItem(451);
+    const secondItem = createVideoItem(452);
+    const firstCapsule = createCapsule('capsule-download-one', 'Download One', firstItem);
+    const secondCapsule = createCapsule('capsule-download-two', 'Download Two', secondItem);
+    const store = createStore([firstCapsule, secondCapsule], {
+      [firstCapsule.id]: [firstItem],
+      [secondCapsule.id]: [secondItem]
+    });
+
+    const wrapper = mount(StoriesModal, {
+      props: {
+        items: [firstCapsule, secondCapsule],
+        initialId: firstCapsule.id,
+        railSingularLabel: 'Story',
+        store
+      },
+      global: {
+        stubs: {
+          Avatar: {
+            template: '<div data-test="avatar" />'
+          },
+          ResilientImage: {
+            template: '<img data-test="resilient-image" />'
+          }
+        }
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get('a[aria-label="Download original file"]').attributes('href')).toBe('/api/originals/451?download=1');
+
+    await wrapper.get('.story-stage__pager--right').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('a[aria-label="Download original file"]').attributes('href')).toBe('/api/originals/452?download=1');
+  });
+
   it('keeps the next arrow enabled on the last item when another capsule exists and advances into it', async () => {
     const firstItem = createVideoItem(501);
     const secondItem = createVideoItem(502);

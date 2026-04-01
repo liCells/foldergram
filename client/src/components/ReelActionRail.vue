@@ -36,6 +36,16 @@
       </div>
     </div>
 
+    <a
+      class="reel-action-rail__button"
+      :href="downloadOriginalMediaUrl"
+      download
+      aria-label="Download original file"
+      title="Download original file"
+    >
+      <span class="reel-action-rail__icon i-fluent-arrow-download-20-regular" aria-hidden="true" />
+    </a>
+
     <RouterLink
       class="reel-action-rail__button"
       :to="{ name: 'folder', params: { slug: item.folderSlug } }"
@@ -53,6 +63,7 @@ import { RouterLink } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useLikesStore } from '../stores/likes';
 import type { FeedItem } from '../types/api';
+import { getOriginalMediaDownloadUrl } from '../utils/original-media';
 
 const props = defineProps<{
   item: FeedItem;
@@ -66,6 +77,7 @@ defineEmits<{
 const authStore = useAuthStore();
 const likesStore = useLikesStore();
 const isLiked = computed(() => likesStore.isLiked(props.item.id));
+const downloadOriginalMediaUrl = computed(() => getOriginalMediaDownloadUrl(props.item.id));
 
 async function handleLike() {
   if (!authStore.canUseSavedItems) {

@@ -106,6 +106,7 @@ import type { MediaPlayerElement } from 'vidstack/elements';
 
 import { useAppStore } from '../stores/app';
 import type { FeedItem, FolderSummary } from '../types/api';
+import { getOriginalMediaUrl } from '../utils/original-media';
 import Avatar from './Avatar.vue';
 
 const props = defineProps<{
@@ -119,7 +120,7 @@ const playerElement = ref<MediaPlayerElement | null>(null);
 const isPaused = ref(false);
 const isUsingOriginalFallback = ref(false);
 const playerLoadMode = computed(() => (props.active ? 'eager' : 'visible'));
-const currentVideoSrc = computed(() => (isUsingOriginalFallback.value ? `/api/originals/${props.item.id}` : props.item.previewUrl));
+const currentVideoSrc = computed(() => (isUsingOriginalFallback.value ? getOriginalMediaUrl(props.item.id) : props.item.previewUrl));
 const videoSource = computed<PlayerSrc>(() => ({
   src: currentVideoSrc.value,
   type: 'video/mp4'

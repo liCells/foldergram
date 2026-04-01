@@ -87,4 +87,34 @@ describe('ReelActionRail', () => {
     expect(wrapper.get('[data-test="parent-count"]').text()).toBe('0');
     expect(likesStore.isLiked(item.id)).toBe(true);
   });
+
+  it('renders the download control between the info toggle and folder link', () => {
+    const item = createFeedItem(22);
+
+    const wrapper = mount(ReelActionRail, {
+      props: {
+        item
+      },
+      global: {
+        stubs: {
+          RouterLink: {
+            props: ['to'],
+            template: '<a data-test="folder-link"><slot /></a>'
+          }
+        }
+      }
+    });
+
+    const controls = wrapper.findAll('.reel-action-rail > *');
+
+    expect(controls).toHaveLength(4);
+    expect(controls[1]?.find('button[aria-label="Show reel details"]').exists()).toBe(true);
+
+    const downloadLink = controls[2];
+
+    expect(downloadLink?.attributes('aria-label')).toBe('Download original file');
+    expect(downloadLink?.attributes('href')).toBe('/api/originals/22?download=1');
+    expect(downloadLink?.attributes('title')).toBe('Download original file');
+    expect(controls[3]?.attributes('data-test')).toBe('folder-link');
+  });
 });

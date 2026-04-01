@@ -28,7 +28,7 @@
 
 Foldergram is a self-hosted web application that turns your local folders into a beautiful, instagram-style feed and profile. It turns your local folder to app folders (profiles), and serves a lightning-fast Progressive Web App (PWA).
 
-Foldergram indexes supported media from a configured `GALLERY_ROOT`, stores metadata in SQLite, generates thumbnails and previews, and serves a fast feed-style web app for local browsing. Derivatives can be generated during scans or lazily on first request, and image detail pages can be configured to use generated previews or originals. The current app includes Home, Reels, Explore, Library, Likes, Moments or Highlights, App Folder pages, post detail views, delete actions, scan controls, and rebuild tools.
+Foldergram indexes supported media from a configured `GALLERY_ROOT`, stores metadata in SQLite, generates thumbnails and previews, and serves a fast feed-style web app for local browsing. Derivatives can be generated during scans or lazily on first request, and image detail pages can be configured to use generated previews or originals. The current app includes Home, Reels, Explore, Library, Likes, Moments or Highlights, App Folder pages, post detail views, original-media download controls, delete actions, scan controls, and rebuild tools.
 
 ## Features
 
@@ -40,6 +40,7 @@ Foldergram indexes supported media from a configured `GALLERY_ROOT`, stores meta
 - App Folder pages with a posts grid and a folder-specific `Reels` tab when videos exist.
 - Shared likes in SQLite for signed-in admin/viewer sessions, plus browser-local favorites in public mode.
 - Image and video support with configurable eager or lazy derivative generation for fast browsing.
+- Original-media download controls on home feed cards, post detail, and stories, alongside open-original actions.
 - Optional role-based local access with admin, viewer, and public browse modes.
 - Settings actions for Home/Reels default modes, manual scan, thumbnail rebuild, and library-index rebuild.
 - A web app manifest plus production service worker registration.

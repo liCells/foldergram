@@ -225,6 +225,29 @@ describe('PostViewer', () => {
     expect(setFolderCoverSpy).toHaveBeenCalledWith('animal-planet', 21);
   });
 
+  it('renders a download-original control beside the open-original action', () => {
+    const wrapper = mount(PostViewer, {
+      props: {
+        image: createImageDetail(18, {
+          previousImageId: null,
+          nextImageId: null
+        }),
+        isModal: true
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    const downloadLink = wrapper.get('a[aria-label="Download original file"]');
+    const originalLink = wrapper.get('a[aria-label="Open original file"]');
+
+    expect(downloadLink.attributes('href')).toBe('/api/originals/18?download=1');
+    expect(downloadLink.attributes('title')).toBe('Download original file');
+    expect(originalLink.attributes('href')).toBe('/api/originals/18');
+    expect(originalLink.attributes('title')).toBe('Open original file');
+  });
+
   it('toggles video playback from stage clicks and shows the paused indicator', async () => {
     const wrapper = mount(PostViewer, {
       props: {

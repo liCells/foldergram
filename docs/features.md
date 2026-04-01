@@ -17,6 +17,7 @@ It includes:
 - a top Moments or Highlights section
 - feed-card avatar rings that can open an App Folder's avatar story in place when that folder has stories
 - an active home-feed video player that promotes one visible video card at a time and gives that card play, mute, and fullscreen controls
+- feed-card actions for downloading the original media file and opening the original in a new tab
 - a startup scan state when the first index is still being built
 - a rebuild notice when the configured gallery root changed
 - desktop recommendations for folders based on recency, likes, and recent navigation
@@ -116,6 +117,7 @@ In the default reserved-stories mode:
 - the folder header avatar opens the avatar story when one exists
 - Home feed cards can open the same avatar story from the folder avatar ring
 - the shared stories modal is used for both the home-feed entry point and the folder-page entry points
+- the shared stories modal header includes original-media download plus playback controls for the active story item
 
 If the reserved root has no direct media but highlight capsules do exist,
 Foldergram can synthesize the avatar story from recent highlight media so the
@@ -141,6 +143,7 @@ The detail view includes:
 - folder link and breadcrumb context
 - size, dimensions, MIME type, and duration metadata
 - like toggle
+- original-media download control
 - original-file link
 - an admin-only "Set as Cover" action to customize the folder avatar, which highlights dynamically if the image is already the cover
 - delete action with confirmation for admin sessions only

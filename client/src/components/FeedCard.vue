@@ -238,25 +238,46 @@
             <span class="i-fluent-folder-16-regular w-[1.30rem] h-[1.30rem]" aria-hidden="true" />
           </RouterLink>
         </div>
-        <a
-          class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer color-inherit transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
-          :href="originalMediaUrl"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Open original file"
-          title="Open original file"
-        >
-          <svg class="w-[1.45rem] h-[1.45rem]" viewBox="0 0 24 24" role="presentation">
-            <path
-              d="M14 5h5v5m0-5-7.5 7.5M10 7H7.5A2.5 2.5 0 0 0 5 9.5v7A2.5 2.5 0 0 0 7.5 19h7a2.5 2.5 0 0 0 2.5-2.5V14"
-              fill="none"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.8"
-            />
-          </svg>
-        </a>
+        <div class="flex items-center gap-[0.65rem]">
+          <a
+            v-if="isHomeContext"
+            class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer color-inherit transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
+            :href="downloadOriginalMediaUrl"
+            download
+            aria-label="Download original file"
+            title="Download original file"
+          >
+            <svg class="w-[1.45rem] h-[1.45rem]" viewBox="0 0 24 24" role="presentation">
+              <path
+                d="M12 4.75v9.5m0 0 3.5-3.5M12 14.25l-3.5-3.5M5.75 16.75v1.5A1.75 1.75 0 0 0 7.5 20h9a1.75 1.75 0 0 0 1.75-1.75v-1.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+              />
+            </svg>
+          </a>
+          <a
+            class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer color-inherit transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
+            :href="originalMediaUrl"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open original file"
+            title="Open original file"
+          >
+            <svg class="w-[1.45rem] h-[1.45rem]" viewBox="0 0 24 24" role="presentation">
+              <path
+                d="M14 5h5v5m0-5-7.5 7.5M10 7H7.5A2.5 2.5 0 0 0 5 9.5v7A2.5 2.5 0 0 0 7.5 19h7a2.5 2.5 0 0 0 2.5-2.5V14"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+              />
+            </svg>
+          </a>
+        </div>
       </div>
 
       <p class="m-0 text-[0.88rem]">
@@ -382,6 +403,7 @@ import { useMomentsStore } from '../stores/moments';
 import type { FeedItem } from '../types/api';
 import { formatMediaDuration } from '../utils/media';
 import { resolveFeedAspectRatio } from '../utils/media-layout';
+import { getOriginalMediaDownloadUrl, getOriginalMediaUrl } from '../utils/original-media';
 import Avatar from './Avatar.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ResilientImage from './ResilientImage.vue';
@@ -469,7 +491,8 @@ const formattedDuration = computed(() => formatMediaDuration(props.item.duration
 const mediaAspectRatio = computed(() => resolveFeedAspectRatio(props.item.width, props.item.height));
 const homeVideoAspectRatio = computed(() => loadedHomeVideoAspectRatio.value ?? mediaAspectRatio.value);
 const homeImageSrc = computed(() => (props.item.isAnimated ? props.item.previewUrl : props.item.thumbnailUrl));
-const originalMediaUrl = computed(() => `/api/originals/${props.item.id}`);
+const originalMediaUrl = computed(() => getOriginalMediaUrl(props.item.id));
+const downloadOriginalMediaUrl = computed(() => getOriginalMediaDownloadUrl(props.item.id));
 const homeVideoSource = computed<PlayerSrc>(() => ({
   src: props.item.previewUrl,
   type: 'video/mp4'
@@ -791,7 +814,7 @@ function bindHomePlayerEventListeners(player: MediaPlayerElement | null) {
 
 function openOriginal() {
   menuOpen.value = false;
-  window.open(`/api/originals/${props.item.id}`, '_blank', 'noopener,noreferrer');
+  window.open(getOriginalMediaUrl(props.item.id), '_blank', 'noopener,noreferrer');
 }
 
 function handleDelete() {

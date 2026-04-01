@@ -274,6 +274,11 @@ describe('FeedCard', () => {
     expect(postRouteLink?.attributes('data-to')).toContain('"id":"807"');
     expect(wrapper.get('a[aria-label="Open folder"]').attributes('title')).toBe('Open folder');
 
+    const downloadLink = wrapper.get('a[aria-label="Download original file"]');
+
+    expect(downloadLink.attributes('href')).toBe('/api/originals/807?download=1');
+    expect(downloadLink.attributes('title')).toBe('Download original file');
+
     const originalLink = wrapper.get('a[aria-label="Open original file"]');
 
     expect(originalLink.attributes('href')).toBe('/api/originals/807');

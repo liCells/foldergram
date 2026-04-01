@@ -166,6 +166,27 @@ function buildPreviewUrl(
   return toPublicMediaUrl('/previews', image.previewUrl, version);
 }
 
+function resolveOriginalMediaFile(id: number): { path: string; filename: string } | null {
+  if (!storageService.getState().libraryAvailable) {
+    return null;
+  }
+
+  const detail = imageRepository.getById(id);
+  if (!detail || detail.is_deleted || detail.is_trashed) {
+    return null;
+  }
+
+  const resolvedPath = resolveWithinRoot(appConfig.galleryRoot, detail.absolute_path);
+  if (!resolvedPath || !fs.existsSync(resolvedPath)) {
+    return null;
+  }
+
+  return {
+    path: resolvedPath,
+    filename: detail.filename
+  };
+}
+
 function resolveWithinRoot(rootPath: string, targetPath: string): string | null {
   const resolved = path.resolve(targetPath);
   const relative = path.relative(path.resolve(rootPath), resolved);
@@ -1361,22 +1382,12 @@ export const galleryService = {
     };
   },
 
+  getOriginalMediaFile(id: number): { path: string; filename: string } | null {
+    return resolveOriginalMediaFile(id);
+  },
+
   getOriginalImagePath(id: number): string | null {
-    if (!storageService.getState().libraryAvailable) {
-      return null;
-    }
-
-    const detail = imageRepository.getById(id);
-    if (!detail || detail.is_deleted || detail.is_trashed) {
-      return null;
-    }
-
-    const resolved = resolveWithinRoot(appConfig.galleryRoot, detail.absolute_path);
-    if (!resolved || !fs.existsSync(resolved)) {
-      return null;
-    }
-
-    return resolved;
+    return resolveOriginalMediaFile(id)?.path ?? null;
   },
 
   async deleteImage(id: number) {

@@ -101,6 +101,26 @@
             </div>
 
             <div class="story-stage__controls">
+              <a
+                v-if="downloadOriginalMediaUrl"
+                class="story-stage__control-button"
+                :href="downloadOriginalMediaUrl"
+                download
+                aria-label="Download original file"
+                title="Download original file"
+                data-swipe-ignore="true"
+              >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" role="presentation">
+                  <path
+                    d="M12 4.75v9.5m0 0 3.5-3.5M12 14.25l-3.5-3.5M5.75 16.75v1.5A1.75 1.75 0 0 0 7.5 20h9a1.75 1.75 0 0 0 1.75-1.75v-1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.8"
+                  />
+                </svg>
+              </a>
               <button
                 class="story-stage__control-button"
                 type="button"
@@ -236,6 +256,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useHorizontalSwipe } from '../composables/useHorizontalSwipe';
 import type { FeedItem, RailCapsule, RailViewerStoreContract } from '../types/api';
 import { useAppStore } from '../stores/app';
+import { getOriginalMediaDownloadUrl } from '../utils/original-media';
 import Avatar from './Avatar.vue';
 import ResilientImage from './ResilientImage.vue';
 
@@ -280,6 +301,9 @@ const activeImages = computed(() =>
   props.store.currentCapsule?.id === activeCapsuleId.value ? props.store.currentImages : []
 );
 const displayImage = computed<FeedItem | null>(() => activeImages.value[activeImageIndex.value] ?? activeCapsule.value?.coverImage ?? null);
+const downloadOriginalMediaUrl = computed(() =>
+  displayImage.value ? getOriginalMediaDownloadUrl(displayImage.value.id) : null
+);
 const totalImageCount = computed(() => Math.max(activeCapsule.value?.imageCount ?? activeImages.value.length, 1));
 const previousCapsule = computed(() => {
   const index = activeCapsuleIndex.value;
