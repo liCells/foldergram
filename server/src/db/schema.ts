@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS images (
   file_size INTEGER NOT NULL,
   width INTEGER NOT NULL,
   height INTEGER NOT NULL,
+  display_orientation INTEGER NULL,
   media_type TEXT NOT NULL DEFAULT 'image',
   mime_type TEXT NOT NULL,
   duration_ms REAL NULL,

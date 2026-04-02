@@ -49,6 +49,7 @@ export interface ImageRecord {
   file_size: number;
   width: number;
   height: number;
+  display_orientation: number | null;
   media_type: MediaType;
   mime_type: string;
   duration_ms: number | null;

@@ -71,6 +71,10 @@ class DatabaseManager {
       this.database.exec('ALTER TABLE images ADD COLUMN duration_ms REAL NULL');
     }
 
+    if (this.tableExists('images') && !this.tableHasColumn('images', 'display_orientation')) {
+      this.database.exec('ALTER TABLE images ADD COLUMN display_orientation INTEGER NULL');
+    }
+
     if (this.tableExists('images') && !this.tableHasColumn('images', 'is_animated')) {
       this.database.exec('ALTER TABLE images ADD COLUMN is_animated INTEGER NULL');
     }

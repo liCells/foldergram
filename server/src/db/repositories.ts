@@ -214,6 +214,7 @@ export interface UpsertImageInput {
   fileSize: number;
   width: number;
   height: number;
+  displayOrientation?: number | null;
   mediaType: MediaType;
   mimeType: string;
   durationMs: number | null;
@@ -239,6 +240,7 @@ export interface RefreshIndexedImageInput {
   fileSize: number;
   width: number;
   height: number;
+  displayOrientation?: number | null;
   mediaType: MediaType;
   mimeType: string;
   durationMs: number | null;
@@ -540,11 +542,11 @@ export const imageRepository = {
     database.prepare(
       `
       INSERT INTO images (
-        folder_id, filename, extension, relative_path, absolute_path, file_size, width, height,
+        folder_id, filename, extension, relative_path, absolute_path, file_size, width, height, display_orientation,
         media_type, mime_type, duration_ms, is_animated, checksum_or_fingerprint, mtime_ms, first_seen_at, sort_timestamp, taken_at, taken_at_source, exif_json,
         thumbnail_path, preview_path, playback_strategy, is_deleted, is_trashed, trashed_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NULL, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NULL, ?)
       ON CONFLICT(relative_path) DO UPDATE SET
         folder_id = excluded.folder_id,
         filename = excluded.filename,
@@ -553,6 +555,7 @@ export const imageRepository = {
         file_size = excluded.file_size,
         width = excluded.width,
         height = excluded.height,
+        display_orientation = excluded.display_orientation,
         media_type = excluded.media_type,
         mime_type = excluded.mime_type,
         duration_ms = excluded.duration_ms,
@@ -577,6 +580,7 @@ export const imageRepository = {
       input.fileSize,
       input.width,
       input.height,
+      input.displayOrientation ?? null,
       input.mediaType,
       input.mimeType,
       input.durationMs,
@@ -609,6 +613,7 @@ export const imageRepository = {
         file_size = ?,
         width = ?,
         height = ?,
+        display_orientation = ?,
         media_type = ?,
         mime_type = ?,
         duration_ms = ?,
@@ -633,6 +638,7 @@ export const imageRepository = {
       input.fileSize,
       input.width,
       input.height,
+      input.displayOrientation ?? null,
       input.mediaType,
       input.mimeType,
       input.durationMs,

@@ -1821,6 +1821,7 @@ class ScannerService {
     const previewRelativePath = getPreviewRelativePath(file.relativePath, mediaType);
     const needsTakenAtBackfill = existing?.taken_at === null || existing?.taken_at_source === null;
     const needsMediaBackfill = existing?.media_type !== mediaType || (mediaType === 'video' && existing?.duration_ms === null);
+    const needsOrientationBackfill = mediaType === 'image' && existing?.display_orientation === null;
     const needsPlaybackStrategyBackfill = mediaType === 'video' && existing?.playback_strategy === null;
     const needsAnimatedBackfill = mediaType === 'image' && existing?.is_animated === null;
     const needsExifBackfill = mediaType === 'image' && existing?.exif_json === null;
@@ -1837,11 +1838,12 @@ class ScannerService {
       let metadataDurationMs = existing.duration_ms;
       let metadataWidth = existing.width;
       let metadataHeight = existing.height;
+      let metadataDisplayOrientation = existing.display_orientation;
       let metadataPlaybackStrategy = existing.playback_strategy ?? 'preview';
       let metadataIsAnimated = existing.is_animated === 1;
       let metadataExifJson = existing.exif_json;
 
-      if (needsTakenAtBackfill || needsMediaBackfill || needsPlaybackStrategyBackfill || needsAnimatedBackfill || needsExifBackfill) {
+      if (needsTakenAtBackfill || needsMediaBackfill || needsOrientationBackfill || needsPlaybackStrategyBackfill || needsAnimatedBackfill || needsExifBackfill) {
         const metadata = await readMediaMetadata(file.absolutePath, mediaType, {
           fileSize: file.stats.size
         });
@@ -1849,6 +1851,7 @@ class ScannerService {
         metadataDurationMs = metadata.durationMs;
         metadataWidth = metadata.width;
         metadataHeight = metadata.height;
+        metadataDisplayOrientation = mediaType === 'image' ? (metadata.displayOrientation ?? 1) : null;
         metadataPlaybackStrategy = metadata.playbackStrategy;
         metadataIsAnimated = metadata.isAnimated;
         metadataExifJson = mediaType === 'image'
@@ -1858,7 +1861,7 @@ class ScannerService {
           : null;
       }
 
-      if (refreshedIndexedRow || needsTakenAtBackfill || needsMediaBackfill || needsPlaybackStrategyBackfill || needsAnimatedBackfill || needsExifBackfill) {
+      if (refreshedIndexedRow || needsTakenAtBackfill || needsMediaBackfill || needsOrientationBackfill || needsPlaybackStrategyBackfill || needsAnimatedBackfill || needsExifBackfill) {
         const resolvedTakenAt = resolveTakenAt({
           exifTakenAt: metadataTakenAt,
           existingTakenAt: existing.taken_at,
@@ -1880,6 +1883,7 @@ class ScannerService {
           fileSize: file.stats.size,
           width: metadataWidth,
           height: metadataHeight,
+          displayOrientation: metadataDisplayOrientation,
           mediaType,
           mimeType: getMimeTypeFromExtension(extension),
           durationMs: metadataDurationMs,
@@ -1946,6 +1950,7 @@ class ScannerService {
       fileSize: file.stats.size,
       width: metadata.width,
       height: metadata.height,
+      displayOrientation: mediaType === 'image' ? (metadata.displayOrientation ?? 1) : null,
       mediaType,
       mimeType: getMimeTypeFromExtension(extension),
       durationMs: metadata.durationMs,

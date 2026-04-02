@@ -54,6 +54,7 @@ interface FfprobePayload {
 export interface MediaMetadata {
   width: number;
   height: number;
+  displayOrientation?: number | null;
   takenAt: number | null;
   exif?: ImageExifData | null;
   durationMs: number | null;
@@ -151,15 +152,46 @@ function resolveVideoDisplayDimensions(videoStream: FfprobeStream | undefined): 
   };
 }
 
+function normalizeImageOrientation(orientation: number | null | undefined): number | null {
+  if (typeof orientation !== 'number' || !Number.isInteger(orientation) || orientation < 1 || orientation > 8) {
+    return null;
+  }
+
+  return orientation;
+}
+
+function resolveImageDisplayDimensions(
+  metadata: sharp.Metadata,
+  displayOrientation: number
+): Pick<MediaMetadata, 'width' | 'height'> {
+  const width = metadata.width ?? THUMBNAIL_SIZE;
+  const height = metadata.height ?? THUMBNAIL_SIZE;
+
+  if (displayOrientation >= 5) {
+    return {
+      width: height,
+      height: width
+    };
+  }
+
+  return {
+    width,
+    height
+  };
+}
+
 async function readImageMetadata(sourcePath: string): Promise<MediaMetadata> {
   const [metadata, imageExif] = await Promise.all([
     sharp(sourcePath, { animated: false }).metadata(),
     extractImageExif(sourcePath)
   ]);
+  const displayOrientation = normalizeImageOrientation(metadata.orientation) ?? 1;
+  const displayDimensions = resolveImageDisplayDimensions(metadata, displayOrientation);
 
   return {
-    width: metadata.width ?? THUMBNAIL_SIZE,
-    height: metadata.height ?? THUMBNAIL_SIZE,
+    width: displayDimensions.width,
+    height: displayDimensions.height,
+    displayOrientation,
     takenAt: imageExif.takenAt,
     exif: imageExif.exif,
     durationMs: null,
