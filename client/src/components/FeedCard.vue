@@ -87,6 +87,10 @@
         :retry-while="appStore.isScanning"
         class="h-full w-full object-cover"
       />
+      <!-- Instagram-style double-tap heart burst, centered inside card -->
+      <div ref="heartBurstEl" class="feed-card__heart-burst" aria-hidden="true">
+        <span class="i-fluent-heart-20-filled feed-card__heart-burst-icon" />
+      </div>
     </div>
 
     <div
@@ -455,6 +459,7 @@ const loadedHomeVideoAspectRatio = ref<string | null>(null);
 const isHomeVideoPaused = ref(false);
 const isHomeVideoFullscreen = ref(false);
 const lastHomeImageTapAt = ref(0);
+const heartBurstEl = ref<HTMLElement | null>(null);
 
 let homeImageTapResetTimer: ReturnType<typeof setTimeout> | null = null;
 let homeVideoObserver: IntersectionObserver | null = null;
@@ -540,6 +545,16 @@ async function likeFromMedia() {
   await likesStore.toggleLike(props.item);
 }
 
+function triggerHeartBurst() {
+  const el = heartBurstEl.value;
+  if (!el) return;
+
+  // Restart animation cleanly
+  el.classList.remove('feed-card__heart-burst--active');
+  void el.offsetWidth; // force reflow
+  el.classList.add('feed-card__heart-burst--active');
+}
+
 function handleImageNavigation(event: MouseEvent, navigate: () => void) {
   if (!isPrimaryPlainClick(event)) {
     return;
@@ -563,6 +578,7 @@ function handleHomeImageClick(event: MouseEvent) {
   if (lastHomeImageTapAt.value > 0 && now - lastHomeImageTapAt.value <= HOME_IMAGE_DOUBLE_TAP_WINDOW_MS) {
     lastHomeImageTapAt.value = 0;
     clearHomeImageTapResetTimer();
+    triggerHeartBurst();
     void likeFromMedia();
     return;
   }
@@ -942,3 +958,52 @@ onBeforeUnmount(() => {
   });
 });
 </script>
+
+<style scoped>
+/* ── Double-tap heart burst ─────────────────────────────────────────── */
+.feed-card__heart-burst {
+  /* Always centered in the image card */
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 6.5rem;
+  height: 6.5rem;
+  opacity: 0;
+  color: #e5484d;
+  pointer-events: none;
+  transform: scale(0);
+  filter:
+    drop-shadow(0 0 12px rgba(229, 72, 77, 0.65))
+    drop-shadow(0 3px 8px rgba(0, 0, 0, 0.28));
+  z-index: 10;
+}
+
+.feed-card__heart-burst-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.feed-card__heart-burst--active {
+  animation: feed-heart-burst 1.1s ease-out forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes feed-heart-burst {
+  /* Phase 1 — spring pop-in */
+  0%   { opacity: 0;   transform: translateY(0) scale(0) rotate(0deg); }
+  16%  { opacity: 1;   transform: translateY(0) scale(1.4) rotate(0deg); }
+  26%  { opacity: 1;   transform: translateY(0) scale(0.88) rotate(0deg); }
+  36%  { opacity: 1;   transform: translateY(0) scale(1.1) rotate(0deg); }
+  46%  { opacity: 1;   transform: translateY(0) scale(1) rotate(0deg); }
+
+  /* Phase 2 — tilt left while beginning to rise */
+  58%  { opacity: 1;   transform: translateY(-60%) scale(1) rotate(-18deg); }
+
+  /* Phase 3 — straighten and continue rising */
+  70%  { opacity: 1;   transform: translateY(-150%) scale(0.95) rotate(0deg); }
+
+  /* Phase 4 — rocket upward and fade, clipped by overflow:hidden */
+  100% { opacity: 0;   transform: translateY(-350%) scale(0.82) rotate(0deg); }
+}
+</style>
