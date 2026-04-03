@@ -37,11 +37,14 @@ export interface FolderSummaryRecord extends FolderRecord {
   video_count: number;
   latest_image_mtime_ms: number | null;
   has_avatar_story?: number | null;
+  summary_avatar_image_id?: number | null;
+  summary_avatar_thumbnail_path?: string | null;
 }
 
 export interface ImageRecord {
   id: number;
   folder_id: number;
+  asset_key: string | null;
   filename: string;
   extension: string;
   relative_path: string;
@@ -65,6 +68,7 @@ export interface ImageRecord {
   preview_path: string;
   playback_strategy: PlaybackStrategy | null;
   is_deleted: number;
+  deleted_at: string | null;
   is_trashed: number;
   trashed_at: string | null;
   created_at: string;

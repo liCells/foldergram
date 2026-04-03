@@ -222,6 +222,15 @@ function resolveWithinRoot(rootPath: string, targetPath: string): string | null 
   return resolved;
 }
 
+function resolveStoredPathWithinRoot(rootPath: string, relativePath: string, label: string): string | null {
+  const resolvedPath = resolveWithinRoot(rootPath, path.join(rootPath, relativePath));
+  if (!resolvedPath && relativePath) {
+    throw new Error(`Stored ${label} path is outside the configured root`);
+  }
+
+  return resolvedPath;
+}
+
 async function removeFileIfPresent(targetPath: string | null): Promise<void> {
   if (!targetPath) {
     return;
@@ -234,6 +243,32 @@ async function removeFileIfPresent(targetPath: string | null): Promise<void> {
     if (fileError.code !== 'ENOENT') {
       throw error;
     }
+  }
+}
+
+async function removeFileAndPruneAncestors(rootPath: string, targetPath: string | null): Promise<void> {
+  if (!targetPath) {
+    return;
+  }
+
+  await removeFileIfPresent(targetPath);
+
+  let currentDirectory = path.dirname(targetPath);
+  const resolvedRoot = path.resolve(rootPath);
+
+  while (currentDirectory.startsWith(resolvedRoot) && currentDirectory !== resolvedRoot) {
+    try {
+      await fsPromises.rmdir(currentDirectory);
+    } catch (error) {
+      const directoryError = error as NodeJS.ErrnoException;
+      if (directoryError.code === 'ENOENT' || directoryError.code === 'ENOTEMPTY' || directoryError.code === 'EEXIST') {
+        return;
+      }
+
+      throw error;
+    }
+
+    currentDirectory = path.dirname(currentDirectory);
   }
 }
 
@@ -351,6 +386,28 @@ function mapTrashImage(image: IndexedTrashImage, derivativeVersion = getDerivati
 
 function buildFolderSummary(folder: FolderSummaryRecord) {
   const derivativeVersion = getDerivativeAssetVersion();
+  const hasPreloadedAvatarSummary =
+    Object.hasOwn(folder, 'summary_avatar_image_id') || Object.hasOwn(folder, 'summary_avatar_thumbnail_path');
+
+  if (hasPreloadedAvatarSummary) {
+    return {
+      id: folder.id,
+      slug: folder.slug,
+      name: folder.name,
+      description: folder.description,
+      folderPath: folder.folder_path,
+      breadcrumb: getPathBreadcrumb(folder.folder_path),
+      imageCount: folder.image_count,
+      videoCount: folder.video_count,
+      latestImageMtimeMs: folder.latest_image_mtime_ms,
+      hasAvatarStory: Boolean(folder.has_avatar_story),
+      avatarImageId: folder.summary_avatar_image_id ?? null,
+      avatarUrl: folder.summary_avatar_thumbnail_path
+        ? toPublicMediaUrl('/thumbnails', folder.summary_avatar_thumbnail_path, derivativeVersion)
+        : null
+    };
+  }
+
   const preferredAvatarImageId = folder.avatar_image_id ?? imageRepository.getLatestFolderImageId(folder.id);
   let avatar = preferredAvatarImageId ? imageRepository.getImageDetail(preferredAvatarImageId, undefined, true) : undefined;
 
@@ -1298,9 +1355,7 @@ export const galleryService = {
   },
 
   getStatus() {
-    const lastCompletedScan = scanRunRepository.latestCompleted() ?? null;
     const storageState = storageService.getState();
-    const scanProgress = scannerService.getProgress();
     const rebuildRequired = appSettingsRepository.get(LIBRARY_REBUILD_REQUIRED_SETTING_KEY) === '1';
     const defaultHomeFeedMode = getDefaultHomeFeedMode();
     const defaultReelsFeedMode = getDefaultReelsFeedMode();
@@ -1311,11 +1366,7 @@ export const galleryService = {
       folders: storageState.libraryAvailable ? folderRepository.count() : 0,
       indexedImages: storageState.libraryAvailable ? imageRepository.countFeed() : 0,
       indexedVideos: storageState.libraryAvailable ? imageRepository.countByMediaType('video') : 0,
-      scan: {
-        ...scanProgress,
-        currentFolder: null,
-        lastCompletedScan: toViewerSafeScanSummary(lastCompletedScan)
-      },
+      scan: this.getScanProgress(),
       storage: {
         available: storageState.libraryAvailable,
         reason: buildViewerSafeStorageReason(storageState.libraryAvailable)
@@ -1334,14 +1385,36 @@ export const galleryService = {
     };
   },
 
+  getScanProgress() {
+    const lastCompletedScan = scanRunRepository.latestCompleted() ?? null;
+    const scanProgress = scannerService.getProgress();
+
+    return {
+      ...scanProgress,
+      currentFolder: null,
+      currentFile: null,
+      lastCompletedScan: toViewerSafeScanSummary(lastCompletedScan)
+    };
+  },
+
+  getAdminScanProgress() {
+    const lastCompletedScan = scanRunRepository.latestCompleted() ?? null;
+    const scanProgress = scannerService.getProgress();
+
+    return {
+      ...scanProgress,
+      lastCompletedScan
+    };
+  },
+
   getStats() {
     const lastCompletedScan = scanRunRepository.latestCompleted() ?? null;
     const storageState = storageService.getState();
-    const scanProgress = scannerService.getProgress();
     const currentGalleryRoot = appConfig.galleryRoot;
     const previousGalleryRoot = appSettingsRepository.get(PREVIOUS_GALLERY_ROOT_SETTING_KEY);
     const rebuildRequired = appSettingsRepository.get(LIBRARY_REBUILD_REQUIRED_SETTING_KEY) === '1';
     const lastSuccessfulGalleryRoot = appSettingsRepository.get(LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY);
+    const pendingDerivativeMigrationRows = storageState.libraryAvailable ? imageRepository.countPendingDerivativeMigrationRows() : 0;
     const defaultHomeFeedMode = getDefaultHomeFeedMode();
     const defaultReelsFeedMode = getDefaultReelsFeedMode();
     const treatStoriesAsFolders = getTreatStoriesAsFolders();
@@ -1356,10 +1429,7 @@ export const galleryService = {
       thumbnailCount: storageState.libraryAvailable ? countDerivativeFilesOnDisk(appConfig.thumbnailsDir) : 0,
       previewCount: storageState.libraryAvailable ? countDerivativeFilesOnDisk(appConfig.previewsDir) : 0,
       lastScan: lastCompletedScan,
-      scan: {
-        ...scanProgress,
-        lastCompletedScan
-      },
+      scan: this.getAdminScanProgress(),
       storage: {
         available: storageState.libraryAvailable,
         reason: storageState.reason,
@@ -1371,6 +1441,8 @@ export const galleryService = {
         currentGalleryRoot,
         previousGalleryRoot,
         lastSuccessfulGalleryRoot,
+        legacyDerivativeMigrationPending: pendingDerivativeMigrationRows > 0,
+        pendingDerivativeMigrationRows,
         ignoredRootMediaCount: storageState.libraryAvailable ? countSupportedRootMediaFiles(currentGalleryRoot) : 0
       },
       preferences: {
@@ -1447,25 +1519,17 @@ export const galleryService = {
     }
 
     const originalPath = resolveWithinRoot(appConfig.galleryRoot, imageRecord.absolute_path);
-    const thumbnailPath = resolveWithinRoot(appConfig.thumbnailsDir, path.join(appConfig.thumbnailsDir, imageRecord.thumbnail_path));
-    const previewPath = resolveWithinRoot(appConfig.previewsDir, path.join(appConfig.previewsDir, imageRecord.preview_path));
+    const thumbnailPath = resolveStoredPathWithinRoot(appConfig.thumbnailsDir, imageRecord.thumbnail_path, 'thumbnail');
+    const previewPath = resolveStoredPathWithinRoot(appConfig.previewsDir, imageRecord.preview_path, 'preview');
 
     if (!originalPath) {
       throw new Error('Stored image path is outside the gallery root');
     }
 
-    if (!thumbnailPath && imageRecord.thumbnail_path) {
-      throw new Error('Stored thumbnail path is outside the thumbnails root');
-    }
-
-    if (!previewPath && imageRecord.preview_path) {
-      throw new Error('Stored preview path is outside the previews root');
-    }
-
     await Promise.all([
-      removeFileIfPresent(originalPath),
-      removeFileIfPresent(thumbnailPath),
-      removeFileIfPresent(previewPath)
+      removeFileAndPruneAncestors(appConfig.galleryRoot, originalPath),
+      removeFileAndPruneAncestors(appConfig.thumbnailsDir, thumbnailPath),
+      removeFileAndPruneAncestors(appConfig.previewsDir, previewPath)
     ]);
 
     if (folder.avatar_image_id === imageRecord.id) {
@@ -1499,13 +1563,21 @@ export const galleryService = {
       const affectedFolders = folderRepository
         .getAll()
         .filter((entry) => isSameOrDescendantFolderPath(normalizedFolderPath, entry.folder_path));
-      const deletedImageCount = affectedFolders.reduce((total, entry) => total + imageRepository.listActiveByFolder(entry.id).length, 0);
+      const affectedImages = affectedFolders.flatMap((entry) => imageRepository.listActiveByFolder(entry.id));
+      const deletedImageCount = affectedImages.length;
 
-      await Promise.all([
-        removeDirectoryTree(resolveWithinRoot(appConfig.galleryRoot, path.join(appConfig.galleryRoot, normalizedFolderPath))),
-        removeDirectoryTree(resolveWithinRoot(appConfig.thumbnailsDir, path.join(appConfig.thumbnailsDir, normalizedFolderPath))),
-        removeDirectoryTree(resolveWithinRoot(appConfig.previewsDir, path.join(appConfig.previewsDir, normalizedFolderPath)))
-      ]);
+      await removeDirectoryTree(resolveWithinRoot(appConfig.galleryRoot, path.join(appConfig.galleryRoot, normalizedFolderPath)));
+      await Promise.all(
+        affectedImages.flatMap((imageRecord) => {
+          const thumbnailPath = resolveStoredPathWithinRoot(appConfig.thumbnailsDir, imageRecord.thumbnail_path, 'thumbnail');
+          const previewPath = resolveStoredPathWithinRoot(appConfig.previewsDir, imageRecord.preview_path, 'preview');
+
+          return [
+            removeFileAndPruneAncestors(appConfig.thumbnailsDir, thumbnailPath),
+            removeFileAndPruneAncestors(appConfig.previewsDir, previewPath)
+          ];
+        })
+      );
 
       folderScanStateRepository.deleteTree(normalizedFolderPath);
 
@@ -1525,25 +1597,17 @@ export const galleryService = {
     await Promise.all(
       images.map(async (imageRecord) => {
         const originalPath = resolveWithinRoot(appConfig.galleryRoot, imageRecord.absolute_path);
-        const thumbnailPath = resolveWithinRoot(appConfig.thumbnailsDir, path.join(appConfig.thumbnailsDir, imageRecord.thumbnail_path));
-        const previewPath = resolveWithinRoot(appConfig.previewsDir, path.join(appConfig.previewsDir, imageRecord.preview_path));
+        const thumbnailPath = resolveStoredPathWithinRoot(appConfig.thumbnailsDir, imageRecord.thumbnail_path, 'thumbnail');
+        const previewPath = resolveStoredPathWithinRoot(appConfig.previewsDir, imageRecord.preview_path, 'preview');
 
         if (!originalPath) {
           throw new Error('Stored image path is outside the gallery root');
         }
 
-        if (!thumbnailPath && imageRecord.thumbnail_path) {
-          throw new Error('Stored thumbnail path is outside the thumbnails root');
-        }
-
-        if (!previewPath && imageRecord.preview_path) {
-          throw new Error('Stored preview path is outside the previews root');
-        }
-
         await Promise.all([
-          removeFileIfPresent(originalPath),
-          removeFileIfPresent(thumbnailPath),
-          removeFileIfPresent(previewPath)
+          removeFileAndPruneAncestors(appConfig.galleryRoot, originalPath),
+          removeFileAndPruneAncestors(appConfig.thumbnailsDir, thumbnailPath),
+          removeFileAndPruneAncestors(appConfig.previewsDir, previewPath)
         ]);
       })
     );

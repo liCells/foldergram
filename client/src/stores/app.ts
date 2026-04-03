@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia';
 
-import { fetchStats } from '../api/gallery';
-import type { AppStatus, FeedMode, ReelsFeedMode } from '../types/api';
+import {
+  fetchAdminScanProgress,
+  fetchAdminStats,
+  fetchScanProgress,
+  fetchStats as fetchStatus
+} from '../api/gallery';
+import type { AppStatus, FeedMode, ReelsFeedMode, ScanProgress } from '../types/api';
+import { useAuthStore } from './auth';
 
 interface AppState {
   stats: AppStatus | null;
@@ -13,7 +19,8 @@ interface AppState {
   recentOpenedFolderSlugs: string[];
   imageModalBackgroundPath: string | null;
   statsPollFailures: number;
-  statsPollTimer: ReturnType<typeof setInterval> | null;
+  statsPollTimer: number | null;
+  statsPollInFlight: boolean;
 }
 
 const THEME_STORAGE_KEY = 'foldergram-theme';
@@ -21,6 +28,7 @@ const VIDEO_MUTED_STORAGE_KEY = 'foldergram-video-muted';
 const LAST_OPENED_FOLDER_STORAGE_KEY = 'foldergram-last-opened-folder';
 const RECENT_OPENED_FOLDERS_STORAGE_KEY = 'foldergram-recent-opened-folders';
 const RECENT_OPENED_FOLDERS_LIMIT = 24;
+const SCAN_PROGRESS_POLL_INTERVAL_MS = 1000;
 
 function parseStoredRecentFolderSlugs(value: string | null): string[] {
   if (!value) {
@@ -54,7 +62,8 @@ export const useAppStore = defineStore('app', {
     recentOpenedFolderSlugs: [],
     imageModalBackgroundPath: null,
     statsPollFailures: 0,
-    statsPollTimer: null
+    statsPollTimer: null,
+    statsPollInFlight: false
   }),
   getters: {
     isLibraryUnavailable: (state) => state.stats?.storage.available === false,
@@ -161,6 +170,12 @@ export const useAppStore = defineStore('app', {
           phase: 'discovery',
           startedAt: new Date().toISOString(),
           runId: null,
+          migrationTotalRows: 0,
+          processedMigrationRows: 0,
+          migratedDerivativeFiles: 0,
+          missingDerivativeFiles: 0,
+          repairedDerivativeFiles: 0,
+          backfilledAssetKeys: 0,
           discoveredFolders: 0,
           processedFolders: 0,
           discoveredImages: 0,
@@ -169,6 +184,9 @@ export const useAppStore = defineStore('app', {
           processedDerivativeJobs: 0,
           generatedThumbnails: 0,
           generatedPreviews: 0,
+          currentOperation: 'discovering_media',
+          currentFile: null,
+          currentPhaseMessage: 'Discovering folders and media for the current gallery root.',
           currentFolder: null
         }
       };
@@ -189,6 +207,23 @@ export const useAppStore = defineStore('app', {
           phase: 'idle',
           startedAt: null,
           runId: null,
+          migrationTotalRows: 0,
+          processedMigrationRows: 0,
+          migratedDerivativeFiles: 0,
+          missingDerivativeFiles: 0,
+          repairedDerivativeFiles: 0,
+          backfilledAssetKeys: 0,
+          discoveredFolders: 0,
+          processedFolders: 0,
+          discoveredImages: 0,
+          processedImages: 0,
+          queuedDerivativeJobs: 0,
+          processedDerivativeJobs: 0,
+          generatedThumbnails: 0,
+          generatedPreviews: 0,
+          currentOperation: null,
+          currentFile: null,
+          currentPhaseMessage: null,
           currentFolder: null
         }
       };
@@ -199,7 +234,7 @@ export const useAppStore = defineStore('app', {
         return;
       }
 
-      this.statsPollTimer = setInterval(() => {
+      this.statsPollTimer = window.setInterval(() => {
         if (document.visibilityState === 'hidden') {
           return;
         }
@@ -209,8 +244,15 @@ export const useAppStore = defineStore('app', {
           return;
         }
 
-        void this.fetchStats({ background: true });
-      }, 2500);
+        if (this.statsPollInFlight) {
+          return;
+        }
+
+        this.statsPollInFlight = true;
+        void this.refreshScanProgress().finally(() => {
+          this.statsPollInFlight = false;
+        });
+      }, SCAN_PROGRESS_POLL_INTERVAL_MS);
     },
 
     stopStatsPolling() {
@@ -220,6 +262,7 @@ export const useAppStore = defineStore('app', {
       }
 
       this.statsPollFailures = 0;
+      this.statsPollInFlight = false;
     },
 
     resetProtectedState() {
@@ -228,6 +271,21 @@ export const useAppStore = defineStore('app', {
       this.loadingStats = false;
       this.error = null;
       this.imageModalBackgroundPath = null;
+    },
+
+    shouldUseAdminScanProgress() {
+      return useAuthStore().canAccessSettings;
+    },
+
+    updateScanProgress(progress: ScanProgress) {
+      if (!this.stats) {
+        return;
+      }
+
+      this.stats = {
+        ...this.stats,
+        scan: progress
+      };
     },
 
     removeIndexedImage(removedFolderCount = 0, mediaType: 'image' | 'video' = 'image') {
@@ -258,7 +316,9 @@ export const useAppStore = defineStore('app', {
       }
 
       try {
-        this.stats = await fetchStats();
+        this.stats = this.shouldUseAdminScanProgress()
+          ? await fetchAdminStats()
+          : await fetchStatus();
         this.statsPollFailures = 0;
 
         if (options.background && this.error) {
@@ -287,6 +347,39 @@ export const useAppStore = defineStore('app', {
       } finally {
         if (!options.background) {
           this.loadingStats = false;
+        }
+      }
+    },
+
+    async refreshScanProgress() {
+      if (!this.stats) {
+        await this.fetchStats({ background: true });
+        return;
+      }
+
+      try {
+        const progress = this.shouldUseAdminScanProgress()
+          ? await fetchAdminScanProgress()
+          : await fetchScanProgress();
+
+        this.updateScanProgress(progress);
+        this.statsPollFailures = 0;
+
+        if (this.error) {
+          this.error = null;
+        }
+
+        if (!progress.isScanning) {
+          this.stopStatsPolling();
+          await this.fetchStats({ background: true });
+        }
+      } catch {
+        this.statsPollFailures += 1;
+
+        if (this.statsPollFailures >= 3) {
+          this.stopStatsPolling();
+          this.markScanStatusUnavailable();
+          this.error = 'Lost connection while refreshing scan status.';
         }
       }
     }

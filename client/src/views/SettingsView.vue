@@ -744,6 +744,21 @@
               >{{ statusLabel }}</span>
             </div>
 
+            <div
+              v-if="legacyDerivativeMigrationPending"
+              class="rounded-[0.95rem] border border-[rgba(210,161,51,0.28)] bg-[rgba(210,161,51,0.08)] px-4 py-3 text-[#9f6a00]"
+            >
+              <div class="flex items-start justify-between gap-3 max-sm:flex-col max-sm:items-start">
+                <div>
+                  <p class="m-0 text-[0.76rem] font-bold tracking-[0.08em] uppercase">Legacy derivative migration pending</p>
+                  <p class="m-0 mt-1 text-[0.9rem] leading-relaxed">{{ legacyDerivativeMigrationMessage }}</p>
+                </div>
+                <span class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap text-[#9f6a00] bg-[rgba(210,161,51,0.14)]">
+                  {{ formatCount(legacyDerivativeMigrationCount) }}
+                </span>
+              </div>
+            </div>
+
             <div class="flex flex-col md:flex-row items-center gap-4 max-sm:items-stretch mt-4">
               <p class="m-0 flex-1 text-muted">{{ scanActionNote }}</p>
               <button
@@ -891,7 +906,7 @@
     <ConfirmDialog
       v-if="confirmThumbnailRebuildOpen"
       title="Regenerate thumbnails only?"
-      message="This will remove generated feed and profile thumbnails plus video poster images, then rebuild them from the current indexed library. Previews, likes, scan history, and indexed library records will not be changed. Original files in the gallery will not be deleted."
+      message="This will remove generated feed and profile thumbnails plus video poster images, then rebuild them from the current indexed library using each item's current thumbnail path. Previews, likes, scan history, and indexed library records will not be changed. Original files in the gallery will not be deleted."
       confirm-label="Regenerate Thumbnails"
       loading-label="Regenerating..."
       :loading="rebuildingThumbnails"
@@ -1232,6 +1247,10 @@ const savedStoriesMode = computed(() => appStore.treatStoriesAsFolders);
 const savedCustomExcludedFolders = computed(() => adminStats.value?.excludedFolders.customExcludedFolders ?? []);
 const envExcludedFolders = computed(() => adminStats.value?.excludedFolders.envExcludedFolders ?? []);
 const effectiveExcludedFolders = computed(() => adminStats.value?.excludedFolders.effectiveExcludedFolders ?? []);
+const legacyDerivativeMigrationPending = computed(
+  () => adminStats.value?.libraryIndex.legacyDerivativeMigrationPending === true
+);
+const legacyDerivativeMigrationCount = computed(() => adminStats.value?.libraryIndex.pendingDerivativeMigrationRows ?? 0);
 const storiesModeRequiresDecision = computed(() => appStore.stats?.storiesMigration.decisionPending === true);
 const savedHomeFeedDefaultModeLabel = computed(
   () => homeFeedDefaultOptions.find((mode) => mode.id === savedHomeFeedDefaultMode.value)?.label ?? 'Random'
@@ -1446,6 +1465,10 @@ const scanActionNote = computed(() => {
     return 'Live progress appears in the sticky status bar.';
   }
 
+  if (legacyDerivativeMigrationPending.value) {
+    return 'Run Scan Library to move legacy mirrored thumbnails and previews into the asset-key storage layout.';
+  }
+
   return 'Scans check for added, updated, or missing media.';
 });
 const rebuildButtonLabel = computed(() => {
@@ -1512,6 +1535,10 @@ const thumbnailRebuildActionNote = computed(() => {
 
   if (appStore.isScanning) {
     return 'Wait for the current scan to finish first.';
+  }
+
+  if (legacyDerivativeMigrationPending.value) {
+    return 'This keeps the current thumbnail paths and does not migrate legacy mirrored derivatives. Run Scan Library instead to move them into asset-key storage.';
   }
 
   return 'Use this for a faster thumbnail-only refresh.';
@@ -1675,6 +1702,11 @@ const scanErrorNoticeMessage = computed(() => {
 const ignoredRootMediaNoticeMessage = computed(() => {
   const supportedFileLabel = ignoredRootMediaCount.value === 1 ? 'supported file is' : 'supported files are';
   return `${formatCount(ignoredRootMediaCount.value)} ${supportedFileLabel} being ignored in the gallery root. Move them into a folder inside your gallery root to create App Folders. Files placed directly in the gallery root are ignored.`;
+});
+const legacyDerivativeMigrationMessage = computed(() => {
+  const count = legacyDerivativeMigrationCount.value;
+  const recordLabel = count === 1 ? 'indexed media record still uses' : 'indexed media records still use';
+  return `${formatCount(count)} ${recordLabel} the old mirrored thumbnail and preview paths. Run Scan Library to move them into asset-key storage.`;
 });
 
 function dismissScanErrorNotice() {

@@ -22,17 +22,22 @@ import {
   scanRunRepository
 } from '../db/repositories.js';
 import { generateDerivatives, generateThumbnailDerivative, readMediaMetadata } from './derivative-service.js';
+import {
+  derivativeMigrationService,
+  type DerivativeMigrationOperation,
+  type DerivativeMigrationProgress,
+  type DerivativeMigrationSummary
+} from './derivative-migration-service.js';
 import { log } from './log-service.js';
 import { storageService } from './storage-service.js';
 import {
   createFingerprint,
   getMediaTypeFromExtension,
   getMimeTypeFromExtension,
-  getPreviewRelativePath,
   getStableSortTimestamp,
-  getThumbnailRelativePath,
   isSupportedMediaFile
 } from '../utils/image-utils.js';
+import { generateAssetKey, getPreviewPathForAssetKey, getThumbnailPathForAssetKey } from '../utils/derivative-paths.js';
 import { resolveTakenAt, serializeImageExifData } from '../utils/exif-utils.js';
 import {
   getFolderDisplayInfo,
@@ -62,7 +67,7 @@ import {
   type IndexedFileStatus
 } from '../utils/scan-utils.js';
 import { resolveUniqueSlug, slugifyFolderPath } from '../utils/slug.js';
-import type { FolderRecord, FolderRole, FolderScanStateRecord, ScanRunRecord } from '../types/models.js';
+import type { FolderRecord, FolderRole, FolderScanStateRecord, ImageRecord, ScanRunRecord } from '../types/models.js';
 
 interface ScanSummary {
   status: string;
@@ -76,6 +81,8 @@ interface ScanSummary {
 interface DerivativeJob {
   absolutePath: string;
   relativePath: string;
+  thumbnailPath: string;
+  previewPath?: string;
   force: boolean;
   kind: 'all' | 'thumbnail';
 }
@@ -155,6 +162,8 @@ interface SourceFolderScanResult {
 interface ImageProcessingContext {
   galleryRootChanged: boolean;
   hasStoredGalleryRoot: boolean;
+  moveReconciliationEnabled: boolean;
+  claimedMoveImageIds: Set<number>;
 }
 
 interface FullScanMetrics {
@@ -180,7 +189,13 @@ interface DerivativeProcessingSummary {
   queuedJobs: number;
 }
 
-type ScanPhase = 'idle' | 'discovery' | 'derivatives';
+type ScanPhase = 'idle' | 'migration' | 'discovery' | 'derivatives';
+export type ScanOperation =
+  | DerivativeMigrationOperation
+  | 'discovering_media'
+  | 'generating_thumbnail'
+  | 'generating_preview'
+  | 'generating_thumbnail_and_preview';
 type StartupAction = 'scan' | 'idle' | 'blocked';
 
 export interface ScanProgressSnapshot {
@@ -189,6 +204,12 @@ export interface ScanProgressSnapshot {
   phase: ScanPhase;
   startedAt: string | null;
   runId: number | null;
+  migrationTotalRows: number;
+  processedMigrationRows: number;
+  migratedDerivativeFiles: number;
+  missingDerivativeFiles: number;
+  repairedDerivativeFiles: number;
+  backfilledAssetKeys: number;
   discoveredFolders: number;
   processedFolders: number;
   discoveredImages: number;
@@ -197,6 +218,9 @@ export interface ScanProgressSnapshot {
   processedDerivativeJobs: number;
   generatedThumbnails: number;
   generatedPreviews: number;
+  currentOperation: ScanOperation | null;
+  currentFile: string | null;
+  currentPhaseMessage: string | null;
   currentFolder: string | null;
   lastCompletedScan: ScanRunRecord | null;
 }
@@ -227,6 +251,12 @@ function createIdleProgress(lastCompletedScan: ScanRunRecord | null = null): Sca
     phase: 'idle',
     startedAt: null,
     runId: null,
+    migrationTotalRows: 0,
+    processedMigrationRows: 0,
+    migratedDerivativeFiles: 0,
+    missingDerivativeFiles: 0,
+    repairedDerivativeFiles: 0,
+    backfilledAssetKeys: 0,
     discoveredFolders: 0,
     processedFolders: 0,
     discoveredImages: 0,
@@ -235,9 +265,48 @@ function createIdleProgress(lastCompletedScan: ScanRunRecord | null = null): Sca
     processedDerivativeJobs: 0,
     generatedThumbnails: 0,
     generatedPreviews: 0,
+    currentOperation: null,
+    currentFile: null,
+    currentPhaseMessage: null,
     currentFolder: null,
     lastCompletedScan
   };
+}
+
+function getDiscoveryPhaseMessage(scanReason: string | null): string {
+  if (scanReason === 'rebuild-thumbnails') {
+    return 'Loading indexed media before thumbnail regeneration starts.';
+  }
+
+  if (scanReason === 'rebuild') {
+    return 'Discovering folders and media for the current gallery root.';
+  }
+
+  return 'Discovering folders and media...';
+}
+
+function getMigrationPhaseMessage(): string {
+  return 'Upgrading legacy thumbnails and previews before indexing starts.';
+}
+
+function getDerivativePhaseMessage(scanReason: string | null): string {
+  if (scanReason === 'rebuild-thumbnails') {
+    return 'Generating feed thumbnails, profile thumbnails, and video posters.';
+  }
+
+  if (scanReason === 'rebuild') {
+    return 'Generating any missing thumbnails and previews for the rebuilt library.';
+  }
+
+  return 'Generating thumbnails and previews for queued changes.';
+}
+
+function getDerivativeOperationForJob(job: DerivativeJob): ScanOperation {
+  if (job.kind === 'thumbnail') {
+    return 'generating_thumbnail';
+  }
+
+  return job.previewPath ? 'generating_thumbnail_and_preview' : 'generating_preview';
 }
 
 function formatElapsed(startedAt: string | null): string {
@@ -295,13 +364,18 @@ class ScannerService {
   }
 
   handleStartup(reason = 'startup'): StartupAction {
-    const options = resolveFullScanOptions({ repairUnchangedDerivatives: false });
+    const options = resolveFullScanOptions({
+      repairUnchangedDerivatives: false,
+      allowDerivativeMigration: false
+    });
     const currentGalleryRoot = normalizePath(appConfig.galleryRoot);
     const storedGalleryRoot = appSettingsRepository.get(LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY);
     const normalizedStoredGalleryRoot = storedGalleryRoot ? normalizePath(storedGalleryRoot) : null;
     const hasStoredGalleryRoot = normalizedStoredGalleryRoot !== null;
     const galleryRootChanged = normalizedStoredGalleryRoot !== currentGalleryRoot;
     const hasIndexedFolders = folderRepository.getAll().length > 0;
+    const pendingDerivativeMigrationRows = imageRepository.countPendingDerivativeMigrationRows();
+    const requiresDerivativeMigration = pendingDerivativeMigrationRows > 0;
 
     if (galleryRootChanged && normalizedStoredGalleryRoot && hasIndexedFolders) {
       this.markLibraryRebuildRequired(normalizedStoredGalleryRoot);
@@ -335,6 +409,18 @@ class ScannerService {
       return 'scan';
     }
 
+    if (requiresDerivativeMigration) {
+      log.info(
+        joinLogParts([
+          'Startup scan skipped',
+          formatStep('reason', reason),
+          formatStep('pending-legacy-derivatives', pendingDerivativeMigrationRows),
+          'waiting for a manual library scan'
+        ])
+      );
+      return 'idle';
+    }
+
     log.info(
       joinLogParts([
         'Startup scan skipped',
@@ -346,7 +432,10 @@ class ScannerService {
   }
 
   async scanAll(reason = 'manual', options: Partial<FullScanOptions> = {}): Promise<ScanRunRecord | undefined> {
-    const resolvedOptions = resolveFullScanOptions(options);
+    const resolvedOptions = resolveFullScanOptions({
+      allowDerivativeMigration: reason !== 'startup' && !reason.startsWith('watcher'),
+      ...options
+    });
 
     await this.enqueue(async () => this.performFullScan(reason, resolvedOptions));
     return scanRunRepository.latest();
@@ -355,7 +444,8 @@ class ScannerService {
   async rebuildLibraryIndex(reason = 'rebuild'): Promise<ScanRunRecord | undefined> {
     const resolvedOptions = resolveFullScanOptions({
       repairUnchangedDerivatives: false,
-      forceNewFileDerivatives: false
+      forceNewFileDerivatives: false,
+      allowDerivativeMigration: true
     });
 
     await this.enqueue(async () => this.performLibraryRebuild(reason, resolvedOptions));
@@ -388,11 +478,28 @@ class ScannerService {
       scanReason: reason,
       phase: 'discovery',
       startedAt: new Date().toISOString(),
-      runId
+      runId,
+      currentOperation: 'discovering_media',
+      currentPhaseMessage: getDiscoveryPhaseMessage(reason)
     };
 
     this.startHeartbeat();
     this.logProgress('started');
+  }
+
+  private updateMigrationProgress(progress: DerivativeMigrationProgress): void {
+    this.setProgress({
+      migrationTotalRows: progress.totalRows,
+      processedMigrationRows: progress.processedRows,
+      migratedDerivativeFiles: progress.movedFiles,
+      missingDerivativeFiles: progress.missingFiles,
+      repairedDerivativeFiles: progress.repairedFiles,
+      backfilledAssetKeys: progress.backfilledAssetKeys,
+      currentOperation: progress.currentOperation,
+      currentFile: progress.currentFile,
+      currentFolder: progress.currentFile ? getSourceFolderPathFromRelativePath(progress.currentFile) : null,
+      currentPhaseMessage: progress.currentPhaseMessage
+    });
   }
 
   private setProgress(patch: Partial<Omit<ScanProgressSnapshot, 'lastCompletedScan'>>): void {
@@ -421,7 +528,7 @@ class ScannerService {
       return;
     }
 
-    if (kind === 'folder' || kind === 'phase') {
+    if (kind === 'folder') {
       return;
     }
 
@@ -445,7 +552,27 @@ class ScannerService {
           formatStep('jobs', `${this.progress.processedDerivativeJobs}/${this.progress.queuedDerivativeJobs}`),
           formatStep('thumbnails', this.progress.generatedThumbnails),
           formatStep('previews', this.progress.generatedPreviews),
+          this.progress.currentOperation ? formatStep('operation', this.progress.currentOperation) : null,
+          this.progress.currentFile ? formatStep('file', this.progress.currentFile) : null,
           this.progress.currentFolder ? formatStep('current', this.progress.currentFolder) : null,
+          formatStep('elapsed', elapsed)
+        ])
+      );
+      return;
+    }
+
+    if (this.progress.phase === 'migration') {
+      const totalRows = this.progress.migrationTotalRows || '?';
+      log.info(
+        joinLogParts([
+          'Migration',
+          formatStep('assets', `${this.progress.processedMigrationRows}/${totalRows}`),
+          formatStep('backfilled', this.progress.backfilledAssetKeys),
+          formatStep('moved', this.progress.migratedDerivativeFiles),
+          formatStep('repaired', this.progress.repairedDerivativeFiles),
+          formatStep('missing', this.progress.missingDerivativeFiles),
+          this.progress.currentOperation ? formatStep('operation', this.progress.currentOperation) : null,
+          this.progress.currentFile ? formatStep('file', this.progress.currentFile) : null,
           formatStep('elapsed', elapsed)
         ])
       );
@@ -457,6 +584,7 @@ class ScannerService {
         'Discovery',
         formatStep('folders', `${this.progress.processedFolders}/${this.progress.discoveredFolders}`),
         formatStep('images', `${this.progress.processedImages}/${this.progress.discoveredImages}`),
+        this.progress.currentOperation ? formatStep('operation', this.progress.currentOperation) : null,
         this.progress.currentFolder ? formatStep('current', this.progress.currentFolder) : null,
         formatStep('elapsed', elapsed)
       ])
@@ -1245,6 +1373,8 @@ class ScannerService {
       const derivativeJobs: DerivativeJob[] = indexedImages.map((image) => ({
         absolutePath: image.absolute_path,
         relativePath: image.relative_path,
+        thumbnailPath: image.thumbnail_path,
+        previewPath: image.preview_path,
         force: true,
         kind: 'thumbnail'
       }));
@@ -1259,6 +1389,9 @@ class ScannerService {
         processedDerivativeJobs: 0,
         generatedThumbnails: 0,
         generatedPreviews: 0,
+        currentOperation: 'discovering_media',
+        currentFile: null,
+        currentPhaseMessage: getDiscoveryPhaseMessage(reason),
         currentFolder: null
       });
 
@@ -1328,7 +1461,9 @@ class ScannerService {
     const galleryRootChanged = normalizedStoredGalleryRoot !== currentGalleryRoot;
     const imageProcessingContext: ImageProcessingContext = {
       galleryRootChanged,
-      hasStoredGalleryRoot
+      hasStoredGalleryRoot,
+      moveReconciliationEnabled: false,
+      claimedMoveImageIds: new Set<number>()
     };
     const treatStoriesAsFolders = this.shouldTreatStoriesAsFolders();
     const excludedFolderRules = this.getEffectiveExcludedFolderRules();
@@ -1342,6 +1477,7 @@ class ScannerService {
       joinLogParts([
         `Starting full scan (${reason})`,
         formatStep('repair-derivatives', formatToggle(options.repairUnchangedDerivatives)),
+        formatStep('storage-migration', formatToggle(options.allowDerivativeMigration)),
         formatStep('root-changed', formatToggle(galleryRootChanged)),
         formatStep('stored-root', formatToggle(hasStoredGalleryRoot)),
         formatStep('stories-as-folders', formatToggle(treatStoriesAsFolders)),
@@ -1355,6 +1491,75 @@ class ScannerService {
     );
 
     try {
+      const migrationPending = !derivativeMigrationService.isMigrationComplete();
+      const requiresDerivativeMigration = options.allowDerivativeMigration && migrationPending;
+      if (requiresDerivativeMigration) {
+        this.setProgress({
+          phase: 'migration',
+          currentOperation: imageRepository.countAll() > 0 ? 'checking_derivatives' : null,
+          currentFile: null,
+          currentPhaseMessage: getMigrationPhaseMessage(),
+          currentFolder: null,
+          discoveredFolders: 0,
+          processedFolders: 0,
+          discoveredImages: 0,
+          processedImages: 0,
+          queuedDerivativeJobs: 0,
+          processedDerivativeJobs: 0,
+          generatedThumbnails: 0,
+          generatedPreviews: 0,
+          repairedDerivativeFiles: 0,
+          backfilledAssetKeys: 0
+        });
+        this.updateMigrationProgress({
+          totalRows: imageRepository.countAll(),
+          processedRows: 0,
+          movedFiles: 0,
+          missingFiles: 0,
+          repairedFiles: 0,
+          backfilledAssetKeys: 0,
+          currentOperation: imageRepository.countAll() > 0 ? 'checking_derivatives' : null,
+          currentFile: null,
+          currentPhaseMessage: getMigrationPhaseMessage()
+        });
+        this.logProgress('phase');
+      }
+
+      let migrationSummary: DerivativeMigrationSummary = {
+        totalRows: 0,
+        processedRows: 0,
+        movedFiles: 0,
+        missingFiles: 0,
+        repairedFiles: 0,
+        backfilledAssetKeys: 0,
+        currentOperation: null,
+        currentFile: null,
+        currentPhaseMessage: getMigrationPhaseMessage(),
+        migratedRows: 0,
+        repairedRows: 0,
+        complete: derivativeMigrationService.isMigrationComplete()
+      };
+      if (requiresDerivativeMigration) {
+        migrationSummary = await derivativeMigrationService.ensureMigrated({
+          onProgress: (progress) => {
+            this.updateMigrationProgress(progress);
+          }
+        });
+      }
+      if (requiresDerivativeMigration) {
+        this.updateMigrationProgress(migrationSummary);
+        this.setProgress({
+          phase: 'discovery',
+          currentOperation: 'discovering_media',
+          currentFile: null,
+          currentPhaseMessage: getDiscoveryPhaseMessage(reason),
+          currentFolder: null
+        });
+        this.logProgress('phase');
+      }
+      imageProcessingContext.moveReconciliationEnabled =
+        !galleryRootChanged && migrationSummary.complete && derivativeMigrationService.isMigrationComplete();
+
       const existingFolders = folderRepository.getAll();
       if (galleryRootChanged && normalizedStoredGalleryRoot && existingFolders.length > 0) {
         this.markLibraryRebuildRequired(normalizedStoredGalleryRoot);
@@ -1480,6 +1685,10 @@ class ScannerService {
       ]);
 
       derivativeSummary = await this.processDerivativeJobs([...derivativeJobs.values()], errors);
+
+      if (summary.status !== 'failed' && errors.length === 0 && derivativeMigrationService.isMigrationComplete()) {
+        await derivativeMigrationService.cleanupStaleDerivatives();
+      }
     } catch (error) {
       summary.status = 'failed';
       summary.error_text = error instanceof Error ? error.message : String(error);
@@ -1583,9 +1792,14 @@ class ScannerService {
       );
       const imageProcessingContext: ImageProcessingContext = {
         galleryRootChanged: false,
-        hasStoredGalleryRoot: appSettingsRepository.get(LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY) !== null
+        hasStoredGalleryRoot: appSettingsRepository.get(LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY) !== null,
+        moveReconciliationEnabled: false,
+        claimedMoveImageIds: new Set<number>()
       };
-      const incrementalOptions = resolveFullScanOptions({ repairUnchangedDerivatives: false });
+      const incrementalOptions = resolveFullScanOptions({
+        repairUnchangedDerivatives: false,
+        allowDerivativeMigration: false
+      });
 
       for (const sourceFolderPath of impactedSourceFolders) {
         const result = await this.scanSourceFolder(
@@ -1640,7 +1854,12 @@ class ScannerService {
     this.finishProgress();
 
     if (fallbackReason) {
-      return this.performFullScan(fallbackReason, resolveFullScanOptions());
+      return this.performFullScan(
+        fallbackReason,
+        resolveFullScanOptions({
+          allowDerivativeMigration: false
+        })
+      );
     }
 
     return summary;
@@ -1669,7 +1888,11 @@ class ScannerService {
     if (jobs.length === 0) {
       this.setProgress({
         queuedDerivativeJobs: 0,
-        processedDerivativeJobs: 0
+        processedDerivativeJobs: 0,
+        currentOperation: null,
+        currentFile: null,
+        currentPhaseMessage: getDerivativePhaseMessage(this.progress.scanReason),
+        currentFolder: null
       });
 
       return {
@@ -1684,6 +1907,9 @@ class ScannerService {
       phase: 'derivatives',
       queuedDerivativeJobs: jobs.length,
       processedDerivativeJobs: 0,
+      currentOperation: jobs[0] ? getDerivativeOperationForJob(jobs[0]) : null,
+      currentFile: jobs[0]?.relativePath ?? null,
+      currentPhaseMessage: getDerivativePhaseMessage(this.progress.scanReason),
       currentFolder: jobs[0] ? getSourceFolderPathFromRelativePath(jobs[0].relativePath) : null
     });
     this.logProgress('phase');
@@ -1700,11 +1926,15 @@ class ScannerService {
         derivativeLimit(async () => {
           try {
             this.setProgress({
+              currentOperation: getDerivativeOperationForJob(job),
+              currentFile: job.relativePath,
               currentFolder: getSourceFolderPathFromRelativePath(job.relativePath)
             });
 
             if (job.kind === 'thumbnail') {
-              const thumbnail = await generateThumbnailDerivative(job.absolutePath, job.relativePath, job.force);
+              const thumbnail = await generateThumbnailDerivative(job.absolutePath, job.relativePath, job.force, {
+                thumbnailPath: job.thumbnailPath
+              });
 
               if (thumbnail.generatedThumbnail) {
                 generatedThumbnails += 1;
@@ -1713,7 +1943,10 @@ class ScannerService {
                 });
               }
             } else {
-              const derivatives = await generateDerivatives(job.absolutePath, job.relativePath, job.force);
+              const derivatives = await generateDerivatives(job.absolutePath, job.relativePath, job.force, {
+                thumbnailPath: job.thumbnailPath,
+                previewPath: job.previewPath
+              });
 
               if (derivatives.generatedThumbnail) {
                 generatedThumbnails += 1;
@@ -1803,22 +2036,80 @@ class ScannerService {
     existingFolders.push(folder);
   }
 
+  private async pathExists(targetPath: string): Promise<boolean> {
+    try {
+      await fs.access(targetPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async findMoveCandidate(
+    file: IndexedFileCandidate,
+    extension: string,
+    context: ImageProcessingContext
+  ): Promise<ImageRecord | undefined> {
+    if (!context.moveReconciliationEnabled) {
+      return undefined;
+    }
+
+    const candidates = imageRepository
+      .listMoveCandidates(file.stats.size, file.stats.mtimeMs, extension)
+      .filter((candidate) => candidate.relative_path !== file.relativePath && !context.claimedMoveImageIds.has(candidate.id));
+
+    if (candidates.length === 0) {
+      return undefined;
+    }
+
+    const missingCandidates: ImageRecord[] = [];
+    for (const candidate of candidates) {
+      if (!(await this.pathExists(candidate.absolute_path))) {
+        missingCandidates.push(candidate);
+      }
+    }
+
+    if (missingCandidates.length === 0) {
+      return undefined;
+    }
+
+    const requestedBasename = path.basename(file.relativePath).toLowerCase();
+    const basenameMatches = missingCandidates.filter((candidate) => candidate.filename.toLowerCase() === requestedBasename);
+    const selectedCandidate =
+      missingCandidates.length === 1
+        ? missingCandidates[0]
+        : basenameMatches.length === 1
+          ? basenameMatches[0]
+          : undefined;
+
+    if (selectedCandidate) {
+      context.claimedMoveImageIds.add(selectedCandidate.id);
+    }
+
+    return selectedCandidate;
+  }
+
   private async processImageFile(
     folder: FolderRecord,
     file: IndexedFileCandidate,
     options: FullScanOptions = resolveFullScanOptions(),
     context: ImageProcessingContext = {
       galleryRootChanged: false,
-      hasStoredGalleryRoot: false
+      hasStoredGalleryRoot: false,
+      moveReconciliationEnabled: false,
+      claimedMoveImageIds: new Set<number>()
     }
   ): Promise<ProcessedFileSummary> {
     const fingerprint = createFingerprint(file.relativePath, file.stats.size, file.stats.mtimeMs);
-    const existing = imageRepository.getByRelativePath(file.relativePath);
     const extension = path.extname(file.absolutePath).toLowerCase();
-    const absolutePathChanged = existing ? normalizePath(existing.absolute_path) !== normalizePath(file.absolutePath) : false;
     const mediaType = getMediaTypeFromExtension(extension);
-    const thumbnailRelativePath = getThumbnailRelativePath(file.relativePath);
-    const previewRelativePath = getPreviewRelativePath(file.relativePath, mediaType);
+    const existingByPath = imageRepository.getByRelativePath(file.relativePath);
+    const moveCandidate = existingByPath ? undefined : await this.findMoveCandidate(file, extension, context);
+    const existing = existingByPath ?? moveCandidate;
+    const absolutePathChanged = existingByPath ? normalizePath(existingByPath.absolute_path) !== normalizePath(file.absolutePath) : false;
+    const assetKey = existing?.asset_key ?? generateAssetKey();
+    const thumbnailPath = existing?.thumbnail_path ?? getThumbnailPathForAssetKey(assetKey);
+    const previewPath = existing?.preview_path ?? getPreviewPathForAssetKey(assetKey, mediaType);
     const needsTakenAtBackfill = existing?.taken_at === null || existing?.taken_at_source === null;
     const needsMediaBackfill = existing?.media_type !== mediaType || (mediaType === 'video' && existing?.duration_ms === null);
     const needsOrientationBackfill = mediaType === 'image' && existing?.display_orientation === null;
@@ -1826,22 +2117,22 @@ class ScannerService {
     const needsAnimatedBackfill = mediaType === 'image' && existing?.is_animated === null;
     const needsExifBackfill = mediaType === 'image' && existing?.exif_json === null;
 
-    if (existing && existing.checksum_or_fingerprint === fingerprint) {
+    if (existingByPath && existingByPath.checksum_or_fingerprint === fingerprint) {
       const refreshedIndexedRow = shouldRefreshUnchangedImage({
         absolutePathChanged,
         galleryRootChanged: context.galleryRootChanged,
         hasStoredGalleryRoot: context.hasStoredGalleryRoot,
-        isDeleted: existing.is_deleted === 1
+        isDeleted: existingByPath.is_deleted === 1
       });
 
-      let metadataTakenAt = existing.taken_at;
-      let metadataDurationMs = existing.duration_ms;
-      let metadataWidth = existing.width;
-      let metadataHeight = existing.height;
-      let metadataDisplayOrientation = existing.display_orientation;
-      let metadataPlaybackStrategy = existing.playback_strategy ?? 'preview';
-      let metadataIsAnimated = existing.is_animated === 1;
-      let metadataExifJson = existing.exif_json;
+      let metadataTakenAt = existingByPath.taken_at;
+      let metadataDurationMs = existingByPath.duration_ms;
+      let metadataWidth = existingByPath.width;
+      let metadataHeight = existingByPath.height;
+      let metadataDisplayOrientation = existingByPath.display_orientation;
+      let metadataPlaybackStrategy = existingByPath.playback_strategy ?? 'preview';
+      let metadataIsAnimated = existingByPath.is_animated === 1;
+      let metadataExifJson = existingByPath.exif_json;
 
       if (needsTakenAtBackfill || needsMediaBackfill || needsOrientationBackfill || needsPlaybackStrategyBackfill || needsAnimatedBackfill || needsExifBackfill) {
         const metadata = await readMediaMetadata(file.absolutePath, mediaType, {
@@ -1864,18 +2155,19 @@ class ScannerService {
       if (refreshedIndexedRow || needsTakenAtBackfill || needsMediaBackfill || needsOrientationBackfill || needsPlaybackStrategyBackfill || needsAnimatedBackfill || needsExifBackfill) {
         const resolvedTakenAt = resolveTakenAt({
           exifTakenAt: metadataTakenAt,
-          existingTakenAt: existing.taken_at,
-          existingTakenAtSource: existing.taken_at_source,
-          existingSortTimestamp: existing.sort_timestamp,
-          existingFirstSeenAt: existing.first_seen_at,
-          existingMtimeMs: existing.mtime_ms,
+          existingTakenAt: existingByPath.taken_at,
+          existingTakenAtSource: existingByPath.taken_at_source,
+          existingSortTimestamp: existingByPath.sort_timestamp,
+          existingFirstSeenAt: existingByPath.first_seen_at,
+          existingMtimeMs: existingByPath.mtime_ms,
           fileMtimeMs: file.stats.mtimeMs,
-          firstSeenAt: existing.first_seen_at,
-          stableFallbackTimestamp: existing.sort_timestamp
+          firstSeenAt: existingByPath.first_seen_at,
+          stableFallbackTimestamp: existingByPath.sort_timestamp
         });
 
         imageRepository.refreshIndexed({
           folderId: folder.id,
+          assetKey,
           filename: path.basename(file.absolutePath),
           extension,
           relativePath: file.relativePath,
@@ -1893,8 +2185,8 @@ class ScannerService {
           takenAt: resolvedTakenAt.takenAt,
           takenAtSource: resolvedTakenAt.source,
           exifJson: mediaType === 'image' ? (metadataExifJson ?? '{}') : null,
-          thumbnailPath: existing.thumbnail_path || thumbnailRelativePath,
-          previewPath: existing.preview_path || previewRelativePath,
+          thumbnailPath,
+          previewPath,
           playbackStrategy: metadataPlaybackStrategy
         });
       }
@@ -1906,6 +2198,8 @@ class ScannerService {
             ? {
                 absolutePath: file.absolutePath,
                 relativePath: file.relativePath,
+                thumbnailPath,
+                previewPath,
                 force: false,
                 kind: 'all'
               }
@@ -1941,35 +2235,63 @@ class ScannerService {
       stableFallbackTimestamp: sortTimestamp
     });
 
-    imageRepository.upsert({
-      folderId: folder.id,
-      filename: path.basename(file.absolutePath),
-      extension,
-      relativePath: file.relativePath,
-      absolutePath: file.absolutePath,
-      fileSize: file.stats.size,
-      width: metadata.width,
-      height: metadata.height,
-      displayOrientation: mediaType === 'image' ? (metadata.displayOrientation ?? 1) : null,
-      mediaType,
-      mimeType: getMimeTypeFromExtension(extension),
-      durationMs: metadata.durationMs,
-      isAnimated: metadata.isAnimated,
-      fingerprint,
-      mtimeMs: file.stats.mtimeMs,
-      firstSeenAt,
-      sortTimestamp,
-      takenAt: resolvedTakenAt.takenAt,
-      takenAtSource: resolvedTakenAt.source,
-      exifJson: mediaType === 'image'
-        ? serializeImageExifData(metadata.exif ?? null, {
-            storeEmptyObject: true
-          })
-        : null,
-      thumbnailPath: thumbnailRelativePath,
-      previewPath: previewRelativePath,
-      playbackStrategy: metadata.playbackStrategy
-    });
+    const exifJson = mediaType === 'image'
+      ? serializeImageExifData(metadata.exif ?? null, {
+          storeEmptyObject: true
+        })
+      : null;
+
+    if (moveCandidate) {
+      imageRepository.reconcileMove({
+        id: moveCandidate.id,
+        folderId: folder.id,
+        filename: path.basename(file.absolutePath),
+        extension,
+        relativePath: file.relativePath,
+        absolutePath: file.absolutePath,
+        fileSize: file.stats.size,
+        width: metadata.width,
+        height: metadata.height,
+        displayOrientation: mediaType === 'image' ? (metadata.displayOrientation ?? 1) : null,
+        mediaType,
+        mimeType: getMimeTypeFromExtension(extension),
+        durationMs: metadata.durationMs,
+        isAnimated: metadata.isAnimated,
+        fingerprint,
+        mtimeMs: file.stats.mtimeMs,
+        takenAt: resolvedTakenAt.takenAt,
+        takenAtSource: resolvedTakenAt.source,
+        exifJson,
+        playbackStrategy: metadata.playbackStrategy
+      });
+    } else {
+      imageRepository.upsert({
+        folderId: folder.id,
+        assetKey,
+        filename: path.basename(file.absolutePath),
+        extension,
+        relativePath: file.relativePath,
+        absolutePath: file.absolutePath,
+        fileSize: file.stats.size,
+        width: metadata.width,
+        height: metadata.height,
+        displayOrientation: mediaType === 'image' ? (metadata.displayOrientation ?? 1) : null,
+        mediaType,
+        mimeType: getMimeTypeFromExtension(extension),
+        durationMs: metadata.durationMs,
+        isAnimated: metadata.isAnimated,
+        fingerprint,
+        mtimeMs: file.stats.mtimeMs,
+        firstSeenAt,
+        sortTimestamp,
+        takenAt: resolvedTakenAt.takenAt,
+        takenAtSource: resolvedTakenAt.source,
+        exifJson,
+        thumbnailPath,
+        previewPath,
+        playbackStrategy: metadata.playbackStrategy
+      });
+    }
 
       return {
         status: existing ? 'updated' : 'new',
@@ -1978,6 +2300,8 @@ class ScannerService {
           : {
               absolutePath: file.absolutePath,
               relativePath: file.relativePath,
+              thumbnailPath,
+              previewPath,
               force: existing ? true : options.forceNewFileDerivatives,
               kind: 'all'
             },

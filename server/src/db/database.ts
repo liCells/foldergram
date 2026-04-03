@@ -107,8 +107,21 @@ class DatabaseManager {
       this.database.exec('ALTER TABLE images ADD COLUMN is_trashed INTEGER NOT NULL DEFAULT 0');
     }
 
+    if (this.tableExists('images') && !this.tableHasColumn('images', 'asset_key')) {
+      this.database.exec('ALTER TABLE images ADD COLUMN asset_key TEXT NULL');
+    }
+
+    if (this.tableExists('images') && !this.tableHasColumn('images', 'deleted_at')) {
+      this.database.exec('ALTER TABLE images ADD COLUMN deleted_at TEXT NULL');
+    }
+
     if (this.tableExists('images') && !this.tableHasColumn('images', 'trashed_at')) {
       this.database.exec('ALTER TABLE images ADD COLUMN trashed_at TEXT NULL');
+    }
+
+    if (this.tableExists('images') && this.tableHasColumn('images', 'deleted_at')) {
+      this.database.exec("UPDATE images SET deleted_at = updated_at WHERE is_deleted = 1 AND deleted_at IS NULL");
+      this.database.exec('UPDATE images SET deleted_at = NULL WHERE is_deleted = 0');
     }
 
     if (this.tableExists('images') && this.tableHasColumn('images', 'is_trashed') && this.tableHasColumn('images', 'trashed_at')) {
@@ -135,6 +148,8 @@ class DatabaseManager {
       'CREATE INDEX IF NOT EXISTS idx_images_media_visible_sort ON images(media_type, is_deleted, is_trashed, sort_timestamp DESC)'
     );
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_images_trashed_listing ON images(is_trashed, is_deleted, trashed_at DESC, id DESC)');
+    this.database.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_images_asset_key ON images(asset_key) WHERE asset_key IS NOT NULL');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_images_deleted_at ON images(deleted_at)');
   }
 }
 

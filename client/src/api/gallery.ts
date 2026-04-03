@@ -26,6 +26,7 @@ import type {
   RestoreImageResult,
   RebuildLibraryResult,
   RebuildThumbnailsResult,
+  ScanProgress,
   FolderSummary,
   TrashImageResult,
   TrashImagesPayload
@@ -209,6 +210,14 @@ export function fetchStats() {
 
 export function fetchAdminStats() {
   return requestJson<AppStats>('/api/admin/stats');
+}
+
+export function fetchScanProgress() {
+  return requestJson<ScanProgress>('/api/scan-progress');
+}
+
+export function fetchAdminScanProgress() {
+  return requestJson<ScanProgress>('/api/admin/scan-progress');
 }
 
 export function fetchAuthStatus() {

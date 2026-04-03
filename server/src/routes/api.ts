@@ -353,6 +353,14 @@ router.get('/status', (_request, response) => {
   response.json(galleryService.getStatus());
 });
 
+router.get('/scan-progress', (_request, response) => {
+  response.json(galleryService.getScanProgress());
+});
+
+router.get('/admin/scan-progress', requireCapability('canAccessSettings', 'Admin access is required.'), (_request, response) => {
+  response.json(galleryService.getAdminScanProgress());
+});
+
 router.put(
   '/admin/settings/home-feed-default',
   requireCapability('canAccessSettings', 'Admin access is required.'),

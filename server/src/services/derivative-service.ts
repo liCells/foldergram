@@ -75,6 +75,11 @@ export interface ThumbnailDerivativeResult {
   generatedThumbnail: boolean;
 }
 
+export interface DerivativePathOverrides {
+  thumbnailPath?: string;
+  previewPath?: string;
+}
+
 interface ReadMediaMetadataOptions {
   fileSize?: number;
 }
@@ -392,10 +397,11 @@ async function generateVideoDerivatives(
 export async function generateThumbnailDerivative(
   sourcePath: string,
   relativePath: string,
-  force = false
+  force = false,
+  overrides: DerivativePathOverrides = {}
 ): Promise<ThumbnailDerivativeResult> {
   const mediaType = getMediaTypeFromExtension(path.extname(relativePath));
-  const thumbnailPath = getThumbnailRelativePath(relativePath);
+  const thumbnailPath = overrides.thumbnailPath ?? getThumbnailRelativePath(relativePath);
   const thumbnailAbsolutePath = safeJoin(appConfig.thumbnailsDir, thumbnailPath);
   const shouldWriteThumbnail = force || !(await fileExists(thumbnailAbsolutePath));
 
@@ -413,10 +419,15 @@ export async function generateThumbnailDerivative(
   };
 }
 
-export async function generateDerivatives(sourcePath: string, relativePath: string, force = false): Promise<DerivativeResult> {
+export async function generateDerivatives(
+  sourcePath: string,
+  relativePath: string,
+  force = false,
+  overrides: DerivativePathOverrides = {}
+): Promise<DerivativeResult> {
   const mediaType = getMediaTypeFromExtension(path.extname(relativePath));
-  const thumbnailPath = getThumbnailRelativePath(relativePath);
-  const previewPath = getPreviewRelativePath(relativePath, mediaType);
+  const thumbnailPath = overrides.thumbnailPath ?? getThumbnailRelativePath(relativePath);
+  const previewPath = overrides.previewPath ?? getPreviewRelativePath(relativePath, mediaType);
   const thumbnailAbsolutePath = safeJoin(appConfig.thumbnailsDir, thumbnailPath);
   const previewAbsolutePath = safeJoin(appConfig.previewsDir, previewPath);
   const metadata = await readMediaMetadata(sourcePath, mediaType);

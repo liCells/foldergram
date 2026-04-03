@@ -43,6 +43,54 @@ const HAS_AVATAR_STORY_SQL = `
     LIMIT 1
   )
 `;
+const ACTIVE_FOLDER_AVATAR_IMAGE_ID_SQL = `
+  SELECT avatar_images.id
+  FROM images AS avatar_images
+  WHERE avatar_images.id = folders.avatar_image_id
+    AND avatar_images.folder_id = folders.id
+    AND avatar_images.is_deleted = 0
+    AND avatar_images.is_trashed = 0
+  LIMIT 1
+`;
+const FALLBACK_FOLDER_AVATAR_IMAGE_ID_SQL = `
+  SELECT fallback_images.id
+  FROM images AS fallback_images
+  WHERE fallback_images.folder_id = folders.id
+    AND fallback_images.is_deleted = 0
+    AND fallback_images.is_trashed = 0
+    AND LOWER(fallback_images.filename) NOT IN (${COVER_FILENAME_SQL})
+  ORDER BY fallback_images.sort_timestamp DESC, fallback_images.id DESC
+  LIMIT 1
+`;
+const FOLDER_SUMMARY_AVATAR_IMAGE_ID_SQL = `
+  COALESCE(
+    (${ACTIVE_FOLDER_AVATAR_IMAGE_ID_SQL}),
+    (${FALLBACK_FOLDER_AVATAR_IMAGE_ID_SQL})
+  )
+`;
+const FOLDER_SUMMARY_AVATAR_THUMBNAIL_PATH_SQL = `
+  COALESCE(
+    (
+      SELECT avatar_images.thumbnail_path
+      FROM images AS avatar_images
+      WHERE avatar_images.id = folders.avatar_image_id
+        AND avatar_images.folder_id = folders.id
+        AND avatar_images.is_deleted = 0
+        AND avatar_images.is_trashed = 0
+      LIMIT 1
+    ),
+    (
+      SELECT fallback_images.thumbnail_path
+      FROM images AS fallback_images
+      WHERE fallback_images.folder_id = folders.id
+        AND fallback_images.is_deleted = 0
+        AND fallback_images.is_trashed = 0
+        AND LOWER(fallback_images.filename) NOT IN (${COVER_FILENAME_SQL})
+      ORDER BY fallback_images.sort_timestamp DESC, fallback_images.id DESC
+      LIMIT 1
+    )
+  )
+`;
 const IMAGE_FILENAME_SEARCH_SQL = 'LOWER(images.filename)';
 const FOLDER_NAME_SEARCH_SQL = 'LOWER(folders.name)';
 const FOLDER_SLUG_SEARCH_SQL = 'LOWER(folders.slug)';
@@ -82,6 +130,18 @@ const FEED_IMAGE_SELECT_SQL = `
     images.taken_at AS takenAt
   FROM images
   INNER JOIN folders ON folders.id = images.folder_id
+`;
+const FOLDER_SUMMARY_SELECT_SQL = `
+  SELECT
+    folders.*,
+    COUNT(images.id) AS image_count,
+    SUM(CASE WHEN images.media_type = 'video' THEN 1 ELSE 0 END) AS video_count,
+    MAX(images.mtime_ms) AS latest_image_mtime_ms,
+    CASE WHEN ${HAS_AVATAR_STORY_SQL} THEN 1 ELSE 0 END AS has_avatar_story,
+    ${FOLDER_SUMMARY_AVATAR_IMAGE_ID_SQL} AS summary_avatar_image_id,
+    ${FOLDER_SUMMARY_AVATAR_THUMBNAIL_PATH_SQL} AS summary_avatar_thumbnail_path
+  FROM folders
+  INNER JOIN images ON images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_SQL}
 `;
 
 interface MediaSearchSql {
@@ -207,6 +267,7 @@ export interface SaveFolderResult {
 
 export interface UpsertImageInput {
   folderId: number;
+  assetKey?: string | null;
   filename: string;
   extension: string;
   relativePath: string;
@@ -233,6 +294,7 @@ export interface UpsertImageInput {
 
 export interface RefreshIndexedImageInput {
   folderId: number;
+  assetKey?: string | null;
   filename: string;
   extension: string;
   relativePath: string;
@@ -252,6 +314,29 @@ export interface RefreshIndexedImageInput {
   exifJson: string | null;
   thumbnailPath: string;
   previewPath: string;
+  playbackStrategy?: PlaybackStrategy | null;
+}
+
+export interface ReconcileImageMoveInput {
+  id: number;
+  folderId: number;
+  filename: string;
+  extension: string;
+  relativePath: string;
+  absolutePath: string;
+  fileSize: number;
+  width: number;
+  height: number;
+  displayOrientation?: number | null;
+  mediaType: MediaType;
+  mimeType: string;
+  durationMs: number | null;
+  isAnimated?: boolean | null;
+  fingerprint: string;
+  mtimeMs: number;
+  takenAt: number;
+  takenAtSource: TakenAtSource;
+  exifJson: string | null;
   playbackStrategy?: PlaybackStrategy | null;
 }
 
@@ -276,14 +361,7 @@ export const folderRepository = {
     return database
       .prepare(
         `
-        SELECT
-          folders.*,
-          COUNT(images.id) AS image_count,
-          SUM(CASE WHEN images.media_type = 'video' THEN 1 ELSE 0 END) AS video_count,
-          MAX(images.mtime_ms) AS latest_image_mtime_ms,
-          CASE WHEN ${HAS_AVATAR_STORY_SQL} THEN 1 ELSE 0 END AS has_avatar_story
-        FROM folders
-        INNER JOIN images ON images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+        ${FOLDER_SUMMARY_SELECT_SQL}
         WHERE folders.role = 'normal'
         GROUP BY folders.id
         ORDER BY latest_image_mtime_ms DESC, folders.name COLLATE NOCASE ASC, folders.folder_path COLLATE NOCASE ASC
@@ -310,14 +388,7 @@ export const folderRepository = {
     return database
       .prepare(
         `
-        SELECT
-          folders.*,
-          COUNT(images.id) AS image_count,
-          SUM(CASE WHEN images.media_type = 'video' THEN 1 ELSE 0 END) AS video_count,
-          MAX(images.mtime_ms) AS latest_image_mtime_ms,
-          CASE WHEN ${HAS_AVATAR_STORY_SQL} THEN 1 ELSE 0 END AS has_avatar_story
-        FROM folders
-        INNER JOIN images ON images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+        ${FOLDER_SUMMARY_SELECT_SQL}
         WHERE folders.slug = ? AND folders.role = 'normal'
         GROUP BY folders.id
         `
@@ -542,13 +613,14 @@ export const imageRepository = {
     database.prepare(
       `
       INSERT INTO images (
-        folder_id, filename, extension, relative_path, absolute_path, file_size, width, height, display_orientation,
+        folder_id, asset_key, filename, extension, relative_path, absolute_path, file_size, width, height, display_orientation,
         media_type, mime_type, duration_ms, is_animated, checksum_or_fingerprint, mtime_ms, first_seen_at, sort_timestamp, taken_at, taken_at_source, exif_json,
-        thumbnail_path, preview_path, playback_strategy, is_deleted, is_trashed, trashed_at, updated_at
+        thumbnail_path, preview_path, playback_strategy, is_deleted, deleted_at, is_trashed, trashed_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NULL, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 0, NULL, ?)
       ON CONFLICT(relative_path) DO UPDATE SET
         folder_id = excluded.folder_id,
+        asset_key = COALESCE(images.asset_key, excluded.asset_key),
         filename = excluded.filename,
         extension = excluded.extension,
         absolute_path = excluded.absolute_path,
@@ -569,10 +641,12 @@ export const imageRepository = {
         preview_path = excluded.preview_path,
         playback_strategy = excluded.playback_strategy,
         is_deleted = 0,
+        deleted_at = NULL,
         updated_at = excluded.updated_at
       `
     ).run(
       input.folderId,
+      input.assetKey ?? null,
       input.filename,
       input.extension,
       input.relativePath,
@@ -607,6 +681,7 @@ export const imageRepository = {
       UPDATE images
       SET
         folder_id = ?,
+        asset_key = COALESCE(asset_key, ?),
         filename = ?,
         extension = ?,
         absolute_path = ?,
@@ -627,11 +702,13 @@ export const imageRepository = {
         preview_path = ?,
         playback_strategy = ?,
         is_deleted = 0,
+        deleted_at = NULL,
         updated_at = ?
       WHERE relative_path = ?
       `
     ).run(
       input.folderId,
+      input.assetKey ?? null,
       input.filename,
       input.extension,
       input.absolutePath,
@@ -659,7 +736,10 @@ export const imageRepository = {
   },
 
   markDeleted(relativePath: string): void {
-    database.prepare('UPDATE images SET is_deleted = 1, updated_at = ? WHERE relative_path = ?').run(nowIso(), relativePath);
+    const deletedAt = nowIso();
+    database
+      .prepare('UPDATE images SET is_deleted = 1, deleted_at = COALESCE(deleted_at, ?), updated_at = ? WHERE relative_path = ?')
+      .run(deletedAt, deletedAt, relativePath);
   },
 
   markFolderImagesDeleted(folderId: number, activeRelativePaths: string[]): number {
@@ -678,12 +758,81 @@ export const imageRepository = {
   },
 
   markAllDeletedByFolder(folderId: number): number {
-    const result = database.prepare('UPDATE images SET is_deleted = 1, updated_at = ? WHERE folder_id = ? AND is_deleted = 0').run(nowIso(), folderId);
+    const deletedAt = nowIso();
+    const result = database
+      .prepare('UPDATE images SET is_deleted = 1, deleted_at = COALESCE(deleted_at, ?), updated_at = ? WHERE folder_id = ? AND is_deleted = 0')
+      .run(deletedAt, deletedAt, folderId);
     return Number(result.changes ?? 0);
   },
 
   reactivate(relativePath: string): void {
-    database.prepare('UPDATE images SET is_deleted = 0, updated_at = ? WHERE relative_path = ?').run(nowIso(), relativePath);
+    database.prepare('UPDATE images SET is_deleted = 0, deleted_at = NULL, updated_at = ? WHERE relative_path = ?').run(nowIso(), relativePath);
+  },
+
+  updateAssetKey(id: number, assetKey: string): void {
+    database.prepare('UPDATE images SET asset_key = ?, updated_at = ? WHERE id = ?').run(assetKey, nowIso(), id);
+  },
+
+  updateDerivativePaths(id: number, thumbnailPath: string, previewPath: string): void {
+    database
+      .prepare('UPDATE images SET thumbnail_path = ?, preview_path = ?, updated_at = ? WHERE id = ?')
+      .run(thumbnailPath, previewPath, nowIso(), id);
+  },
+
+  reconcileMove(input: ReconcileImageMoveInput): ImageRecord {
+    database.prepare(
+      `
+      UPDATE images
+      SET
+        folder_id = ?,
+        filename = ?,
+        extension = ?,
+        relative_path = ?,
+        absolute_path = ?,
+        file_size = ?,
+        width = ?,
+        height = ?,
+        display_orientation = ?,
+        media_type = ?,
+        mime_type = ?,
+        duration_ms = ?,
+        is_animated = ?,
+        checksum_or_fingerprint = ?,
+        mtime_ms = ?,
+        taken_at = ?,
+        taken_at_source = ?,
+        exif_json = ?,
+        playback_strategy = ?,
+        is_deleted = 0,
+        deleted_at = NULL,
+        updated_at = ?
+      WHERE id = ?
+      `
+    ).run(
+      input.folderId,
+      input.filename,
+      input.extension,
+      input.relativePath,
+      input.absolutePath,
+      input.fileSize,
+      input.width,
+      input.height,
+      input.displayOrientation ?? null,
+      input.mediaType,
+      input.mimeType,
+      input.durationMs,
+      serializeAnimatedFlag(input.isAnimated),
+      input.fingerprint,
+      input.mtimeMs,
+      input.takenAt,
+      input.takenAtSource,
+      input.exifJson,
+      input.playbackStrategy ?? 'preview',
+      nowIso(),
+      input.id
+    );
+
+    return this.getById(input.id) as ImageRecord;
   },
 
   moveToTrash(id: number, trashedAt = nowIso()): boolean {
@@ -1108,6 +1257,50 @@ export const imageRepository = {
       .all() as unknown as ImageRecord[];
   },
 
+  listByIdRange(afterId: number, limit: number): ImageRecord[] {
+    return database
+      .prepare('SELECT * FROM images WHERE id > ? ORDER BY id ASC LIMIT ?')
+      .all(afterId, limit) as unknown as ImageRecord[];
+  },
+
+  countAll(): number {
+    return Number((database.prepare('SELECT COUNT(*) AS count FROM images').get() as { count: number }).count);
+  },
+
+  countUpToId(id: number): number {
+    return Number((database.prepare('SELECT COUNT(*) AS count FROM images WHERE id <= ?').get(id) as { count: number }).count);
+  },
+
+  countMissingAssetKeys(): number {
+    return Number(
+      (database.prepare('SELECT COUNT(*) AS count FROM images WHERE asset_key IS NULL OR asset_key = \'\'').get() as { count: number }).count
+    );
+  },
+
+  countPendingDerivativeMigrationRows(): number {
+    return Number(
+      (
+        database
+          .prepare(
+            `
+            SELECT COUNT(*) AS count
+            FROM images
+            WHERE asset_key IS NULL
+              OR TRIM(asset_key) = ''
+              OR LOWER(thumbnail_path) != LOWER(SUBSTR(TRIM(asset_key), 1, 2) || '/' || LOWER(TRIM(asset_key)) || '.webp')
+              OR LOWER(preview_path) != LOWER(
+                SUBSTR(TRIM(asset_key), 1, 2)
+                || '/'
+                || LOWER(TRIM(asset_key))
+                || CASE WHEN media_type = 'video' THEN '.mp4' ELSE '.webp' END
+              )
+            `
+          )
+          .get() as { count: number }
+      ).count
+    );
+  },
+
   countMissingTimestampMetadataByFolder(folderId: number): number {
     return Number(
       (
@@ -1265,6 +1458,44 @@ export const imageRepository = {
 
   countDeleted(): number {
     return Number((database.prepare('SELECT COUNT(*) AS count FROM images WHERE is_deleted = 1').get() as { count: number }).count);
+  },
+
+  listMoveCandidates(fileSize: number, mtimeMs: number, extension: string): ImageRecord[] {
+    return database.prepare(
+      `
+      SELECT *
+      FROM images
+      WHERE file_size = ?
+        AND ROUND(mtime_ms) = ?
+        AND LOWER(extension) = LOWER(?)
+        AND is_deleted = 0
+        AND is_trashed = 0
+      ORDER BY id ASC
+      `
+    ).all(fileSize, Math.round(mtimeMs), extension) as unknown as ImageRecord[];
+  },
+
+  listSoftDeletedDerivativeCandidates(cutoffIso: string): Array<Pick<ImageRecord, 'id' | 'thumbnail_path' | 'preview_path'>> {
+    return database.prepare(
+      `
+      SELECT id, thumbnail_path, preview_path
+      FROM images
+      WHERE is_deleted = 1
+        AND deleted_at IS NOT NULL
+        AND deleted_at <= ?
+      ORDER BY id ASC
+      `
+    ).all(cutoffIso) as Array<Pick<ImageRecord, 'id' | 'thumbnail_path' | 'preview_path'>>;
+  },
+
+  listAllDerivativePaths(): Array<Pick<ImageRecord, 'thumbnail_path' | 'preview_path'>> {
+    return database.prepare('SELECT thumbnail_path, preview_path FROM images').all() as Array<Pick<ImageRecord, 'thumbnail_path' | 'preview_path'>>;
+  },
+
+  listDerivativeReferences(): Array<Pick<ImageRecord, 'thumbnail_path' | 'preview_path' | 'is_deleted' | 'deleted_at'>> {
+    return database
+      .prepare('SELECT thumbnail_path, preview_path, is_deleted, deleted_at FROM images')
+      .all() as Array<Pick<ImageRecord, 'thumbnail_path' | 'preview_path' | 'is_deleted' | 'deleted_at'>>;
   },
 
   countByMediaType(mediaType: MediaType): number {

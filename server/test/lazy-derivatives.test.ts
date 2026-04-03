@@ -346,8 +346,8 @@ describe.sequential('DERIVATIVE_MODE lazy behavior', () => {
 
     const images = imageRepository.listActive();
     expect(images).toHaveLength(1);
-    expect(images[0]!.thumbnail_path).toMatch(/album3/);
-    expect(images[0]!.preview_path).toMatch(/album3/);
+    expect(images[0]!.thumbnail_path).toMatch(/^[a-f0-9]{2}\/[a-f0-9]{32}\.webp$/);
+    expect(images[0]!.preview_path).toMatch(/^[a-f0-9]{2}\/[a-f0-9]{32}\.webp$/);
   });
 
   it('generates a missing thumbnail on first request, reuses it on later requests, and preserves cache headers', async () => {

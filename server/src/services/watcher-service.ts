@@ -75,7 +75,9 @@ class WatcherService {
 
         if (this.fullRescanRequested) {
           this.fullRescanRequested = false;
-          await scannerService.scanAll('watcher');
+          await scannerService.scanAll('watcher', {
+            allowDerivativeMigration: false
+          });
           return;
         }
 

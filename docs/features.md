@@ -18,7 +18,7 @@ It includes:
 - feed-card avatar rings that can open an App Folder's avatar story in place when that folder has stories
 - an active home-feed video player that promotes one visible video card at a time and gives that card play, mute, and fullscreen controls
 - feed-card actions for downloading the original media file and opening the original in a new tab
-- a startup scan state when the first index is still being built
+- scan progress states that distinguish discovery from later media-processing work while the library is being prepared
 - a rebuild notice when the configured gallery root changed
 - desktop recommendations for folders based on recency, likes, and recent navigation
 - infinite loading for feed pagination
@@ -185,7 +185,7 @@ Its left sidebar is split into:
 
 | Section | What it contains |
 | --- | --- |
-| `Scan & Library` | Live scan state, manual scan, thumbnail-only rebuild, and library-index rebuild actions. |
+| `Scan & Library` | Phase-aware live scan state, manual scan, thumbnail-only rebuild, and library-index rebuild actions. |
 | `General Settings` | Home and Reels default feed modes, stories-folders mode, excluded-folder rules, migration notices, and save-and-rescan prompts for those app-wide changes. |
 | `Security & Access` | Admin password, viewer password, public mode, sign-out, and related auth controls. |
 | `System Status` | Storage and index state plus last completed scan details. |
@@ -193,6 +193,9 @@ Its left sidebar is split into:
 In `General Settings`, env-backed excluded-folder rules are shown read-only and
 custom rules are saved at runtime. Changing stories mode or excluded folders
 still requires a follow-up scan from `Scan & Library`.
+
+The live scan state stays open-ended during discovery and becomes determinate
+when later media-processing work has a known total.
 
 ### Access protection
 

@@ -97,6 +97,8 @@ The Settings sidebar is split into:
 - `THUMBNAILS_DIR` and `PREVIEWS_DIR` must be separate, non-overlapping directories.
 - `THUMBNAILS_DIR` cannot contain `GALLERY_ROOT`.
 - `PREVIEWS_DIR` cannot contain `GALLERY_ROOT`.
+- `GALLERY_ROOT` only needs read access for scans and originals.
+- `DB_DIR`, `THUMBNAILS_DIR`, and `PREVIEWS_DIR` must be writable.
 
 Foldergram normalizes path separators so the same rules work with POSIX-style and
 Windows-style paths.
@@ -130,7 +132,7 @@ Behavior:
 - `eager` generates thumbnails and previews during scans
 - `lazy` still indexes metadata during scans, but missing files are generated on the first request to `/thumbnails/...` or `/previews/...` and then cached on disk
 - lazy mode applies to thumbnails and previews
-- lazy mode keeps derivative URLs deterministic because the indexed relative derivative paths are still stored in SQLite
+- lazy mode keeps derivative URLs deterministic because the stored asset-key derivative paths are still persisted in SQLite
 
 ### Recommended combinations
 
@@ -142,10 +144,37 @@ Behavior:
 ### Settings actions and lazy mode
 
 - `Scan Library` always refreshes index metadata.
-- `Rebuild Library Index` resets and rebuilds the SQLite-backed index, then reuses any matching derivatives already on disk.
+- `Rebuild Library Index` resets and rebuilds the SQLite-backed index. Existing sharded derivatives remain reusable when the same indexed rows survive the upgrade path.
 - In `DERIVATIVE_MODE=lazy`, neither a normal scan nor `Rebuild Library Index` pre-generates missing thumbnails or previews.
 - `Regenerate Thumbnails` remains a manual thumbnail and video-poster rebuild only. It does not rebuild previews.
 - Runtime-only app-wide controls such as stories mode and excluded folders live under `Settings -> General Settings`, while the scan and rebuild actions live under `Settings -> Scan & Library`.
+
+## Derivative layout upgrade
+
+Recent versions store derivatives under sharded asset-key paths instead of
+mirroring the gallery tree. Existing libraries migrate on the next full scan:
+
+- current derivative paths use a single shard segment based on the first two hex characters of `asset_key`, such as `thumbnails/ab/<asset_key>.webp` and `previews/ab/<asset_key>.webp`
+- old mirrored rows keep working until the migration runs
+- the migration backfills `asset_key` and moves derivative files in place
+- stored derivative paths are updated only when the destination file already exists
+- if a legacy derivative still exists but the stored path is broken, the next full scan repairs it before falling back to regeneration
+- after migration, full rescans can preserve the same indexed media identity across safe folder moves
+- stale derivatives from soft-deleted files are cleaned up after the retention window on later successful full scans
+
+## Live scan progress
+
+Foldergram exposes live scan state in three places:
+
+- `GET /api/status` includes the current viewer-safe `scan` snapshot alongside broader shell status
+- `GET /api/scan-progress` returns the same viewer-safe scan payload on its own for lighter polling
+- `GET /api/admin/scan-progress` returns the admin-detailed scan payload, including current file and folder detail when available
+
+Scan phases behave as follows:
+
+- `migration` is determinate and reports checked rows, moved files, repaired files, missing files, and asset-key backfills
+- `discovery` reports discovered and processed folders and posts, but remains open-ended while the scanner is still finding additional folders
+- `derivatives` is determinate and reports queued-versus-completed jobs plus generated thumbnails and previews
 
 ## Managed path ignores
 
@@ -236,7 +265,10 @@ Foldergram marks the library as requiring a rebuild. Until that rebuild happens:
 - manual rescans return `409`
 - thumbnail rebuilds return `409`
 
-Viewer-safe shell status comes from `GET /api/status`.
+Viewer-safe shell status comes from `GET /api/status`, with dedicated live scan
+polling available from `GET /api/scan-progress`.
 
 The current and previous gallery roots remain exposed only in
+`GET /api/admin/stats`. Admin-only live scan file and folder detail is available
+from `GET /api/admin/scan-progress` and from the `scan` field in
 `GET /api/admin/stats`.

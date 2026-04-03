@@ -7,6 +7,7 @@ export type IndexedFileStatus = 'unchanged' | 'new' | 'updated';
 export interface FullScanOptions {
   repairUnchangedDerivatives: boolean;
   forceNewFileDerivatives: boolean;
+  allowDerivativeMigration: boolean;
 }
 
 export interface FolderScanFileFingerprint {
@@ -40,7 +41,8 @@ export interface UnchangedImageRefreshDecisionInput {
 
 const defaultFullScanOptions: FullScanOptions = {
   repairUnchangedDerivatives: true,
-  forceNewFileDerivatives: true
+  forceNewFileDerivatives: true,
+  allowDerivativeMigration: true
 };
 
 export function resolveFullScanOptions(options: Partial<FullScanOptions> = {}): FullScanOptions {

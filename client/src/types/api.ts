@@ -2,6 +2,18 @@ export type FeedMode = 'recent' | 'rediscover' | 'random';
 export type ReelsFeedMode = 'recommended' | 'recent' | 'random';
 export type FeedRailKind = 'moments' | 'highlights';
 export type StoryCapsulePresentation = 'avatar' | 'highlight';
+export type ScanOperation =
+  | 'checking_derivatives'
+  | 'backfilling_asset_key'
+  | 'moving_thumbnail'
+  | 'moving_preview'
+  | 'repairing_thumbnail'
+  | 'repairing_preview'
+  | 'regenerating_derivatives'
+  | 'discovering_media'
+  | 'generating_thumbnail'
+  | 'generating_preview'
+  | 'generating_thumbnail_and_preview';
 
 export interface HomeFeedDefaultSetting {
   defaultMode: FeedMode;
@@ -206,9 +218,15 @@ export interface ScanRunSummary {
 export interface ScanProgress {
   isScanning: boolean;
   scanReason: string | null;
-  phase: 'idle' | 'discovery' | 'derivatives';
+  phase: 'idle' | 'migration' | 'discovery' | 'derivatives';
   startedAt: string | null;
   runId: number | null;
+  migrationTotalRows: number;
+  processedMigrationRows: number;
+  migratedDerivativeFiles: number;
+  missingDerivativeFiles: number;
+  repairedDerivativeFiles: number;
+  backfilledAssetKeys: number;
   discoveredFolders: number;
   processedFolders: number;
   discoveredImages: number;
@@ -217,6 +235,9 @@ export interface ScanProgress {
   processedDerivativeJobs: number;
   generatedThumbnails: number;
   generatedPreviews: number;
+  currentOperation: ScanOperation | null;
+  currentFile: string | null;
+  currentPhaseMessage: string | null;
   currentFolder: string | null;
   lastCompletedScan: ScanRunSummary | null;
 }
@@ -273,6 +294,8 @@ export interface AppStats extends AppStatus {
     currentGalleryRoot: string;
     previousGalleryRoot: string | null;
     lastSuccessfulGalleryRoot: string | null;
+    legacyDerivativeMigrationPending: boolean;
+    pendingDerivativeMigrationRows: number;
   };
   lastScan: ScanRunSummary | null;
 }

@@ -51,7 +51,11 @@ directories, so subsequent requests use the cached file on disk.
 
 ## Derivative mapping
 
-Foldergram mirrors relative source paths into the derivative roots.
+Foldergram stores derivatives by stable asset key, not by source-relative path.
+Thumbnails and previews share the same shard layout so a media item keeps the
+same derivative location even when its source folder path changes.
+The current layout uses a single shard segment based on the first two hex
+characters of `asset_key`.
 
 | Source media | Thumbnail output | Preview output |
 | --- | --- | --- |
@@ -62,8 +66,13 @@ Examples:
 
 | Source | Thumbnail | Preview |
 | --- | --- | --- |
-| `trips/oslo/IMG_0001.jpg` | `trips/oslo/IMG_0001.webp` | `trips/oslo/IMG_0001.webp` |
-| `trips/oslo/clip-01.mov` | `trips/oslo/clip-01.webp` | `trips/oslo/clip-01.mp4` |
+| `trips/oslo/IMG_0001.jpg` | `ab/abcd1234....webp` | `ab/abcd1234....webp` |
+| `trips/oslo/clip-01.mov` | `ef/ef01abcd....webp` | `ef/ef01abcd....mp4` |
+
+Existing libraries are migrated in place on the next full scan after upgrade.
+Old mirrored derivative paths keep working until that migration completes. If a
+stored derivative path points at a missing file during the upgrade, Foldergram
+keeps the last known-good path until the new target is repaired or regenerated.
 
 ## Image derivatives
 
@@ -172,10 +181,11 @@ The thumbnail rebuild action:
 It does not regenerate previews. In lazy mode it acts as a thumbnail and poster
 prewarm only; preview generation still happens on demand.
 
-## Why derivatives are mirrored by relative path
+## Why derivatives are sharded by asset key
 
-Mirroring keeps the derivative tree predictable and lets Foldergram:
+Sharding keeps derivative directories small and decouples cache storage from the
+gallery tree. That lets Foldergram:
 
-- resolve public asset URLs without exposing arbitrary filesystem paths
-- reuse derivatives across scans when the relative source path still matches
-- remove per-folder derivative trees safely during folder deletion
+- preserve the same thumbnail and preview paths when a media item is moved
+- migrate existing derivatives in place instead of regenerating everything
+- garbage-collect stale derivatives by indexed asset reference instead of by mirrored folder tree

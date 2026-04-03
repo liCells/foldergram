@@ -41,6 +41,9 @@
             <div class="grid gap-[0.2rem] min-w-0">
               <strong class="text-[0.96rem] leading-tight tracking-[-0.02em]">{{ stickyScanTitle }}</strong>
               <p class="m-0 text-[0.84rem] leading-[1.45] text-white/75">{{ stickyScanSummary }}</p>
+              <p v-if="stickyScanActionLine" class="m-0 min-w-0 truncate text-[0.77rem] font-semibold text-[#dbeafe]">
+                {{ stickyScanActionLine }}
+              </p>
             </div>
             <span
               class="inline-flex items-center justify-center min-h-8 px-[0.72rem] py-[0.34rem] rounded-full text-[0.73rem] font-bold whitespace-nowrap text-[#dbeafe]"
@@ -56,15 +59,19 @@
             aria-hidden="true"
           >
             <div
+              v-if="stickyScanBarState.indeterminate"
+              class="app-shell__scan-bar app-shell__scan-bar--indeterminate absolute inset-y-0 left-0 w-[38%] rounded-full shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+            />
+            <div
+              v-else
               class="absolute inset-y-0 left-0 rounded-full shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
               style="background: linear-gradient(90deg, #38bdf8 0%, #4ec5ff 48%, #f8fafc 100%);"
-              :style="{ width: `${stickyScanProgressPercent}%` }"
+              :style="{ width: `${stickyScanBarState.percent}%` }"
             />
           </div>
 
           <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-[0.82rem] text-white/72">
             <span>{{ stickyScanMetricLine }}</span>
-            <span v-if="stickyScanCurrentFolder" class="min-w-0 truncate">Current: {{ stickyScanCurrentFolder }}</span>
           </div>
         </div>
       </section>
@@ -80,7 +87,13 @@ import SidebarNav from './SidebarNav.vue';
 import TopNav from './TopNav.vue';
 
 import { useAppStore } from '../stores/app';
-import type { ScanProgress } from '../types/api';
+import {
+  getScanActionLine,
+  getScanBarState,
+  getScanMetricLine,
+  getScanPhaseLabel,
+  getScanSummary
+} from '../utils/scan-progress';
 
 const appStore = useAppStore();
 const route = useRoute();
@@ -89,27 +102,6 @@ const isReelsShell = computed(() => route.meta.shell === 'reels');
 const isImmersiveShell = computed(() => isExploreShell.value || isReelsShell.value);
 const activeScan = computed(() => appStore.stats?.scan ?? null);
 const showStickyScanStatus = computed(() => Boolean(activeScan.value?.isScanning));
-
-function calculateProgressPercent(progress: ScanProgress | null) {
-  if (!progress?.isScanning) {
-    return 0;
-  }
-
-  const discoveryTotal = progress.discoveredFolders + progress.discoveredImages;
-  const discoveryDone = progress.processedFolders + progress.processedImages;
-  const discoveryRatio = discoveryTotal > 0 ? discoveryDone / discoveryTotal : 0;
-
-  if (progress.phase === 'discovery') {
-    return Math.round(Math.min(92, Math.max(8, discoveryRatio * 78)));
-  }
-
-  if (progress.queuedDerivativeJobs === 0) {
-    return 100;
-  }
-
-  const derivativeRatio = progress.processedDerivativeJobs / progress.queuedDerivativeJobs;
-  return Math.round(Math.min(99, 78 + derivativeRatio * 22));
-}
 
 const stickyScanTitle = computed(() => {
   if (activeScan.value?.scanReason === 'rebuild') {
@@ -123,62 +115,11 @@ const stickyScanTitle = computed(() => {
   return 'Scanning library';
 });
 
-const stickyScanPhaseLabel = computed(() => {
-  if (!activeScan.value?.isScanning) {
-    return 'Idle';
-  }
-
-  return activeScan.value.phase === 'derivatives' ? 'Derivatives' : 'Discovery';
-});
-
-const stickyScanSummary = computed(() => {
-  const scan = activeScan.value;
-  if (!scan) {
-    return '';
-  }
-
-  if (scan.scanReason === 'rebuild-thumbnails') {
-    if (scan.phase === 'discovery' && scan.discoveredImages === 0) {
-      return 'Preparing indexed media for thumbnail regeneration.';
-    }
-
-    return scan.phase === 'derivatives'
-      ? 'Rebuilding feed and profile thumbnails plus video posters from indexed media.'
-      : 'Loading indexed media before thumbnail regeneration starts.';
-  }
-
-  if (scan.scanReason === 'rebuild') {
-    if (scan.phase === 'discovery' && scan.discoveredFolders === 0 && scan.discoveredImages === 0) {
-      return 'Resetting the library index and preparing the current gallery root.';
-    }
-
-    return scan.phase === 'derivatives'
-      ? 'Reusing existing thumbnails and previews where possible, then generating any missing derivatives.'
-      : 'Rebuilding folders and indexed posts from the active gallery root.';
-  }
-
-  if (scan.phase === 'discovery' && scan.discoveredFolders === 0 && scan.discoveredImages === 0) {
-    return 'Walking the library tree to find media folders before indexing starts.';
-  }
-
-  return scan.phase === 'derivatives'
-    ? 'Generating thumbnails and previews for queued changes.'
-    : 'Scanning folders and indexing any changes found in the library.';
-});
-
-const stickyScanMetricLine = computed(() => {
-  const scan = activeScan.value;
-  if (!scan) {
-    return '';
-  }
-
-  const progressLabel = scan.scanReason === 'rebuild-thumbnails' ? 'processed' : 'indexed';
-  const totalImages = scan.discoveredImages || '?';
-  return `${scan.processedImages}/${totalImages} ${progressLabel} | ${scan.generatedThumbnails} thumbnails | ${scan.generatedPreviews} previews`;
-});
-
-const stickyScanCurrentFolder = computed(() => activeScan.value?.currentFolder ?? null);
-const stickyScanProgressPercent = computed(() => calculateProgressPercent(activeScan.value));
+const stickyScanPhaseLabel = computed(() => getScanPhaseLabel(activeScan.value));
+const stickyScanSummary = computed(() => getScanSummary(activeScan.value));
+const stickyScanActionLine = computed(() => getScanActionLine(activeScan.value));
+const stickyScanMetricLine = computed(() => getScanMetricLine(activeScan.value));
+const stickyScanBarState = computed(() => getScanBarState(activeScan.value));
 </script>
 
 <style scoped>
@@ -194,5 +135,23 @@ const stickyScanProgressPercent = computed(() => calculateProgressPercent(active
 
 .app-shell--reels .app-shell__main {
   overflow: hidden;
+}
+
+.app-shell__scan-bar {
+  background: linear-gradient(90deg, #38bdf8 0%, #4ec5ff 48%, #f8fafc 100%);
+}
+
+.app-shell__scan-bar--indeterminate {
+  animation: app-shell-scan-indeterminate 1.15s ease-in-out infinite;
+}
+
+@keyframes app-shell-scan-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(260%);
+  }
 }
 </style>

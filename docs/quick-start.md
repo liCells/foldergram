@@ -115,7 +115,10 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 - `http://localhost:4141` for the app
 - `http://localhost:4141/api/health` for a quick backend check
 
-On first run, the server performs a startup scan when there is no existing index.
+On first run, the server performs a startup scan because there is no existing
+index. Existing libraries keep using the current index on startup; run
+`Scan Library` from Settings whenever you want to refresh the library after
+changes.
 
 If you want the lowest upfront derivative work for a large library in Docker,
 edit `docker-compose.yml` before startup:

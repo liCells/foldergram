@@ -27,6 +27,10 @@ function createAppStatus(
       phase: 'idle',
       startedAt: null,
       runId: null,
+      migrationTotalRows: 0,
+      processedMigrationRows: 0,
+      migratedDerivativeFiles: 0,
+      missingDerivativeFiles: 0,
       discoveredFolders: 0,
       processedFolders: 0,
       discoveredImages: 0,
@@ -81,6 +85,8 @@ function createAppStats(): AppStats {
       currentGalleryRoot: '/gallery',
       previousGalleryRoot: null,
       lastSuccessfulGalleryRoot: '/gallery',
+      legacyDerivativeMigrationPending: false,
+      pendingDerivativeMigrationRows: 0,
       ignoredRootMediaCount: 0
     },
     lastScan: null
@@ -177,6 +183,26 @@ describe('SettingsView', () => {
 
     expect(saveButton).toBeDefined();
     expect(saveButton!.attributes('disabled')).toBeDefined();
+  });
+
+  it('shows the pending legacy derivative migration warning next to the scan action', async () => {
+    const appStore = useAppStore();
+    appStore.$patch({
+      stats: createAppStatus()
+    });
+
+    const pendingStats = createAppStats();
+    pendingStats.libraryIndex.legacyDerivativeMigrationPending = true;
+    pendingStats.libraryIndex.pendingDerivativeMigrationRows = 24;
+    vi.spyOn(galleryApi, 'fetchAdminStats').mockResolvedValue(pendingStats);
+
+    const wrapper = mountSettingsView();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Legacy derivative migration pending');
+    expect(wrapper.text()).toContain('24 indexed media records still use the old mirrored thumbnail and preview paths.');
+    expect(wrapper.text()).toContain('Run Scan Library to move legacy mirrored thumbnails and previews into the asset-key storage layout.');
+    expect(wrapper.text()).toContain('This keeps the current thumbnail paths and does not migrate legacy mirrored derivatives.');
   });
 
   it('saves the reels default from the general settings card', async () => {

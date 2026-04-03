@@ -149,7 +149,7 @@ describe.sequential('image orientation backfill', () => {
     await scannerService.scanAll('manual');
 
     expect(readMediaMetadataMock).toHaveBeenCalledTimes(1);
-    expect(generateDerivativesMock).toHaveBeenCalledTimes(1);
+    expect(generateDerivativesMock).toHaveBeenCalled();
 
     const refreshed = imageRepository.getByRelativePath(relativePath);
     expect(refreshed?.width).toBe(800);

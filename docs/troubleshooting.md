@@ -20,7 +20,10 @@ Check:
 
 - the configured paths in `.env`
 - whether those paths exist
-- whether they are writable by the current process
+- whether `DB_DIR`, `THUMBNAILS_DIR`, and `PREVIEWS_DIR` are writable by the current process
+
+`GALLERY_ROOT` is scanned read-only. It does not need write access unless you
+use delete actions that remove originals from the gallery.
 
 ## The database keeps resetting
 
@@ -63,6 +66,28 @@ library index already existed.
 
 Use Settings or `POST /api/admin/rebuild-index` to rebuild the library against
 the new root.
+
+## I moved files into different folders and expected them to stay the same post
+
+After the derivative-layout upgrade migration has completed, full rescans can
+preserve the same indexed row, likes, and derivative paths for safe file moves.
+
+Check:
+
+- that a full scan has already completed since the upgrade
+- that the moved file kept the same size and modification time
+- that the old source path is genuinely gone, not duplicated
+
+If a move is ambiguous, Foldergram falls back to the older delete-and-new
+behavior to avoid matching the wrong file.
+
+## Old thumbnails or previews are still on disk after files disappeared
+
+Missing originals are soft-deleted first. Stale derivatives are cleaned up only
+after the retention window on a later successful full scan.
+
+That is intentional so temporary share outages or accidental moves do not
+immediately delete cached derivatives.
 
 ## Moments are missing and highlights appear instead
 

@@ -22,6 +22,7 @@ describe.sequential('startup behavior', () => {
   let tempRoot = '';
   let appConfig: AppConfigModule['appConfig'];
   let scannerService: ScannerServiceModule['scannerService'];
+  let folderRepository: RepositoriesModule['folderRepository'];
   let imageRepository: RepositoriesModule['imageRepository'];
   let maintenanceRepository: RepositoriesModule['maintenanceRepository'];
   let scanRunRepository: RepositoriesModule['scanRunRepository'];
@@ -54,7 +55,7 @@ describe.sequential('startup behavior', () => {
 
     ({ appConfig } = await import('../src/config/env.js'));
     ({ scannerService } = await import('../src/services/scanner-service.js'));
-    ({ imageRepository, maintenanceRepository, scanRunRepository } = await import('../src/db/repositories.js'));
+    ({ folderRepository, imageRepository, maintenanceRepository, scanRunRepository } = await import('../src/db/repositories.js'));
 
     await Promise.all([
       fs.mkdir(appConfig.galleryRoot, { recursive: true }),
@@ -123,10 +124,68 @@ describe.sequential('startup behavior', () => {
     expect(scanRunRepository.latest()?.id ?? null).toBe(lastRunId);
   });
 
-  async function createSourceFile(relativePath: string): Promise<void> {
+  it('keeps startup idle when legacy derivative migration is still pending and waits for a manual scan', async () => {
+    const relativePath = 'legacy/photo-1.jpg';
+    const absolutePath = await createSourceFile(relativePath);
+    const thumbnailPath = getThumbnailRelativePath(relativePath);
+    const previewPath = getPreviewRelativePath(relativePath, 'image');
+    const folder = folderRepository.upsert({
+      slug: 'legacy',
+      name: 'legacy',
+      folderPath: 'legacy'
+    });
+
+    await fs.mkdir(path.dirname(path.join(appConfig.thumbnailsDir, thumbnailPath)), { recursive: true });
+    await fs.mkdir(path.dirname(path.join(appConfig.previewsDir, previewPath)), { recursive: true });
+    await fs.writeFile(path.join(appConfig.thumbnailsDir, thumbnailPath), 'legacy-thumb');
+    await fs.writeFile(path.join(appConfig.previewsDir, previewPath), 'legacy-preview');
+
+    imageRepository.upsert({
+      folderId: folder.id,
+      filename: 'photo-1.jpg',
+      extension: '.jpg',
+      relativePath,
+      absolutePath,
+      fileSize: Buffer.byteLength(`source:${relativePath}`),
+      width: 1600,
+      height: 1200,
+      mediaType: 'image',
+      mimeType: 'image/jpeg',
+      durationMs: null,
+      fingerprint: `${relativePath}:1`,
+      mtimeMs: Date.parse('2026-03-07T12:00:00.000Z'),
+      firstSeenAt: '2026-03-07T12:00:00.000Z',
+      sortTimestamp: Date.parse('2026-03-07T12:00:00.000Z'),
+      takenAt: Date.parse('2026-03-07T12:00:00.000Z'),
+      takenAtSource: 'mtime',
+      exifJson: '{}',
+      thumbnailPath,
+      previewPath
+    });
+
+    const action = scannerService.handleStartup('startup');
+
+    expect(action).toBe('idle');
+    await wait(50);
+
+    const untouched = imageRepository.getByRelativePath(relativePath);
+    expect(untouched?.asset_key).toBeNull();
+    expect(untouched?.thumbnail_path).toBe(thumbnailPath);
+    expect(untouched?.preview_path).toBe(previewPath);
+
+    await scannerService.scanAll('manual');
+
+    const migrated = imageRepository.getByRelativePath(relativePath);
+    expect(migrated?.asset_key).toMatch(/^[a-f0-9]{32}$/);
+    expect(migrated?.thumbnail_path).not.toBe(thumbnailPath);
+    expect(migrated?.preview_path).not.toBe(previewPath);
+  });
+
+  async function createSourceFile(relativePath: string): Promise<string> {
     const absolutePath = path.join(appConfig.galleryRoot, relativePath);
     await fs.mkdir(path.dirname(absolutePath), { recursive: true });
     await fs.writeFile(absolutePath, `source:${relativePath}`);
+    return absolutePath;
   }
 });
 

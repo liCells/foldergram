@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS folders (
 CREATE TABLE IF NOT EXISTS images (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   folder_id INTEGER NOT NULL,
+  asset_key TEXT NULL,
   filename TEXT NOT NULL,
   extension TEXT NOT NULL,
   relative_path TEXT NOT NULL UNIQUE,
@@ -43,6 +44,7 @@ CREATE TABLE IF NOT EXISTS images (
   preview_path TEXT NOT NULL,
   playback_strategy TEXT NOT NULL DEFAULT 'preview',
   is_deleted INTEGER NOT NULL DEFAULT 0,
+  deleted_at TEXT NULL,
   is_trashed INTEGER NOT NULL DEFAULT 0,
   trashed_at TEXT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -101,6 +103,8 @@ CREATE INDEX IF NOT EXISTS idx_images_folder_media_visible_sort ON images(folder
 CREATE INDEX IF NOT EXISTS idx_images_media_visible_sort ON images(media_type, is_deleted, is_trashed, sort_timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_images_trashed_listing ON images(is_trashed, is_deleted, trashed_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_images_relative_path ON images(relative_path);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_images_asset_key ON images(asset_key) WHERE asset_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_images_deleted_at ON images(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_folder_scan_state_updated_at ON folder_scan_state(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_likes_created_at ON likes(created_at DESC);
 `;

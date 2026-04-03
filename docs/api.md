@@ -272,7 +272,7 @@ Response shape:
     "latestImageMtimeMs": 1700000000000,
     "hasAvatarStory": false,
     "avatarImageId": 42,
-    "avatarUrl": "/thumbnails/trips/oslo/IMG_0001.webp?v=4"
+    "avatarUrl": "/thumbnails/ab/abcd1234ef567890abcd1234ef567890.webp?v=4"
   },
   "items": [],
   "page": 1,
@@ -454,7 +454,7 @@ Notable fields:
 | `folders` | Active indexed folders. |
 | `indexedImages` | Active indexed posts. The name is historical and still includes videos in the total feed count. |
 | `indexedVideos` | Active indexed videos only. |
-| `scan` | Live scan progress snapshot. `currentFolder` is redacted and `lastCompletedScan.error_text` is always `null`. |
+| `scan` | Viewer-safe live scan progress snapshot. It uses the same shape as `GET /api/scan-progress`, with `currentFolder` and `currentFile` redacted and `lastCompletedScan.error_text` forced to `null`. |
 | `storage` | Availability with a generic unavailable message only. |
 | `libraryIndex` | Rebuild requirement plus ignored root-media count. Gallery-root paths are omitted. |
 | `preferences.defaultHomeFeedMode` | Current app-wide default home feed mode. |
@@ -462,12 +462,56 @@ Notable fields:
 | `preferences.treatStoriesAsFolders` | Whether folders literally named `stories` are treated as ordinary app folders instead of reserved story sources. |
 | `storiesMigration` | Migration hint with `hasLegacyStoriesCandidates` and `decisionPending`. |
 
+### `GET /api/scan-progress`
+
+Returns the standalone viewer-safe scan payload used for lightweight polling.
+
+Access rules match `GET /api/status`:
+
+- `admin` and `viewer` sessions can read it when access protection is enabled
+- anonymous visitors can also read it when `viewer_access_mode=public`
+
+Notable fields:
+
+| Field | Notes |
+| --- | --- |
+| `isScanning` | Whether a scan or rebuild is currently running. |
+| `phase` | `idle`, `migration`, `discovery`, or `derivatives`. |
+| `scanReason` | Current trigger such as startup, manual rescan, index rebuild, or thumbnail rebuild. |
+| `currentPhaseMessage` | Short phase summary for the UI. |
+| `currentOperation` | Current action label such as derivative repair, derivative move, metadata discovery, or derivative generation. |
+| `migrationTotalRows` / `processedMigrationRows` | Progress through legacy derivative migration checks. |
+| `migratedDerivativeFiles` / `repairedDerivativeFiles` / `missingDerivativeFiles` / `backfilledAssetKeys` | Migration counters for moved, repaired, missing, and backfilled assets. |
+| `discoveredFolders` / `processedFolders` | Folder discovery counters. |
+| `discoveredImages` / `processedImages` | Indexed-post discovery counters. |
+| `queuedDerivativeJobs` / `processedDerivativeJobs` | Derivative job counters once the queue is known. |
+| `generatedThumbnails` / `generatedPreviews` | Completed derivative outputs in the current run. |
+| `currentFolder` / `currentFile` | Always `null` in this viewer-safe route. |
+| `lastCompletedScan` | Latest completed scan summary with `error_text` forced to `null`. |
+
+Notes:
+
+- discovery remains open-ended while folders and media are still being found, so clients should treat that phase as indeterminate even though the counters continue to advance
+- migration and derivative phases expose determinate totals once the work queue is known
+
+### `GET /api/admin/scan-progress`
+
+Returns the admin-detailed live scan payload.
+
+This route is read-only but `admin`-only.
+
+It uses the same overall shape as `GET /api/scan-progress`, with the following differences:
+
+- `currentFile` and `currentFolder` are populated when the active operation can identify a source path
+- `lastCompletedScan` is the full scan record, including `error_text`
+
 ### `GET /api/admin/stats`
 
 Returns the full admin operational payload.
 
 This route is read-only but `admin`-only. It extends `GET /api/status` with the
-additional fields below:
+additional fields below and uses the same admin-detailed `scan` payload as
+`GET /api/admin/scan-progress`:
 
 | Field | Notes |
 | --- | --- |

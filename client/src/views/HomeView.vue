@@ -111,25 +111,28 @@
 
       <!-- Initial scan state (no feed yet) -->
       <section v-else-if="showInitialScanState" class="grid gap-[0.85rem] px-5 py-5 mb-[1.1rem] border border-border rounded-[1rem] shadow-[var(--shadow)]" style="background: radial-gradient(circle at top right, rgba(0,149,246,0.12), transparent 38%), linear-gradient(180deg, var(--surface) 0%, color-mix(in srgb, var(--surface) 90%, var(--accent) 10%) 100%);">
-        <span class="text-accent-strong text-[0.75rem] font-bold tracking-[0.08em] uppercase">Startup scan in progress</span>
+        <div class="flex items-start justify-between gap-3 max-sm:flex-col max-sm:items-start">
+          <span class="text-accent-strong text-[0.75rem] font-bold tracking-[0.08em] uppercase">Startup scan in progress</span>
+          <span
+            data-test="initial-scan-phase"
+            class="inline-flex items-center justify-center min-h-8 px-[0.72rem] py-[0.34rem] rounded-full text-[0.73rem] font-bold whitespace-nowrap text-accent-strong"
+            style="background: color-mix(in srgb, var(--surface-alt) 78%, var(--accent) 22%);"
+          >
+            {{ initialScanPhaseLabel }}
+          </span>
+        </div>
         <h2 class="m-0">Indexing your library</h2>
         <p class="m-0 text-muted">{{ scanDescription }}</p>
+        <p v-if="scanActionLine" class="m-0 text-[0.86rem] font-semibold text-text">{{ scanActionLine }}</p>
         <dl class="grid grid-cols-4 gap-[0.8rem] m-0 max-sm:grid-cols-2">
-          <div class="px-[0.9rem] py-[0.8rem] rounded-[0.85rem]" style="background: color-mix(in srgb, var(--surface-alt) 88%, var(--accent) 12%)">
-            <dt class="m-0 mb-[0.25rem] text-muted text-[0.74rem] uppercase tracking-[0.05em]">Folders</dt>
-            <dd class="m-0 text-base font-bold">{{ appStore.stats?.scan.processedFolders ?? 0 }}/{{ appStore.stats?.scan.discoveredFolders ?? 0 }}</dd>
-          </div>
-          <div class="px-[0.9rem] py-[0.8rem] rounded-[0.85rem]" style="background: color-mix(in srgb, var(--surface-alt) 88%, var(--accent) 12%)">
-            <dt class="m-0 mb-[0.25rem] text-muted text-[0.74rem] uppercase tracking-[0.05em]">Posts indexed</dt>
-            <dd class="m-0 text-base font-bold">{{ appStore.stats?.scan.processedImages ?? 0 }}/{{ appStore.stats?.scan.discoveredImages ?? 0 }}</dd>
-          </div>
-          <div class="px-[0.9rem] py-[0.8rem] rounded-[0.85rem]" style="background: color-mix(in srgb, var(--surface-alt) 88%, var(--accent) 12%)">
-            <dt class="m-0 mb-[0.25rem] text-muted text-[0.74rem] uppercase tracking-[0.05em]">Thumbnails</dt>
-            <dd class="m-0 text-base font-bold">{{ appStore.stats?.scan.generatedThumbnails ?? 0 }}</dd>
-          </div>
-          <div class="px-[0.9rem] py-[0.8rem] rounded-[0.85rem]" style="background: color-mix(in srgb, var(--surface-alt) 88%, var(--accent) 12%)">
-            <dt class="m-0 mb-[0.25rem] text-muted text-[0.74rem] uppercase tracking-[0.05em]">Previews</dt>
-            <dd class="m-0 text-base font-bold">{{ appStore.stats?.scan.generatedPreviews ?? 0 }}</dd>
+          <div
+            v-for="stat in initialScanStats"
+            :key="stat.label"
+            class="px-[0.9rem] py-[0.8rem] rounded-[0.85rem]"
+            style="background: color-mix(in srgb, var(--surface-alt) 88%, var(--accent) 12%)"
+          >
+            <dt class="m-0 mb-[0.25rem] text-muted text-[0.74rem] uppercase tracking-[0.05em]">{{ stat.label }}</dt>
+            <dd class="m-0 text-base font-bold">{{ stat.value }}</dd>
           </div>
         </dl>
       </section>
@@ -284,6 +287,7 @@ import { useFoldersStore } from '../stores/folders';
 import { useMomentsStore } from '../stores/moments';
 import type { FeedMode } from '../types/api';
 import { buildLikedCountByFolder, selectHomeRecommendations } from '../utils/home-recommendations';
+import { getInitialScanStats, getScanActionLine, getScanPhaseLabel, getScanSummary } from '../utils/scan-progress';
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
@@ -408,27 +412,13 @@ const homeScanNote = computed(() => {
 
   return 'Run a scan after adding folders or moving files so the library can index them.';
 });
+const initialScanPhaseLabel = computed(() => getScanPhaseLabel(appStore.stats?.scan ?? null));
+const initialScanStats = computed(() => getInitialScanStats(appStore.stats?.scan ?? null));
 const scanDescription = computed(() => {
   const scan = appStore.stats?.scan;
-  if (!scan) {
-    return 'Preparing scan status...';
-  }
-
-  const currentFolder = scan.currentFolder ? ` Current folder: ${scan.currentFolder}.` : '';
-  if (scan.scanReason === 'rebuild-thumbnails') {
-    return `Regenerating thumbnails and video posters in the background.${currentFolder}`;
-  }
-
-  if (scan.phase === 'discovery' && scan.discoveredFolders === 0 && scan.discoveredImages === 0) {
-    return `Walking the library tree to find media folders before indexing begins.${currentFolder}`;
-  }
-
-  if (scan.phase === 'derivatives') {
-    return `Generating thumbnails and previews in the background.${currentFolder}`;
-  }
-
-  return `Indexing folders and posts so the library can open immediately.${currentFolder}`;
+  return scan ? getScanSummary(scan) : 'Preparing scan status...';
 });
+const scanActionLine = computed(() => getScanActionLine(appStore.stats?.scan ?? null));
 
 function wait(milliseconds: number) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));

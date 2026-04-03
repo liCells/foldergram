@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises';
-import path from 'node:path';
 
 import express from 'express';
 import pLimit from 'p-limit';
@@ -8,7 +7,6 @@ import { appConfig } from '../config/env.js';
 import { imageRepository } from '../db/repositories.js';
 import { log } from '../services/log-service.js';
 import { generateThumbnailDerivative, writeImagePreview, writeVideoPreview } from '../services/derivative-service.js';
-import { getMediaTypeFromExtension } from '../utils/image-utils.js';
 import { applyDerivativeErrorHeaders, applyProtectedMediaHeaders } from '../utils/media-response.js';
 import { normalizePath, safeJoin } from '../utils/path-utils.js';
 
@@ -116,7 +114,7 @@ async function serveOrGenerate(
     return;
   }
 
-  const mediaType = getMediaTypeFromExtension(path.extname(imageRecord.relative_path));
+  const mediaType = imageRecord.media_type;
   let generationPromise = inflightGenerations.get(absoluteOutputPath);
 
   if (!generationPromise) {
@@ -129,7 +127,9 @@ async function serveOrGenerate(
     generationPromise = generationLimit(async () => {
       try {
         if (kind === 'thumbnail') {
-          await generateThumbnailDerivative(imageRecord.absolute_path, imageRecord.relative_path, false);
+          await generateThumbnailDerivative(imageRecord.absolute_path, imageRecord.relative_path, false, {
+            thumbnailPath: imageRecord.thumbnail_path
+          });
           return;
         }
 

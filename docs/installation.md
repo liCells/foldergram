@@ -253,9 +253,12 @@ pnpm dev:docs
 
 On startup, the server checks storage availability and then decides whether to:
 
-- queue a startup scan
-- keep using the existing index
+- queue a startup scan for first-run indexing
+- keep using the existing index for already-initialized libraries
 - block scanning until a library rebuild happens after a gallery root change
+
+When a full library task runs, the UI reports discovery separately from later
+media-processing phases so long-running maintenance work stays understandable.
 
 If the configured database directory is unavailable, Foldergram falls back to an
 in-memory SQLite database. If the gallery, thumbnails, or previews directories

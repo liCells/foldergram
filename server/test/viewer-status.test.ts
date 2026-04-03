@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 type AppConfigModule = typeof import('../src/config/env.js');
 type GalleryServiceModule = typeof import('../src/services/gallery-service.js');
+type ScannerServiceModule = typeof import('../src/services/scanner-service.js');
 type RepositoriesModule = typeof import('../src/db/repositories.js');
 type StorageServiceModule = typeof import('../src/services/storage-service.js');
 type AppSettingKeysModule = typeof import('../src/constants/app-setting-keys.js');
@@ -14,6 +15,8 @@ describe.sequential('viewer-safe status payload', () => {
   let tempRoot = '';
   let appConfig: AppConfigModule['appConfig'];
   let galleryService: GalleryServiceModule['galleryService'];
+  let scannerService: ScannerServiceModule['scannerService'];
+  let imageRepository: RepositoriesModule['imageRepository'];
   let maintenanceRepository: RepositoriesModule['maintenanceRepository'];
   let appSettingsRepository: RepositoriesModule['appSettingsRepository'];
   let scanRunRepository: RepositoriesModule['scanRunRepository'];
@@ -35,7 +38,8 @@ describe.sequential('viewer-safe status payload', () => {
 
     ({ appConfig } = await import('../src/config/env.js'));
     ({ galleryService } = await import('../src/services/gallery-service.js'));
-    ({ maintenanceRepository, appSettingsRepository, scanRunRepository } = await import('../src/db/repositories.js'));
+    ({ scannerService } = await import('../src/services/scanner-service.js'));
+    ({ imageRepository, maintenanceRepository, appSettingsRepository, scanRunRepository } = await import('../src/db/repositories.js'));
     ({ storageService } = await import('../src/services/storage-service.js'));
     ({ HOME_FEED_DEFAULT_MODE_SETTING_KEY, REELS_FEED_DEFAULT_MODE_SETTING_KEY } = await import('../src/constants/app-setting-keys.js'));
   });
@@ -82,11 +86,72 @@ describe.sequential('viewer-safe status payload', () => {
       error_text: null
     });
     expect(status.scan.currentFolder).toBeNull();
+    expect(status.scan.currentFile).toBeNull();
     expect(status).not.toHaveProperty('lastScan');
     expect(status.storage).not.toHaveProperty('usingInMemoryDatabase');
     expect(status.libraryIndex).not.toHaveProperty('currentGalleryRoot');
     expect(status.libraryIndex).not.toHaveProperty('previousGalleryRoot');
     expect(status.libraryIndex).not.toHaveProperty('lastSuccessfulGalleryRoot');
+    expect(status.libraryIndex).not.toHaveProperty('legacyDerivativeMigrationPending');
+    expect(status.libraryIndex).not.toHaveProperty('pendingDerivativeMigrationRows');
+  });
+
+  it('keeps legacy derivative migration state in the admin-only stats payload', () => {
+    const pendingSpy = vi.spyOn(imageRepository, 'countPendingDerivativeMigrationRows').mockReturnValue(14);
+
+    const status = galleryService.getStatus();
+    const adminStats = galleryService.getStats();
+
+    expect(status.libraryIndex).not.toHaveProperty('legacyDerivativeMigrationPending');
+    expect(status.libraryIndex).not.toHaveProperty('pendingDerivativeMigrationRows');
+    expect(adminStats.libraryIndex).toMatchObject({
+      legacyDerivativeMigrationPending: true,
+      pendingDerivativeMigrationRows: 14
+    });
+
+    pendingSpy.mockRestore();
+  });
+
+  it('keeps detailed file and folder context in the admin-only scan progress payload', () => {
+    const progressSpy = vi.spyOn(scannerService, 'getProgress').mockReturnValue({
+      isScanning: true,
+      scanReason: 'manual',
+      phase: 'migration',
+      startedAt: '2026-03-21T00:00:00.000Z',
+      runId: 9,
+      migrationTotalRows: 12,
+      processedMigrationRows: 4,
+      migratedDerivativeFiles: 2,
+      missingDerivativeFiles: 1,
+      repairedDerivativeFiles: 3,
+      backfilledAssetKeys: 4,
+      discoveredFolders: 0,
+      processedFolders: 0,
+      discoveredImages: 0,
+      processedImages: 0,
+      queuedDerivativeJobs: 0,
+      processedDerivativeJobs: 0,
+      generatedThumbnails: 0,
+      generatedPreviews: 0,
+      currentOperation: 'moving_preview',
+      currentFile: 'private/album/photo.jpg',
+      currentPhaseMessage: 'Upgrading legacy thumbnails and previews before indexing starts.',
+      currentFolder: 'private/album',
+      lastCompletedScan: null
+    });
+
+    expect(galleryService.getScanProgress()).toMatchObject({
+      currentFile: null,
+      currentFolder: null,
+      currentOperation: 'moving_preview'
+    });
+    expect(galleryService.getAdminScanProgress()).toMatchObject({
+      currentFile: 'private/album/photo.jpg',
+      currentFolder: 'private/album',
+      currentOperation: 'moving_preview'
+    });
+
+    progressSpy.mockRestore();
   });
 
   it('replaces storage failure details with a generic viewer-safe message', () => {

@@ -30,6 +30,8 @@ Foldergram is a self-hosted web application that turns your local folders into a
 
 Foldergram indexes supported media from a configured `GALLERY_ROOT`, stores metadata in SQLite, generates thumbnails and previews, and serves a fast feed-style web app for local browsing. Derivatives can be generated during scans or lazily on first request, and image detail pages can be configured to use generated previews or originals. The current app includes Home, Reels, Explore, Library, Likes, Moments or Highlights, App Folder pages, post detail views, original-media download controls, delete actions, scan controls, and rebuild tools.
 
+Generated derivatives are now stored under stable asset-key shards instead of mirroring source folders. Existing libraries stay readable during upgrade, then migrate in place on the next full scan. During that upgrade, Foldergram keeps stored paths pointed at files that already exist, repairs surviving legacy derivatives where possible, and lets later folder moves preserve the same indexed media identity and reuse existing thumbnails/previews. Scan status distinguishes discovery, derivative migration, and derivative generation so long-running maintenance work can report the right kind of progress for each phase.
+
 ## Features
 
 - **Instagram-Inspired UI:** Enjoy a familiar feed layout, dedicated app folders (profiles), and a media viewer.
@@ -43,6 +45,7 @@ Foldergram indexes supported media from a configured `GALLERY_ROOT`, stores meta
 - Original-media download controls on home feed cards, post detail, and stories, alongside open-original actions.
 - Optional role-based local access with admin, viewer, and public browse modes.
 - Settings split into `General Settings` for Home/Reels defaults, stories mode, and excluded folders, plus `Scan & Library` for scan and rebuild actions.
+- Phase-aware scan progress for first indexing, derivative migration, and rebuilds.
 - A web app manifest plus production service worker registration.
 - A debounced filesystem watcher in development mode only.
 - No multi-user accounts, cloud sync, uploads, comments, messaging, notifications, or remote APIs.
@@ -214,9 +217,11 @@ data/
   ├─ gallery/       # Original source media
   ├─ db/
   │   └─ gallery.sqlite
-  ├─ thumbnails/    # Generated thumbnails and poster images
-  └─ previews/      # Generated previews
+  ├─ thumbnails/    # Generated thumbnails and poster images, sharded by asset key
+  └─ previews/      # Generated previews, sharded by asset key
 ```
+
+`GALLERY_ROOT` only needs read access. `DB_DIR`, `THUMBNAILS_DIR`, and `PREVIEWS_DIR` must be writable.
 
 | Variable                      | Default             | Description                                                               |
 | ----------------------------- | ------------------- | ------------------------------------------------------------------------- |

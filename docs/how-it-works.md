@@ -69,8 +69,8 @@ data/
   gallery/       # originals
   db/
     gallery.sqlite
-  thumbnails/    # mirrored thumbnail derivatives
-  previews/      # mirrored preview derivatives
+  thumbnails/    # asset-key-sharded thumbnail derivatives
+  previews/      # asset-key-sharded preview derivatives
 ```
 
 The database schema includes:
@@ -86,6 +86,7 @@ The database schema includes:
 
 The `images` table stores:
 
+- a stable `asset_key` used for derivative storage
 - normalized relative and absolute paths
 - file size and `mtime_ms`
 - width and height
@@ -94,9 +95,9 @@ The `images` table stores:
 - a fingerprint built from `relative_path + file_size + mtime_ms`
 - `sort_timestamp`
 - `taken_at` and `taken_at_source`
-- mirrored derivative paths
+- stored derivative paths
 - playback strategy for videos
-- soft-delete state
+- soft-delete state including `deleted_at`
 
 ## Stable ordering
 
@@ -117,6 +118,7 @@ Foldergram does not hard-delete missing indexed files during scans.
 Instead it:
 
 - marks missing files as `is_deleted = 1`
+- records `deleted_at`
 - keeps their historical row data
 - reactivates them if the same relative path reappears later
 
@@ -142,9 +144,24 @@ During a full scan, Foldergram:
 3. Resolves folder records and stable slugs.
 4. Scans reserved `stories/` subtrees for owner folders when reserved-stories mode is active.
 5. Reads or refreshes media metadata.
-6. Marks missing indexed rows as deleted.
-7. Queues derivative work for changed or missing outputs.
-8. Writes scan status to `scan_runs`.
+6. Reconciles eligible file moves so the same row, likes, and derivative paths can survive path changes.
+7. Marks missing indexed rows as deleted.
+8. Queues derivative work for changed or missing outputs.
+9. Performs deferred stale-derivative cleanup after successful scans.
+10. Writes scan status to `scan_runs`.
+
+## Scan progress phases
+
+Foldergram reports long-running scans in three phases:
+
+- `migration` checks previously indexed rows, backfills missing `asset_key` values, and moves, repairs, or regenerates legacy derivatives before fresh indexing begins
+- `discovery` walks the gallery tree, resolves folders, refreshes metadata, and reconciles safe file moves
+- `derivatives` processes queued thumbnail and preview jobs after discovery has identified the required work
+
+Only migration and derivative work have a fixed total upfront. Discovery still
+reports discovered and processed folder and post counts, but the client keeps
+that phase indeterminate because the final discovery total can keep growing
+while more folders are found.
 
 ## Incremental scans and watching
 
@@ -224,6 +241,17 @@ Foldergram tracks the last successful gallery root. If that path changes and
 there is already indexed content, the scanner marks the library as requiring a
 rebuild. This is meant to prevent silent cross-library drift in the index and
 cached derivatives.
+
+## Derivative migration and move preservation
+
+On upgraded libraries, the next full scan backfills `asset_key` values and
+moves stored derivatives from the legacy mirrored layout into the new sharded
+layout. The migration only rewrites stored derivative paths when the new target
+already exists, and it repairs surviving legacy files before falling back to
+regeneration. After that migration is complete, full rescans can reconcile safe
+file moves by matching size, rounded mtime, and extension, with a basename
+tie-break when needed. When reconciliation succeeds, the original row ID, likes,
+`sort_timestamp`, and derivative paths are preserved.
 
 ## Runtime read model
 
