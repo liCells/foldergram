@@ -77,6 +77,33 @@ function createAppStatus(scanOverrides: Partial<ScanProgress> = {}): AppStatus {
   };
 }
 
+function createMomentCapsule(id: string, title: string) {
+  return {
+    id,
+    title,
+    subtitle: `${title} capsule`,
+    dateContext: 'Latest Apr 9, 2026',
+    imageCount: 1,
+    coverImage: {
+      id: Number(id.replace(/\D/g, '')) || 1,
+      folderId: 10,
+      folderSlug: 'weekend-trip',
+      folderName: 'Weekend Trip',
+      folderPath: 'weekend-trip',
+      folderBreadcrumb: null,
+      filename: `${id}.jpg`,
+      width: 1080,
+      height: 1080,
+      mediaType: 'image' as const,
+      durationMs: null,
+      thumbnailUrl: `/thumbs/${id}.webp`,
+      previewUrl: `/previews/${id}.webp`,
+      sortTimestamp: 1_777_000_000_000,
+      takenAt: 1_777_000_000_000
+    }
+  };
+}
+
 function mountHomeView() {
   return mount(HomeView, {
     global: {
@@ -135,5 +162,41 @@ describe('HomeView', () => {
     await flushPromises();
 
     expect(wrapper.get('[data-test="initial-scan-phase"]').text()).toBe('Derivatives');
+  });
+
+  it('renders the home stories rail with a dedicated horizontal scroll track', async () => {
+    const appStore = useAppStore();
+    const feedStore = useFeedStore();
+    const momentsStore = useMomentsStore();
+
+    appStore.$patch({
+      stats: createAppStatus({
+        isScanning: false
+      })
+    });
+    feedStore.$patch({
+      initialized: true,
+      loading: false,
+      items: []
+    });
+    momentsStore.$patch({
+      items: [
+        createMomentCapsule('moment-1', 'One'),
+        createMomentCapsule('moment-2', 'Two'),
+        createMomentCapsule('moment-3', 'Three'),
+        createMomentCapsule('moment-4', 'Four')
+      ]
+    });
+
+    vi.spyOn(feedStore, 'loadInitial').mockResolvedValue();
+    vi.spyOn(momentsStore, 'fetchMoments').mockResolvedValue();
+
+    const wrapper = mountHomeView();
+
+    await flushPromises();
+
+    expect(wrapper.get('.stories-bar.story-rail').attributes('aria-label')).toBe('Moments');
+    expect(wrapper.get('.story-rail__track').classes()).not.toContain('justify-center');
+    expect(wrapper.findAll('.story-rail__item')).toHaveLength(4);
   });
 });

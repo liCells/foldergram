@@ -67,28 +67,30 @@
           <section class="mx-auto w-[min(100%,66.5625rem)]">
             <div
               v-if="folderStoriesStore.highlights.length"
-              class="mb-5 overflow-x-auto pb-3 pt-[0.12rem] [scrollbar-width:none]"
+              class="story-rail-shell mb-5"
               aria-label="Folder stories"
             >
-              <div class="mx-auto flex w-max min-w-full justify-center gap-[0.95rem] px-1">
-                <button
-                  v-for="story in folderStoriesStore.highlights"
-                  :key="story.id"
-                  class="flex flex-col items-center gap-[0.48rem] min-w-[5.85rem] border-0 bg-transparent p-0 text-muted text-[0.74rem] text-center cursor-pointer transition-transform duration-180 hover:-translate-y-[1px]"
-                  :title="`${story.title} · ${story.subtitle}`"
-                  type="button"
-                  @click="openStoryViewer(story.id)"
-                >
-                  <div
-                    class="rounded-full p-[0.2rem] shadow-[0_14px_30px_rgba(246,106,61,0.18)]"
-                    style="background: var(--story-ring);"
+              <div class="story-rail pb-3 pt-[0.12rem]">
+                <div class="story-rail__track mx-auto justify-center">
+                  <button
+                    v-for="story in folderStoriesStore.highlights"
+                    :key="story.id"
+                    class="story-rail__item story-rail__button"
+                    :title="`${story.title} · ${story.subtitle}`"
+                    type="button"
+                    @click="openStoryViewer(story.id)"
                   >
-                    <div class="rounded-full bg-bg p-[0.2rem]">
-                      <Avatar class="w-[4.625rem] h-[4.625rem]" :name="story.title" :src="story.coverImage.thumbnailUrl" />
+                    <div
+                      class="story-rail__ring"
+                      style="background: var(--story-ring);"
+                    >
+                      <div class="story-rail__ring-inner">
+                        <Avatar class="story-rail__avatar" :name="story.title" :src="story.coverImage.thumbnailUrl" />
+                      </div>
                     </div>
-                  </div>
-                  <span class="max-w-[5.75rem] overflow-hidden text-ellipsis whitespace-nowrap font-semibold leading-tight text-text">{{ story.title }}</span>
-                </button>
+                    <span class="story-rail__label">{{ story.title }}</span>
+                  </button>
+                </div>
               </div>
             </div>
             <div class="flex justify-center border-b border-border" aria-label="Folder sections">

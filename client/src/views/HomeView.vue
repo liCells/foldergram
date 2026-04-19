@@ -38,27 +38,31 @@
         </div>
       </section>
 
-      <section v-if="!appStore.isLibraryUnavailable" class="grid gap-[1rem] mb-5 w-full max-w-[39.375rem]">
-        <section v-if="momentsStore.items.length" class="mb-2">
-          <div class="stories-bar flex gap-[0.95rem] overflow-x-auto pb-5 pr-2 pt-[0.12rem] [scrollbar-width:none]" :aria-label="momentsStore.railTitle">
-            <button
-              v-for="moment in momentsStore.items"
-              :key="moment.id"
-              class="flex flex-col items-center gap-[0.48rem] min-w-[5.85rem] border-0 bg-transparent p-0 text-muted text-[0.74rem] text-center cursor-pointer transition-transform duration-180 hover:-translate-y-[1px]"
-              :title="`${moment.title} · ${moment.subtitle}`"
-              type="button"
-              @click="openRailViewer(moment.id)"
-            >
-              <div
-                class="rounded-full p-[0.2rem] shadow-[0_14px_30px_rgba(246,106,61,0.18)]"
-                style="background: var(--story-ring);"
+      <section v-if="!appStore.isLibraryUnavailable" class="grid min-w-0 gap-[1rem] mb-5 w-full max-w-[39.375rem]">
+        <section v-if="momentsStore.items.length" class="mb-2 min-w-0">
+          <div class="story-rail-shell">
+            <div class="stories-bar story-rail pb-5 pt-[0.12rem]" :aria-label="momentsStore.railTitle">
+              <div class="story-rail__track">
+              <button
+                v-for="moment in momentsStore.items"
+                :key="moment.id"
+                class="story-rail__item story-rail__button"
+                :title="`${moment.title} · ${moment.subtitle}`"
+                type="button"
+                @click="openRailViewer(moment.id)"
               >
-                <div class="rounded-full bg-bg p-[0.2rem]">
-                  <Avatar class="w-[4.625rem] h-[4.625rem]" :name="moment.title" :src="moment.coverImage.thumbnailUrl" />
+                <div
+                  class="story-rail__ring"
+                  style="background: var(--story-ring);"
+                >
+                  <div class="story-rail__ring-inner">
+                    <Avatar class="story-rail__avatar" :name="moment.title" :src="moment.coverImage.thumbnailUrl" />
+                  </div>
                 </div>
-              </div>
-              <span class="max-w-[5.75rem] overflow-hidden text-ellipsis whitespace-nowrap font-semibold leading-tight text-text">{{ moment.title }}</span>
-            </button>
+                <span class="story-rail__label">{{ moment.title }}</span>
+              </button>
+            </div>
+          </div>
           </div>
         </section>
 
