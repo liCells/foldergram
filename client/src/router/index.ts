@@ -7,6 +7,8 @@ import LikesView from '../views/LikesView.vue';
 import ExploreView from '../views/ExploreView.vue';
 import FolderView from '../views/FolderView.vue';
 import MomentView from '../views/MomentView.vue';
+import PlaceView from '../views/PlaceView.vue';
+import PlacesView from '../views/PlacesView.vue';
 import ReelsView from '../views/ReelsView.vue';
 import TrashView from '../views/TrashView.vue';
 import { useAppStore } from '../stores/app';
@@ -96,6 +98,17 @@ export const router = createRouter({
       path: '/moments/:id',
       name: 'moment',
       component: MomentView,
+      props: true
+    },
+    {
+      path: '/places',
+      name: 'places',
+      component: PlacesView
+    },
+    {
+      path: '/places/:slug',
+      name: 'place',
+      component: PlaceView,
       props: true
     },
     {

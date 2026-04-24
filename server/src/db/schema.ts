@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS folders (
 CREATE TABLE IF NOT EXISTS images (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   folder_id INTEGER NOT NULL,
+  place_id INTEGER NULL,
   asset_key TEXT NULL,
   filename TEXT NOT NULL,
   extension TEXT NOT NULL,
@@ -49,7 +50,31 @@ CREATE TABLE IF NOT EXISTS images (
   trashed_at TEXT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
+  FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE,
+  FOREIGN KEY (place_id) REFERENCES places(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS places (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  source TEXT NOT NULL,
+  source_confidence REAL NULL,
+  provider TEXT NULL,
+  provider_place_id TEXT NULL,
+  latitude REAL NULL,
+  longitude REAL NULL,
+  city_name TEXT NULL,
+  admin1_name TEXT NULL,
+  country_name TEXT NULL,
+  country_code TEXT NULL,
+  geonames_id INTEGER NULL,
+  is_approximate INTEGER NOT NULL DEFAULT 1,
+  name_override TEXT NULL,
+  description TEXT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS scan_runs (
@@ -89,6 +114,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_folder_path ON folders(folder_path
 CREATE INDEX IF NOT EXISTS idx_folders_role ON folders(role);
 CREATE INDEX IF NOT EXISTS idx_folders_story_owner_role ON folders(story_owner_folder_id, role, folder_path COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_images_folder_id ON images(folder_id);
+CREATE INDEX IF NOT EXISTS idx_images_place_id ON images(place_id);
 CREATE INDEX IF NOT EXISTS idx_images_sort_timestamp ON images(sort_timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_images_taken_at ON images(taken_at DESC);
 CREATE INDEX IF NOT EXISTS idx_images_taken_at_source ON images(is_deleted, taken_at_source);
@@ -105,6 +131,9 @@ CREATE INDEX IF NOT EXISTS idx_images_trashed_listing ON images(is_trashed, is_d
 CREATE INDEX IF NOT EXISTS idx_images_relative_path ON images(relative_path);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_images_asset_key ON images(asset_key) WHERE asset_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_images_deleted_at ON images(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_places_slug ON places(slug);
+CREATE INDEX IF NOT EXISTS idx_places_display_name ON places(display_name);
+CREATE INDEX IF NOT EXISTS idx_places_geonames_id ON places(geonames_id);
 CREATE INDEX IF NOT EXISTS idx_folder_scan_state_updated_at ON folder_scan_state(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_likes_created_at ON likes(created_at DESC);
 `;

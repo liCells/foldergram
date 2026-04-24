@@ -10,6 +10,8 @@ import type {
   ImageRecord,
   LikeRecord,
   MediaType,
+  PlaceKind,
+  PlaceRecord,
   PlaybackStrategy,
   ReelCandidate,
   FolderRecord,
@@ -127,9 +129,15 @@ const FEED_IMAGE_SELECT_SQL = `
     images.preview_path AS previewUrl,
     images.playback_strategy AS playbackStrategy,
     images.sort_timestamp AS sortTimestamp,
-    images.taken_at AS takenAt
+    images.taken_at AS takenAt,
+    places.id AS placeId,
+    places.slug AS placeSlug,
+    places.display_name AS placeName,
+    places.kind AS placeKind,
+    places.is_approximate AS placeIsApproximate
   FROM images
   INNER JOIN folders ON folders.id = images.folder_id
+  LEFT JOIN places ON places.id = images.place_id
 `;
 const FOLDER_SUMMARY_SELECT_SQL = `
   SELECT
@@ -267,6 +275,7 @@ export interface SaveFolderResult {
 
 export interface UpsertImageInput {
   folderId: number;
+  placeId?: number | null;
   assetKey?: string | null;
   filename: string;
   extension: string;
@@ -294,6 +303,7 @@ export interface UpsertImageInput {
 
 export interface RefreshIndexedImageInput {
   folderId: number;
+  placeId?: number | null;
   assetKey?: string | null;
   filename: string;
   extension: string;
@@ -320,6 +330,7 @@ export interface RefreshIndexedImageInput {
 export interface ReconcileImageMoveInput {
   id: number;
   folderId: number;
+  placeId?: number | null;
   filename: string;
   extension: string;
   relativePath: string;
@@ -346,6 +357,19 @@ export interface UpsertFolderScanStateInput {
   fileCount: number;
   maxMtimeMs: number;
   totalSize: number;
+}
+
+export interface UpsertCityPlaceInput {
+  geonamesId: number;
+  displayName: string;
+  slug: string;
+  latitude: number;
+  longitude: number;
+  cityName: string;
+  admin1Name?: string | null;
+  countryName?: string | null;
+  countryCode?: string | null;
+  confidence?: number | null;
 }
 
 export const folderRepository = {
@@ -600,6 +624,123 @@ export const folderRepository = {
   }
 };
 
+export const placeRepository = {
+  list(): Array<PlaceRecord & { post_count: number }> {
+    return database
+      .prepare(
+        `
+        SELECT places.*, COUNT(images.id) AS post_count
+        FROM places
+        INNER JOIN images ON images.place_id = places.id
+        INNER JOIN folders ON folders.id = images.folder_id
+        WHERE ${VISIBLE_IMAGE_WHERE_SQL}
+        GROUP BY places.id
+        ORDER BY post_count DESC, places.display_name COLLATE NOCASE ASC
+        `
+      )
+      .all() as unknown as Array<PlaceRecord & { post_count: number }>;
+  },
+
+  getBySlug(slug: string): PlaceRecord | undefined {
+    return database.prepare('SELECT * FROM places WHERE slug = ?').get(slug) as PlaceRecord | undefined;
+  },
+
+  getByGeonamesId(geonamesId: number): PlaceRecord | undefined {
+    return database.prepare('SELECT * FROM places WHERE geonames_id = ? LIMIT 1').get(geonamesId) as PlaceRecord | undefined;
+  },
+
+  getAllSlugs(): string[] {
+    return (database.prepare('SELECT slug FROM places').all() as Array<{ slug: string }>).map((row) => row.slug);
+  },
+
+  upsertCity(input: UpsertCityPlaceInput): PlaceRecord {
+    const existing = this.getByGeonamesId(input.geonamesId);
+    if (existing) {
+      database
+        .prepare(
+          `
+          UPDATE places
+          SET
+            display_name = ?,
+            source_confidence = ?,
+            latitude = ?,
+            longitude = ?,
+            city_name = ?,
+            admin1_name = ?,
+            country_name = ?,
+            country_code = ?,
+            updated_at = ?
+          WHERE id = ?
+          `
+        )
+        .run(
+          input.displayName,
+          input.confidence ?? null,
+          input.latitude,
+          input.longitude,
+          input.cityName,
+          input.admin1Name ?? null,
+          input.countryName ?? input.countryCode ?? null,
+          input.countryCode ?? null,
+          nowIso(),
+          existing.id
+        );
+
+      return this.getById(existing.id) as PlaceRecord;
+    }
+
+    database
+      .prepare(
+        `
+        INSERT INTO places (
+          slug, display_name, kind, source, source_confidence, provider, provider_place_id,
+          latitude, longitude, city_name, admin1_name, country_name, country_code,
+          geonames_id, is_approximate, updated_at
+        )
+        VALUES (?, ?, 'city', 'offline_city', ?, 'geonames', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        `
+      )
+      .run(
+        input.slug,
+        input.displayName,
+        input.confidence ?? null,
+        String(input.geonamesId),
+        input.latitude,
+        input.longitude,
+        input.cityName,
+        input.admin1Name ?? null,
+        input.countryName ?? input.countryCode ?? null,
+        input.countryCode ?? null,
+        input.geonamesId,
+        nowIso()
+      );
+
+    return this.getByGeonamesId(input.geonamesId) as PlaceRecord;
+  },
+
+  getById(id: number): PlaceRecord | undefined {
+    return database.prepare('SELECT * FROM places WHERE id = ?').get(id) as PlaceRecord | undefined;
+  },
+
+  countVisibleImages(placeId: number, mediaType?: MediaType): number {
+    const mediaTypeClause = mediaType ? ' AND images.media_type = ?' : '';
+    return Number(
+      (
+        database
+          .prepare(
+            `
+            SELECT COUNT(*) AS count
+            FROM images
+            INNER JOIN folders ON folders.id = images.folder_id
+            WHERE images.place_id = ? AND ${VISIBLE_IMAGE_WHERE_SQL}${mediaTypeClause}
+            `
+          )
+          .get(...(mediaType ? [placeId, mediaType] : [placeId])) as { count: number }
+      ).count
+    );
+  }
+};
+
 export const imageRepository = {
   getByRelativePath(relativePath: string): ImageRecord | undefined {
     return database.prepare('SELECT * FROM images WHERE relative_path = ?').get(relativePath) as ImageRecord | undefined;
@@ -777,6 +918,10 @@ export const imageRepository = {
     database
       .prepare('UPDATE images SET thumbnail_path = ?, preview_path = ?, updated_at = ? WHERE id = ?')
       .run(thumbnailPath, previewPath, nowIso(), id);
+  },
+
+  assignPlace(id: number, placeId: number | null): void {
+    database.prepare('UPDATE images SET place_id = ?, updated_at = ? WHERE id = ?').run(placeId, nowIso(), id);
   },
 
   reconcileMove(input: ReconcileImageMoveInput): ImageRecord {
@@ -975,9 +1120,15 @@ export const imageRepository = {
         images.playback_strategy AS playbackStrategy,
         images.sort_timestamp AS sortTimestamp,
         images.taken_at AS takenAt,
+        places.id AS placeId,
+        places.slug AS placeSlug,
+        places.display_name AS placeName,
+        places.kind AS placeKind,
+        places.is_approximate AS placeIsApproximate,
         likes.created_at AS likedAt
       FROM images
       INNER JOIN folders ON folders.id = images.folder_id
+      LEFT JOIN places ON places.id = images.place_id
       LEFT JOIN likes ON likes.image_id = images.id
       WHERE ${VISIBLE_IMAGE_WHERE_SQL} AND images.media_type = 'video'
       ORDER BY images.sort_timestamp DESC, images.id DESC
@@ -1010,7 +1161,12 @@ export const imageRepository = {
         search_results.previewUrl,
         search_results.playbackStrategy,
         search_results.sortTimestamp,
-        search_results.takenAt
+        search_results.takenAt,
+        search_results.placeId,
+        search_results.placeSlug,
+        search_results.placeName,
+        search_results.placeKind,
+        search_results.placeIsApproximate
       FROM (
         SELECT
           images.id,
@@ -1029,9 +1185,15 @@ export const imageRepository = {
           images.playback_strategy AS playbackStrategy,
           images.sort_timestamp AS sortTimestamp,
           images.taken_at AS takenAt,
+          places.id AS placeId,
+          places.slug AS placeSlug,
+          places.display_name AS placeName,
+          places.kind AS placeKind,
+          places.is_approximate AS placeIsApproximate,
           (${mediaSearch.rankSql}) AS searchRank
         FROM images
         INNER JOIN folders ON folders.id = images.folder_id
+        LEFT JOIN places ON places.id = images.place_id
         WHERE ${VISIBLE_IMAGE_WHERE_SQL} AND ${mediaSearch.whereSql}
       ) AS search_results
       ORDER BY search_results.searchRank DESC, search_results.sortTimestamp DESC, search_results.id DESC
@@ -1127,6 +1289,19 @@ export const imageRepository = {
     ).all(...(mediaType ? [folderId, mediaType, limit, offset] : [folderId, limit, offset])) as unknown as FeedImage[];
   },
 
+  listPlaceImages(placeId: number, page: number, limit: number, mediaType?: MediaType): FeedImage[] {
+    const offset = (page - 1) * limit;
+    const mediaTypeClause = mediaType ? ' AND images.media_type = ?' : '';
+    return database.prepare(
+      `
+      ${FEED_IMAGE_SELECT_SQL}
+      WHERE images.place_id = ? AND ${VISIBLE_IMAGE_WHERE_SQL}${mediaTypeClause}
+      ORDER BY images.sort_timestamp DESC, images.id DESC
+      LIMIT ? OFFSET ?
+      `
+    ).all(...(mediaType ? [placeId, mediaType, limit, offset] : [placeId, limit, offset])) as unknown as FeedImage[];
+  },
+
   listStoryFolderImages(folderId: number, page: number, limit: number, mediaType?: MediaType): FeedImage[] {
     const offset = (page - 1) * limit;
     const mediaTypeClause = mediaType ? ' AND images.media_type = ?' : '';
@@ -1176,9 +1351,15 @@ export const imageRepository = {
         images.playback_strategy AS playbackStrategy,
         images.sort_timestamp AS sortTimestamp,
         images.taken_at AS takenAt,
-        images.trashed_at AS trashedAt
+        images.trashed_at AS trashedAt,
+        places.id AS placeId,
+        places.slug AS placeSlug,
+        places.display_name AS placeName,
+        places.kind AS placeKind,
+        places.is_approximate AS placeIsApproximate
       FROM images
       INNER JOIN folders ON folders.id = images.folder_id
+      LEFT JOIN places ON places.id = images.place_id
       WHERE images.is_deleted = 0 AND images.is_trashed = 1
       ORDER BY images.trashed_at DESC, images.id DESC
       LIMIT ? OFFSET ?
@@ -1260,6 +1441,20 @@ export const imageRepository = {
   listByIdRange(afterId: number, limit: number): ImageRecord[] {
     return database
       .prepare('SELECT * FROM images WHERE id > ? ORDER BY id ASC LIMIT ?')
+      .all(afterId, limit) as unknown as ImageRecord[];
+  },
+
+  listWithExifForPlaceRebuild(afterId: number, limit: number): ImageRecord[] {
+    return database
+      .prepare(
+        `
+        SELECT *
+        FROM images
+        WHERE id > ? AND is_deleted = 0 AND exif_json IS NOT NULL
+        ORDER BY id ASC
+        LIMIT ?
+        `
+      )
       .all(afterId, limit) as unknown as ImageRecord[];
   },
 
@@ -1408,9 +1603,15 @@ export const imageRepository = {
         images.exif_json AS exifJson,
         images.absolute_path AS originalUrl,
         images.sort_timestamp AS sortTimestamp,
-        images.taken_at AS takenAt
+        images.taken_at AS takenAt,
+        places.id AS placeId,
+        places.slug AS placeSlug,
+        places.display_name AS placeName,
+        places.kind AS placeKind,
+        places.is_approximate AS placeIsApproximate
       FROM images
       INNER JOIN folders ON folders.id = images.folder_id
+      LEFT JOIN places ON places.id = images.place_id
       WHERE images.id = ? AND ${whereClause}
       `
     ).get(id) as (Omit<ImageDetail, 'nextImageId' | 'previousImageId' | 'exif'> & { originalUrl: string; exifJson: string | null }) | undefined;

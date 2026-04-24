@@ -22,6 +22,11 @@ import type {
   PaginatedFeed,
   PaginatedReels,
   FolderImagesPayload,
+  PlaceDetail,
+  PlaceImagesPayload,
+  PlacesPrepareResult,
+  PlacesRebuildResult,
+  PlacesStatus,
   ReelsFeedMode,
   RestoreImageResult,
   RebuildLibraryResult,
@@ -116,6 +121,27 @@ export function fetchFolderImages(slug: string, page = 1, limit = 24, mediaType?
   }
 
   return requestJson<FolderImagesPayload>(`/api/folders/${encodeURIComponent(slug)}/images?${params.toString()}`);
+}
+
+export function fetchPlaces() {
+  return requestJson<{ items: PlaceDetail[] }>('/api/places');
+}
+
+export function fetchPlace(slug: string) {
+  return requestJson<PlaceDetail>(`/api/places/${encodeURIComponent(slug)}`);
+}
+
+export function fetchPlaceImages(slug: string, page = 1, limit = 24, mediaType?: 'image' | 'video') {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit)
+  });
+
+  if (mediaType) {
+    params.set('mediaType', mediaType);
+  }
+
+  return requestJson<PlaceImagesPayload>(`/api/places/${encodeURIComponent(slug)}/images?${params.toString()}`);
 }
 
 export function fetchFolderStories(slug: string) {
@@ -307,6 +333,22 @@ export function triggerLibraryRebuild() {
 
 export function triggerThumbnailRebuild() {
   return requestJson<RebuildThumbnailsResult>('/api/admin/rebuild-thumbnails', {
+    method: 'POST'
+  });
+}
+
+export function fetchPlacesStatus() {
+  return requestJson<PlacesStatus>('/api/admin/places/status');
+}
+
+export function preparePlacesGeodata() {
+  return requestJson<PlacesPrepareResult>('/api/admin/places/geodata/prepare', {
+    method: 'POST'
+  });
+}
+
+export function rebuildPlaces() {
+  return requestJson<PlacesRebuildResult>('/api/admin/places/rebuild', {
     method: 'POST'
   });
 }

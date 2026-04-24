@@ -3,6 +3,7 @@ export type TakenAtSource = 'exif' | 'mtime' | 'first_seen' | 'sort_timestamp';
 export type PlaybackStrategy = 'preview' | 'original';
 export type FolderAvatarSource = 'auto' | 'manual' | 'cover';
 export type FolderRole = 'normal' | 'story_root' | 'story_capsule';
+export type PlaceKind = 'city' | 'approximate_spot' | 'manual';
 
 export interface ImageExifData {
   cameraMake?: string;
@@ -32,6 +33,29 @@ export interface FolderRecord {
   updated_at: string;
 }
 
+export interface PlaceRecord {
+  id: number;
+  slug: string;
+  display_name: string;
+  kind: PlaceKind;
+  source: string;
+  source_confidence: number | null;
+  provider: string | null;
+  provider_place_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  city_name: string | null;
+  admin1_name: string | null;
+  country_name: string | null;
+  country_code: string | null;
+  geonames_id: number | null;
+  is_approximate: number;
+  name_override: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface FolderSummaryRecord extends FolderRecord {
   image_count: number;
   video_count: number;
@@ -44,6 +68,7 @@ export interface FolderSummaryRecord extends FolderRecord {
 export interface ImageRecord {
   id: number;
   folder_id: number;
+  place_id: number | null;
   asset_key: string | null;
   filename: string;
   extension: string;
@@ -73,6 +98,14 @@ export interface ImageRecord {
   trashed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PlaceSummary {
+  id: number;
+  slug: string;
+  name: string;
+  kind: PlaceKind;
+  isApproximate: boolean;
 }
 
 export interface ScanRunRecord {
@@ -123,6 +156,7 @@ export interface FeedImage {
   previewUrl: string;
   sortTimestamp: number;
   takenAt: number | null;
+  place?: PlaceSummary | null;
 }
 
 export interface ReelCandidate extends FeedImage {
@@ -143,4 +177,15 @@ export interface ImageDetail extends FeedImage {
 
 export interface TrashImage extends FeedImage {
   trashedAt: string | null;
+}
+
+export interface PlaceDetail extends PlaceSummary {
+  latitude: number | null;
+  longitude: number | null;
+  cityName: string | null;
+  admin1Name: string | null;
+  countryName: string | null;
+  countryCode: string | null;
+  description: string | null;
+  postCount: number;
 }
