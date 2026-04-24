@@ -1,11 +1,11 @@
 <template>
   <!-- Mobile top nav — hidden on desktop (md+) -->
   <header class="topbar hidden max-md:flex items-center justify-between gap-4 sticky top-0 z-20 px-4 py-[0.95rem] bg-bg backdrop-blur-[12px] border-b border-border">
-    <RouterLink class="topbar__brand inline-flex items-center justify-center w-12 h-12 p-[0.3rem] rounded-[1rem] color-inherit transition-[background-color,transform] duration-180 hover:bg-surface-hover hover:-translate-y-px" to="/" aria-label="Foldergram home">
+    <RouterLink class="topbar__brand inline-flex items-center justify-center w-12 h-12 shrink-0 p-[0.3rem] rounded-[1rem] color-inherit transition-[background-color,transform] duration-180 hover:bg-surface-hover hover:-translate-y-px" to="/" aria-label="Foldergram home">
       <BrandMark />
     </RouterLink>
     <div v-if="moreMenuOpen" class="fixed inset-0 z-30" @click="closeMoreMenu" />
-    <div class="relative z-40 flex items-center gap-[0.35rem]">
+    <div class="relative z-40 flex min-w-0 max-w-[calc(100vw-6rem)] flex-wrap items-center justify-end gap-[0.35rem]">
       <RouterLink custom to="/" v-slot="{ href, navigate, isActive }">
         <a
           :href="href"
@@ -48,6 +48,17 @@
           @click="navigate"
         >
           <span class="w-[1.45rem] h-[1.45rem]" :class="isActive ? 'i-fluent-folder-16-filled' : 'i-fluent-folder-16-regular'" aria-hidden="true" />
+        </a>
+      </RouterLink>
+      <RouterLink v-if="showPlacesNav" custom :to="{ name: 'places' }" v-slot="{ href, navigate, isActive }">
+        <a
+          :href="href"
+          class="topbar__icon-link inline-flex items-center justify-center w-11 h-12 rounded-[1rem] border-0 bg-transparent color-inherit cursor-pointer transition-colors duration-150 hover:bg-white/8"
+          :class="isActive || isPlacesRoute ? topbarActiveClass : ''"
+          aria-label="Places"
+          @click="navigate"
+        >
+          <span class="w-[1.45rem] h-[1.45rem]" :class="isActive || isPlacesRoute ? 'i-fluent-location-20-filled' : 'i-fluent-location-20-regular'" aria-hidden="true" />
         </a>
       </RouterLink>
       <RouterLink v-if="authStore.canUseSavedItems" custom :to="{ name: 'likes' }" v-slot="{ href, navigate, isActive }">
@@ -156,15 +167,19 @@ import { RouterLink, useRoute } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { useLikesStore } from '../stores/likes';
+import { usePlacesStore } from '../stores/places';
 import BrandMark from './BrandMark.vue';
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const likesStore = useLikesStore();
+const placesStore = usePlacesStore();
 const route = useRoute();
 const moreMenuOpen = ref(false);
 const themeLabel = computed(() => (appStore.theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'));
 const signOutLabel = computed(() => (authStore.accessMode === 'public' ? 'Return to public view' : 'Sign out'));
+const showPlacesNav = computed(() => placesStore.items.length > 0 && placesStore.listError === null);
+const isPlacesRoute = computed(() => route.name === 'places' || route.name === 'place');
 const topbarActiveClass = 'router-link-active bg-[rgba(255,255,255,0.08)]';
 
 function closeMoreMenu() {
@@ -214,6 +229,7 @@ watch(
 );
 
 onMounted(() => {
+  void placesStore.fetchPlaces();
   window.addEventListener('keydown', handleWindowKeydown);
 });
 

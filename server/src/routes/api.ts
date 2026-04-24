@@ -489,6 +489,37 @@ router.get('/folders/:slug/images', (request, response) => {
   response.json(payload);
 });
 
+router.get('/places', (_request, response) => {
+  response.json({
+    items: galleryService.listPlaces()
+  });
+});
+
+router.get('/places/:slug', (request, response) => {
+  const params = slugSchema.parse(request.params);
+  const place = galleryService.getPlaceBySlug(params.slug);
+
+  if (!place) {
+    response.status(404).json({ message: 'Place not found' });
+    return;
+  }
+
+  response.json(place);
+});
+
+router.get('/places/:slug/images', (request, response) => {
+  const params = slugSchema.parse(request.params);
+  const query = paginationQuerySchema.merge(mediaTypeQuerySchema).parse(request.query);
+  const payload = galleryService.getPlaceImages(params.slug, query.page, query.limit, query.mediaType);
+
+  if (!payload) {
+    response.status(404).json({ message: 'Place not found' });
+    return;
+  }
+
+  response.json(payload);
+});
+
 router.get('/folders/:slug/stories', (request, response) => {
   const params = slugSchema.parse(request.params);
   const payload = galleryService.getFolderStories(params.slug);
@@ -719,6 +750,38 @@ router.post(
   } finally {
     await watcherService.start();
   }
+});
+
+router.get('/admin/places/status', requireCapability('canAccessSettings', 'Admin access is required.'), (_request, response) => {
+  response.json(galleryService.getPlacesStatus());
+});
+
+router.post(
+  '/admin/places/geodata/prepare',
+  requireCapability('canManageLibrary', 'Admin access is required.'),
+  adminMutationRateLimiter,
+  async (_request, response) => {
+  try {
+    response.json({
+      ok: true,
+      status: await galleryService.preparePlacesGeodata()
+    });
+  } catch (error) {
+    response.status(500).json({
+      message: error instanceof Error ? error.message : 'Unable to prepare offline place data.'
+    });
+  }
+});
+
+router.post(
+  '/admin/places/rebuild',
+  requireCapability('canManageLibrary', 'Admin access is required.'),
+  adminMutationRateLimiter,
+  (_request, response) => {
+  response.json({
+    ok: true,
+    ...galleryService.rebuildPlaces()
+  });
 });
 
 router.get('/admin/stats', requireCapability('canAccessSettings', 'Admin access is required.'), (_request, response) => {

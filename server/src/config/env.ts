@@ -94,6 +94,7 @@ function parseConfiguredOrigins(value: string | undefined): string[] {
 const dataRoot = resolveConfiguredPath(parsed.DATA_ROOT ?? parsed.DATA_DIR, resolveFromRoot('./data'));
 const galleryRoot = resolveConfiguredPath(parsed.GALLERY_ROOT, path.join(dataRoot, 'gallery'));
 const dbDir = resolveConfiguredPath(parsed.DB_DIR, path.join(dataRoot, 'db'));
+const geodataDir = path.join(dataRoot, 'geodata');
 const thumbnailsDir = resolveConfiguredPath(parsed.THUMBNAILS_DIR, path.join(dataRoot, 'thumbnails'));
 const previewsDir = resolveConfiguredPath(parsed.PREVIEWS_DIR, path.join(dataRoot, 'previews'));
 const logVerbose = parseBooleanFlag(parsed.LOG_VERBOSE);
@@ -132,6 +133,7 @@ export const appConfig = {
   dataRoot,
   galleryRoot,
   dbDir,
+  geodataDir,
   thumbnailsDir,
   previewsDir,
   managedGalleryRelativeIgnores,
@@ -142,6 +144,8 @@ export const appConfig = {
   scanDiscoveryConcurrency: parsed.SCAN_DISCOVERY_CONCURRENCY,
   scanDerivativeConcurrency: parsed.SCAN_DERIVATIVE_CONCURRENCY,
   databasePath: path.join(dbDir, 'gallery.sqlite'),
+  geodataPath: path.join(geodataDir, 'geonames-cities500.sqlite'),
+  geodataMetadataPath: path.join(geodataDir, 'geonames-cities500.meta.json'),
   imageDetailSource: parsed.IMAGE_DETAIL_SOURCE,
   derivativeMode: parsed.DERIVATIVE_MODE
 };

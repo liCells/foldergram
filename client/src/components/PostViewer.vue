@@ -376,6 +376,22 @@
             </dt>
             <dd class="viewer__sidebar-stat-value m-0 text-[0.96rem] font-semibold">{{ fileSize }}</dd>
           </div>
+          <div
+            v-if="image.place"
+            class="viewer__sidebar-stat"
+          >
+            <dt class="viewer__sidebar-stat-label">
+              Place
+            </dt>
+            <dd class="viewer__sidebar-stat-value m-0 text-[0.96rem] font-semibold">
+              <RouterLink
+                class="text-inherit no-underline hover:text-muted"
+                :to="{ name: 'place', params: { slug: image.place.slug } }"
+              >
+                {{ image.place.name }}
+              </RouterLink>
+            </dd>
+          </div>
         </dl>
 
         <!-- Metadata -->

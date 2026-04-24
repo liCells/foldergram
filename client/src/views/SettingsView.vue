@@ -58,6 +58,49 @@
       </button>
     </section>
 
+    <section
+      v-if="showPlacesOnboardingBanner"
+      class="card grid cursor-pointer gap-[1rem] border-[color-mix(in_srgb,var(--border)_84%,#8cc8ff_16%)] p-6 transition-[transform,border-color] duration-180 hover:-translate-y-px hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border)_72%)]"
+      style="background: linear-gradient(135deg, color-mix(in srgb, var(--surface) 97%, #f7fbff 3%) 0%, color-mix(in srgb, var(--surface) 93%, #e6f3ff 7%) 100%);"
+      @click="openPlacesTab"
+    >
+      <div class="flex items-start justify-between gap-4">
+        <div class="grid gap-[0.3rem]">
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="m-0 text-xl">Places from photo GPS data</h2>
+            <span class="eyebrow inline-flex w-fit self-start text-xs">New Feature</span>
+          </div>
+          <p class="m-0 text-[0.95rem] font-medium text-text">
+            Group GPS-tagged photos by offline city and location labels.
+          </p>
+          <p class="m-0 text-muted">
+            Prepare the local GeoNames dataset, then rebuild place assignments for the photos already in your library.
+          </p>
+        </div>
+        <button
+          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-0 bg-[rgba(24,119,242,0.08)] text-accent-strong cursor-pointer transition-colors duration-180 hover:bg-[rgba(24,119,242,0.14)]"
+          type="button"
+          aria-label="Dismiss places announcement"
+          @click.stop="dismissPlacesOnboardingBanner"
+        >
+          <span class="i-fluent-dismiss-20-filled h-5 w-5" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div class="flex items-center gap-4 max-sm:flex-col max-sm:items-stretch">
+        <button
+          class="btn-primary min-w-[11.5rem]"
+          type="button"
+          @click.stop="openPlacesTab"
+        >
+          Set up Places
+        </button>
+        <p class="m-0 text-muted">
+          The download is opt-in, and the Places tab stays available in Settings later.
+        </p>
+      </div>
+    </section>
+
     <div class="flex flex-col md:flex-row gap-8 items-start mt-[0.5rem]">
       <!-- Navigation Sidebar -->
       <nav class="flex flex-col gap-2 w-full md:w-[16rem] shrink-0 sticky top-[6.5rem]">
@@ -82,6 +125,17 @@
 
               <span class="truncate">General Settings</span>
             <span class="text-[0.75rem] font-normal text-muted">Stories mode, excluded folders, and feed defaults</span>
+          </span>
+        </button>
+        <button
+          @click="currentCategory = 'places'"
+          class="flex items-start gap-3 px-4 py-[0.85rem] rounded-[0.85rem] border-0 text-left transition-colors duration-150 cursor-pointer"
+          :class="currentCategory === 'places' ? 'bg-surface-alt font-bold text-text' : 'bg-transparent text-muted hover:bg-surface-hover hover:text-text'"
+        >
+          <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'places' ? 'i-fluent-location-20-filled' : 'i-fluent-location-20-regular'" aria-hidden="true"></span>
+          <span class="flex flex-col gap-[0.1rem] min-w-0">
+            <span>Places</span>
+            <span class="text-[0.75rem] font-normal text-muted">Offline city lookup and place assignment</span>
           </span>
         </button>
         <button
@@ -728,6 +782,64 @@
 
         </template>
 
+        <!-- CATEGORY: PLACES -->
+        <template v-if="currentCategory === 'places'">
+          <section class="card grid gap-[1.15rem] p-8">
+            <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-start">
+              <div>
+                <h2 class="m-0 text-[1.18rem]">Offline places</h2>
+                <p class="m-0 mt-[0.35rem] text-muted">Prepare GeoNames city data, then rebuild place links from existing photo coordinates.</p>
+              </div>
+              <span
+                class="inline-flex items-center justify-center min-h-8 px-[0.7rem] py-[0.35rem] rounded-full text-[0.76rem] font-bold whitespace-nowrap"
+                :class="placesStore.status?.prepared ? 'text-accent-strong bg-[color-mix(in_srgb,var(--accent-soft)_78%,transparent_22%)]' : 'text-muted bg-surface-alt'"
+              >
+                {{ placesStore.status?.prepared ? 'Prepared' : 'Not Prepared' }}
+              </span>
+            </div>
+
+            <dl class="grid grid-cols-2 gap-4 m-0 max-sm:grid-cols-1">
+              <div class="rounded-[0.95rem] border border-border bg-surface-alt p-4">
+                <dt class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Dataset</dt>
+                <dd class="m-0 mt-1 text-[0.95rem] font-semibold">{{ placesStore.status?.metadata?.source ?? 'GeoNames cities500' }}</dd>
+              </div>
+              <div class="rounded-[0.95rem] border border-border bg-surface-alt p-4">
+                <dt class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Rows</dt>
+                <dd class="m-0 mt-1 text-[0.95rem] font-semibold">{{ placesStore.status?.metadata ? formatCount(placesStore.status.metadata.rowCount) : 'Not imported' }}</dd>
+              </div>
+            </dl>
+
+            <p v-if="placesStore.status?.metadata" class="m-0 text-muted">
+              Imported {{ formatDateTime(placesStore.status.metadata.importedAt) }}.
+            </p>
+            <p v-if="placesStore.statusError" class="m-0 text-[#c0392b]">
+              {{ placesStore.statusError }}
+            </p>
+            <p v-if="placesStore.actionMessage" class="m-0 text-muted">
+              {{ placesStore.actionMessage }}
+            </p>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                class="btn-primary min-w-[12rem]"
+                type="button"
+                :disabled="placesStore.preparing"
+                @click="placesStore.prepareGeodata"
+              >
+                {{ placesStore.preparing ? 'Preparing...' : 'Prepare Geodata' }}
+              </button>
+              <button
+                class="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] border border-border bg-surface-alt px-4 text-[0.9rem] font-semibold text-text transition-colors duration-180 hover:bg-surface-hover disabled:cursor-wait disabled:opacity-60"
+                type="button"
+                :disabled="placesStore.rebuilding || !placesStore.status?.prepared"
+                @click="placesStore.rebuildAssignments"
+              >
+                {{ placesStore.rebuilding ? 'Rebuilding...' : 'Rebuild Place Assignments' }}
+              </button>
+            </div>
+          </section>
+        </template>
+
         <!-- CATEGORY: LIBRARY -->
         <template v-if="currentCategory === 'library'">
           <section class="card grid gap-[1.15rem] p-8">
@@ -939,6 +1051,7 @@ import { useFeedStore } from '../stores/feed';
 import { useFoldersStore } from '../stores/folders';
 import { useLikesStore } from '../stores/likes';
 import { useMomentsStore } from '../stores/moments';
+import { usePlacesStore } from '../stores/places';
 import { useViewerStore } from '../stores/viewer';
 import type { AppStats, FeedMode, ReelsFeedMode, ViewerAccessMode } from '../types/api';
 
@@ -948,9 +1061,10 @@ const feedStore = useFeedStore();
 const foldersStore = useFoldersStore();
 const likesStore = useLikesStore();
 const momentsStore = useMomentsStore();
+const placesStore = usePlacesStore();
 const viewerStore = useViewerStore();
 const route = useRoute();
-const currentCategory = ref<'library' | 'general' | 'access' | 'status'>('library');
+const currentCategory = ref<'library' | 'general' | 'places' | 'access' | 'status'>('library');
 const scanError = ref<string | null>(null);
 const rebuildError = ref<string | null>(null);
 const thumbnailRebuildError = ref<string | null>(null);
@@ -991,6 +1105,7 @@ const NOTICE_DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 const MIN_PASSWORD_LENGTH = 8;
 const STORIES_MIGRATION_NOTICE_STORAGE_KEY = 'foldergram-stories-migration-dismissed';
 const STORIES_ANNOUNCEMENT_STORAGE_KEY = 'foldergram-stories-announcement-dismissed';
+const PLACES_ONBOARDING_STORAGE_KEY = 'foldergram:places-onboarding-dismissed:v1';
 const EXCLUDED_FOLDER_EDGE_SLASH_PATTERN = /^\/+|\/+$/g;
 const EXCLUDED_FOLDER_UNSUPPORTED_PATTERN = /[*?]/;
 const excludedFoldersHydrated = ref(false);
@@ -1074,6 +1189,7 @@ const dismissedScanErrorNotice = ref(loadDismissedScanErrorNotice());
 const dismissedIgnoredRootMediaNotice = ref(loadDismissedIgnoredRootMediaNotice());
 const dismissedStoriesMigrationNotice = ref(loadDismissedStoriesNotice(STORIES_MIGRATION_NOTICE_STORAGE_KEY));
 const dismissedStoriesAnnouncement = ref(loadDismissedStoriesNotice(STORIES_ANNOUNCEMENT_STORAGE_KEY));
+const dismissedPlacesOnboardingBanner = ref(loadDismissedStoriesNotice(PLACES_ONBOARDING_STORAGE_KEY));
 
 function wait(milliseconds: number) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -1386,6 +1502,12 @@ const showStoriesAnnouncementCard = computed(
     appStore.stats?.storiesMigration.hasLegacyStoriesCandidates === false &&
     appStore.stats?.storiesMigration.decisionPending === true &&
     !dismissedStoriesAnnouncement.value
+);
+const showPlacesOnboardingBanner = computed(
+  () =>
+    currentCategory.value !== 'places' &&
+    placesStore.status?.prepared === false &&
+    !dismissedPlacesOnboardingBanner.value
 );
 const scanActionDisabled = computed(
   () =>
@@ -1844,6 +1966,17 @@ function dismissStoriesAnnouncement() {
   }
 }
 
+function dismissPlacesOnboardingBanner() {
+  dismissedPlacesOnboardingBanner.value = true;
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(PLACES_ONBOARDING_STORAGE_KEY, '1');
+  }
+}
+
+function openPlacesTab() {
+  currentCategory.value = 'places';
+}
+
 function toggleStoriesAnnouncementStructure() {
   showStoriesAnnouncementStructure.value = !showStoriesAnnouncementStructure.value;
 }
@@ -2271,6 +2404,7 @@ onMounted(async () => {
     syncFeedDefaultsFromSaved();
     syncStoriesModeFromSaved();
   }
+  await placesStore.fetchStatus();
   await loadAdminStats().catch(() => {});
 });
 

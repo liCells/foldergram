@@ -25,13 +25,20 @@
         >
           <Avatar class="w-8 h-8" :name="item.folderName" :src="avatarUrl" />
         </RouterLink>
-        <RouterLink class="min-w-0 text-inherit no-underline" :to="{ name: 'folder', params: { slug: item.folderSlug } }">
-          <div class="min-w-0">
+        <div class="min-w-0">
+          <RouterLink class="block min-w-0 text-inherit no-underline" :to="{ name: 'folder', params: { slug: item.folderSlug } }">
             <h3 class="m-0 text-[0.88rem] font-semibold truncate">
               {{ item.folderName }}
             </h3>
-          </div>
-        </RouterLink>
+          </RouterLink>
+          <RouterLink
+            v-if="item.place"
+            class="mt-[0.08rem] block truncate text-[0.78rem] font-medium text-muted no-underline hover:text-text"
+            :to="{ name: 'place', params: { slug: item.place.slug } }"
+          >
+            {{ item.place.name }}
+          </RouterLink>
+        </div>
       </div>
       <button
         class="inline-flex items-center justify-center w-8 h-8 p-0 border-0 text-muted bg-transparent cursor-pointer"

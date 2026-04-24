@@ -111,6 +111,10 @@ class DatabaseManager {
       this.database.exec('ALTER TABLE images ADD COLUMN asset_key TEXT NULL');
     }
 
+    if (this.tableExists('images') && !this.tableHasColumn('images', 'place_id')) {
+      this.database.exec('ALTER TABLE images ADD COLUMN place_id INTEGER NULL');
+    }
+
     if (this.tableExists('images') && !this.tableHasColumn('images', 'deleted_at')) {
       this.database.exec('ALTER TABLE images ADD COLUMN deleted_at TEXT NULL');
     }
@@ -150,6 +154,10 @@ class DatabaseManager {
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_images_trashed_listing ON images(is_trashed, is_deleted, trashed_at DESC, id DESC)');
     this.database.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_images_asset_key ON images(asset_key) WHERE asset_key IS NOT NULL');
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_images_deleted_at ON images(deleted_at)');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_images_place_id ON images(place_id)');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_places_slug ON places(slug)');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_places_display_name ON places(display_name)');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_places_geonames_id ON places(geonames_id)');
   }
 }
 

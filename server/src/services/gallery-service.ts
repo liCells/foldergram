@@ -13,8 +13,8 @@ import {
   TREAT_STORIES_AS_FOLDERS_SETTING_KEY
 } from '../constants/app-setting-keys.js';
 import { appConfig } from '../config/env.js';
-import { appSettingsRepository, folderRepository, folderScanStateRepository, imageRepository, likeRepository, scanRunRepository } from '../db/repositories.js';
-import type { FeedImage, FolderRecord, FolderSummaryRecord, ImageDetail, MediaType, PlaybackStrategy, TrashImage } from '../types/models.js';
+import { appSettingsRepository, folderRepository, folderScanStateRepository, imageRepository, likeRepository, placeRepository, scanRunRepository } from '../db/repositories.js';
+import type { FeedImage, FolderRecord, FolderSummaryRecord, ImageDetail, MediaType, PlaceKind, PlaybackStrategy, TrashImage } from '../types/models.js';
 import {
   getEffectiveExcludedFolderRules,
   parseExcludedFolderRulesFromSetting,
@@ -29,6 +29,7 @@ import { buildReelQueue, shuffleReelCandidates, type ReelAffinitySignals } from 
 import { parseTreatStoriesAsFoldersSetting, serializeTreatStoriesAsFoldersSetting } from '../utils/stories-utils.js';
 import { scannerService } from './scanner-service.js';
 import { storageService } from './storage-service.js';
+import { geodataService, placeResolutionService } from './place-service.js';
 
 type FeedMode = 'recent' | 'rediscover' | 'random';
 type ReelsFeedMode = 'recommended' | 'recent' | 'random';
@@ -91,9 +92,17 @@ const RAIL_COVER_CANDIDATE_LIMIT = 12;
 const FALLBACK_AVATAR_STORY_LIMIT = 10;
 const FALLBACK_AVATAR_STORY_ID = '__story-avatar-fallback__';
 
-type IndexedFeedImage = FeedImage & { playbackStrategy?: PlaybackStrategy | null };
-type IndexedImageDetail = ImageDetail & { playbackStrategy?: PlaybackStrategy | null; exifJson?: string | null };
-type IndexedTrashImage = TrashImage & { playbackStrategy?: PlaybackStrategy | null };
+interface PlaceRowFields {
+  placeId?: number | null;
+  placeSlug?: string | null;
+  placeName?: string | null;
+  placeKind?: PlaceKind | null;
+  placeIsApproximate?: number | null;
+}
+
+type IndexedFeedImage = FeedImage & PlaceRowFields & { playbackStrategy?: PlaybackStrategy | null };
+type IndexedImageDetail = ImageDetail & PlaceRowFields & { playbackStrategy?: PlaybackStrategy | null; exifJson?: string | null };
+type IndexedTrashImage = TrashImage & PlaceRowFields & { playbackStrategy?: PlaybackStrategy | null };
 type ScanSummaryRecord = ReturnType<typeof scanRunRepository.latestCompleted>;
 
 function toViewerSafeScanSummary(scan: ScanSummaryRecord | null) {
@@ -188,6 +197,20 @@ function buildPreviewUrl(
   }
 
   return toPublicMediaUrl('/previews', image.previewUrl, version);
+}
+
+function mapPlaceSummaryFromRow(image: PlaceRowFields) {
+  if (!image.placeId || !image.placeSlug || !image.placeName || !image.placeKind) {
+    return null;
+  }
+
+  return {
+    id: image.placeId,
+    slug: image.placeSlug,
+    name: image.placeName,
+    kind: image.placeKind,
+    isApproximate: image.placeIsApproximate === 1
+  };
 }
 
 function resolveOriginalMediaFile(id: number): { path: string; filename: string } | null {
@@ -336,7 +359,7 @@ function isSameOrDescendantFolderPath(rootFolderPath: string, candidateFolderPat
 }
 
 function mapFeedImage(image: IndexedFeedImage, derivativeVersion = getDerivativeAssetVersion()): FeedImage {
-  const { playbackStrategy, ...rest } = image;
+  const { playbackStrategy, placeId, placeSlug, placeName, placeKind, placeIsApproximate, ...rest } = image;
   return {
     ...rest,
     isAnimated: Boolean(rest.isAnimated),
@@ -346,12 +369,13 @@ function mapFeedImage(image: IndexedFeedImage, derivativeVersion = getDerivative
       id: rest.id,
       mediaType: rest.mediaType,
       previewUrl: rest.previewUrl
-    }, false, derivativeVersion)
+    }, false, derivativeVersion),
+    place: mapPlaceSummaryFromRow({ placeId, placeSlug, placeName, placeKind, placeIsApproximate })
   };
 }
 
 function mapImageDetail(image: IndexedImageDetail, derivativeVersion = getDerivativeAssetVersion()): ImageDetail {
-  const { playbackStrategy, exifJson, ...rest } = image;
+  const { playbackStrategy, exifJson, placeId, placeSlug, placeName, placeKind, placeIsApproximate, ...rest } = image;
   const useOriginalForImages = appConfig.imageDetailSource === 'original';
   return {
     ...rest,
@@ -365,12 +389,13 @@ function mapImageDetail(image: IndexedImageDetail, derivativeVersion = getDeriva
       previewUrl: rest.previewUrl
     }, useOriginalForImages, derivativeVersion),
     originalUrl: buildOriginalUrl(rest.id),
-    playbackStrategy
+    playbackStrategy,
+    place: mapPlaceSummaryFromRow({ placeId, placeSlug, placeName, placeKind, placeIsApproximate })
   };
 }
 
 function mapTrashImage(image: IndexedTrashImage, derivativeVersion = getDerivativeAssetVersion()): TrashImage {
-  const { playbackStrategy, ...rest } = image;
+  const { playbackStrategy, placeId, placeSlug, placeName, placeKind, placeIsApproximate, ...rest } = image;
   return {
     ...rest,
     isAnimated: Boolean(rest.isAnimated),
@@ -380,7 +405,8 @@ function mapTrashImage(image: IndexedTrashImage, derivativeVersion = getDerivati
       id: rest.id,
       mediaType: rest.mediaType,
       previewUrl: rest.previewUrl
-    }, false, derivativeVersion)
+    }, false, derivativeVersion),
+    place: mapPlaceSummaryFromRow({ placeId, placeSlug, placeName, placeKind, placeIsApproximate })
   };
 }
 
@@ -1085,6 +1111,52 @@ export const galleryService = {
     return folderRepository.getAllSummaries().map(buildFolderSummary);
   },
 
+  listPlaces() {
+    if (!storageService.getState().libraryAvailable) {
+      return [];
+    }
+
+    return placeRepository.list().map((place) => ({
+      ...placeResolutionService.placeDetail(place, place.post_count)
+    }));
+  },
+
+  getPlaceBySlug(slug: string) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const place = placeRepository.getBySlug(slug);
+    if (!place) {
+      return null;
+    }
+
+    return placeResolutionService.placeDetail(place, placeRepository.countVisibleImages(place.id));
+  },
+
+  getPlaceImages(slug: string, page: number, limit: number, mediaType?: MediaType) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const place = placeRepository.getBySlug(slug);
+    if (!place) {
+      return null;
+    }
+
+    const total = placeRepository.countVisibleImages(place.id, mediaType);
+    const derivativeVersion = getDerivativeAssetVersion();
+
+    return {
+      place: placeResolutionService.placeDetail(place, total),
+      items: imageRepository.listPlaceImages(place.id, page, limit, mediaType).map((image) => mapFeedImage(image, derivativeVersion)),
+      page,
+      limit,
+      total,
+      hasMore: page * limit < total
+    };
+  },
+
   getFolderBySlug(slug: string) {
     if (!storageService.getState().libraryAvailable) {
       return null;
@@ -1236,6 +1308,18 @@ export const galleryService = {
     }
 
     return mapImageDetail(detail, getDerivativeAssetVersion());
+  },
+
+  getPlacesStatus() {
+    return geodataService.getStatus();
+  },
+
+  async preparePlacesGeodata() {
+    return geodataService.prepare();
+  },
+
+  rebuildPlaces() {
+    return placeResolutionService.rebuildAssignments();
   },
 
   getTrashImages(page: number, limit: number) {

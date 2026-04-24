@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as galleryApi from '../api/gallery';
-import type { AppStats, AppStatus } from '../types/api';
+import type { AppStats, AppStatus, PlacesStatus } from '../types/api';
 import { useAppStore } from '../stores/app';
 import SettingsView from './SettingsView.vue';
 
@@ -92,6 +92,21 @@ function createAppStats(): AppStats {
       ignoredRootMediaCount: 0
     },
     lastScan: null
+  };
+}
+
+function createPlacesStatus(prepared = false): PlacesStatus {
+  return {
+    prepared,
+    databasePath: '/data/geodata/geonames-cities500.sqlite',
+    metadata: prepared
+      ? {
+          source: 'GeoNames cities500',
+          sourceUrl: 'https://download.geonames.org/export/dump/cities500.zip',
+          importedAt: '2026-04-24T00:00:00.000Z',
+          rowCount: 210_000
+        }
+      : null
   };
 }
 
@@ -214,6 +229,63 @@ describe('SettingsView', () => {
     expect(wrapper.text()).toContain('24 indexed media records still use the old mirrored thumbnail and preview paths.');
     expect(wrapper.text()).toContain('Run Scan Library to move legacy mirrored thumbnails and previews into the asset-key storage layout.');
     expect(wrapper.text()).toContain('This keeps the current thumbnail paths and does not migrate legacy mirrored derivatives.');
+  });
+
+  it('shows the Places onboarding banner and opens the Places tab from its setup action', async () => {
+    const appStore = useAppStore();
+    appStore.$patch({
+      stats: createAppStatus()
+    });
+    vi.spyOn(galleryApi, 'fetchPlacesStatus').mockResolvedValue(createPlacesStatus(false));
+
+    const wrapper = mountSettingsView();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Places from photo GPS data');
+
+    const setupButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Set up Places');
+
+    expect(setupButton).toBeDefined();
+
+    await setupButton!.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('Places from photo GPS data');
+    expect(wrapper.text()).toContain('Offline places');
+    expect(wrapper.text()).toContain('Prepare GeoNames city data');
+  });
+
+  it('persists Places onboarding dismissal and hides the banner', async () => {
+    const appStore = useAppStore();
+    appStore.$patch({
+      stats: createAppStatus()
+    });
+    vi.spyOn(galleryApi, 'fetchPlacesStatus').mockResolvedValue(createPlacesStatus(false));
+
+    const wrapper = mountSettingsView();
+    await flushPromises();
+
+    const dismissButton = wrapper.get('button[aria-label="Dismiss places announcement"]');
+    await dismissButton.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('Places from photo GPS data');
+    expect(window.localStorage.getItem('foldergram:places-onboarding-dismissed:v1')).toBe('1');
+  });
+
+  it('does not show the Places onboarding banner after geodata is prepared', async () => {
+    const appStore = useAppStore();
+    appStore.$patch({
+      stats: createAppStatus()
+    });
+    vi.spyOn(galleryApi, 'fetchPlacesStatus').mockResolvedValue(createPlacesStatus(true));
+
+    const wrapper = mountSettingsView();
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('Places from photo GPS data');
   });
 
   it('saves the reels default from the general settings card', async () => {

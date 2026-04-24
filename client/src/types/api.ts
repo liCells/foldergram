@@ -54,6 +54,28 @@ export interface FeedItem {
   previewUrl: string;
   sortTimestamp: number;
   takenAt: number | null;
+  place?: PlaceSummary | null;
+}
+
+export type PlaceKind = 'city' | 'approximate_spot' | 'manual';
+
+export interface PlaceSummary {
+  id: number;
+  slug: string;
+  name: string;
+  kind: PlaceKind;
+  isApproximate: boolean;
+}
+
+export interface PlaceDetail extends PlaceSummary {
+  latitude: number | null;
+  longitude: number | null;
+  cityName: string | null;
+  admin1Name: string | null;
+  countryName: string | null;
+  countryCode: string | null;
+  description: string | null;
+  postCount: number;
 }
 
 export interface FolderSummary {
@@ -152,6 +174,33 @@ export interface FolderStoryFeedPayload extends PaginatedFeed {
 
 export interface FolderImagesPayload extends PaginatedFeed {
   folder: FolderSummary;
+}
+
+export interface PlaceImagesPayload extends PaginatedFeed {
+  place: PlaceDetail;
+}
+
+export interface PlacesStatus {
+  prepared: boolean;
+  databasePath: string;
+  metadata: {
+    source: string;
+    sourceUrl: string;
+    importedAt: string;
+    rowCount: number;
+  } | null;
+}
+
+export interface PlacesPrepareResult {
+  ok: boolean;
+  status: PlacesStatus;
+}
+
+export interface PlacesRebuildResult {
+  ok: boolean;
+  processed: number;
+  assigned: number;
+  skipped: number;
 }
 
 export interface LikesPayload {

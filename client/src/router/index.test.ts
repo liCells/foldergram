@@ -82,6 +82,28 @@ vi.mock('../views/MomentView.vue', async () => {
   };
 });
 
+vi.mock('../views/PlaceView.vue', async () => {
+  const { defineComponent } = await import('vue');
+
+  return {
+    default: defineComponent({
+      name: 'PlaceView',
+      template: '<div data-test="place-view">place-view</div>'
+    })
+  };
+});
+
+vi.mock('../views/PlacesView.vue', async () => {
+  const { defineComponent } = await import('vue');
+
+  return {
+    default: defineComponent({
+      name: 'PlacesView',
+      template: '<div data-test="places-view">places-view</div>'
+    })
+  };
+});
+
 vi.mock('../views/ReelsView.vue', async () => {
   const { defineComponent } = await import('vue');
 
@@ -154,6 +176,28 @@ describe('router', () => {
     expect(router.currentRoute.value.name).toBe('folder');
     expect(router.currentRoute.value.params.slug).toBe('animalplanet');
     expect(router.currentRoute.value.fullPath).toBe('/folders/animalplanet');
+  });
+
+  it('keeps the places directory distinct from place detail routes', async () => {
+    const directory = router.resolve({
+      name: 'places'
+    });
+    const detail = router.resolve({
+      name: 'place',
+      params: {
+        slug: 'lahore'
+      }
+    });
+
+    expect(directory.fullPath).toBe('/places');
+    expect(detail.fullPath).toBe('/places/lahore');
+
+    await router.replace('/places');
+    await router.isReady();
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe('places');
+    expect(router.currentRoute.value.fullPath).toBe('/places');
   });
 
   it('renders the reels route and preserves the reels shell meta', async () => {

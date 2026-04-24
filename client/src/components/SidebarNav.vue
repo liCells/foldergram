@@ -142,6 +142,39 @@
       </RouterLink>
 
       <RouterLink
+        v-if="showPlacesNav"
+        custom
+        :to="{ name: 'places' }"
+        v-slot="{ href, navigate, isActive }"
+      >
+        <a
+          :href="href"
+          class="sidebar__link sidebar-item"
+          :class="isActive || isPlacesRoute ? sidebarActiveClass : ''"
+          @click="navigate"
+        >
+          <span
+            class="sidebar__icon flex-shrink-0 w-[1.45rem] h-[1.45rem]"
+            :class="
+              isActive || isPlacesRoute
+                ? 'i-fluent-location-20-filled'
+                : 'i-fluent-location-20-regular'
+            "
+            aria-hidden="true"
+          />
+          <span
+            class="sidebar__label max-w-0 overflow-hidden whitespace-nowrap text-[0.9rem] opacity-0 group-hover:max-w-[12rem] group-hover:opacity-100"
+            style="
+              transition:
+                opacity 0.18s ease,
+                max-width 0.22s ease;
+            "
+            >Places</span
+          >
+        </a>
+      </RouterLink>
+
+      <RouterLink
         v-if="authStore.canUseSavedItems"
         custom
         :to="{ name: 'likes' }"
@@ -357,6 +390,7 @@
   import { useAuthStore } from "../stores/auth"
   import { useLikesStore } from "../stores/likes"
   import { useFoldersStore } from "../stores/folders"
+  import { usePlacesStore } from "../stores/places"
   import { buildLikedCountByFolder } from "../utils/home-recommendations"
   import { selectSidebarFolders } from "../utils/sidebar-folders"
   import Avatar from "./Avatar.vue"
@@ -367,6 +401,7 @@
   const authStore = useAuthStore()
   const likesStore = useLikesStore()
   const foldersStore = useFoldersStore()
+  const placesStore = usePlacesStore()
   const route = useRoute()
   const moreMenuOpen = ref(false)
 
@@ -382,6 +417,12 @@
   )
   const appearanceLabel = computed(() =>
     appStore.theme === "light" ? "Switch to dark mode" : "Switch to light mode",
+  )
+  const showPlacesNav = computed(() =>
+    placesStore.items.length > 0 && placesStore.listError === null,
+  )
+  const isPlacesRoute = computed(() =>
+    route.name === "places" || route.name === "place",
   )
   const signOutLabel = computed(() =>
     authStore.accessMode === "public" ? "Return to public view" : "Sign out",
@@ -436,6 +477,7 @@
   )
 
   onMounted(() => {
+    void placesStore.fetchPlaces()
     window.addEventListener("keydown", handleWindowKeydown)
   })
 

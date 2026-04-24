@@ -29,6 +29,7 @@ import {
   type DerivativeMigrationSummary
 } from './derivative-migration-service.js';
 import { log } from './log-service.js';
+import { placeResolutionService } from './place-service.js';
 import { storageService } from './storage-service.js';
 import {
   createFingerprint,
@@ -2165,7 +2166,7 @@ class ScannerService {
           stableFallbackTimestamp: existingByPath.sort_timestamp
         });
 
-        imageRepository.refreshIndexed({
+        const image = imageRepository.refreshIndexed({
           folderId: folder.id,
           assetKey,
           filename: path.basename(file.absolutePath),
@@ -2189,6 +2190,9 @@ class ScannerService {
           previewPath,
           playbackStrategy: metadataPlaybackStrategy
         });
+        placeResolutionService.resolveImage(image);
+      } else if (existingByPath.place_id === null) {
+        placeResolutionService.resolveImage(existingByPath);
       }
 
       return {
@@ -2242,7 +2246,7 @@ class ScannerService {
       : null;
 
     if (moveCandidate) {
-      imageRepository.reconcileMove({
+      const image = imageRepository.reconcileMove({
         id: moveCandidate.id,
         folderId: folder.id,
         filename: path.basename(file.absolutePath),
@@ -2264,8 +2268,9 @@ class ScannerService {
         exifJson,
         playbackStrategy: metadata.playbackStrategy
       });
+      placeResolutionService.resolveImage(image);
     } else {
-      imageRepository.upsert({
+      const image = imageRepository.upsert({
         folderId: folder.id,
         assetKey,
         filename: path.basename(file.absolutePath),
@@ -2291,6 +2296,7 @@ class ScannerService {
         previewPath,
         playbackStrategy: metadata.playbackStrategy
       });
+      placeResolutionService.resolveImage(image);
     }
 
       return {
