@@ -165,6 +165,13 @@ interface ImageProcessingContext {
   hasStoredGalleryRoot: boolean;
   moveReconciliationEnabled: boolean;
   claimedMoveImageIds: Set<number>;
+  rebuildDerivativeReuseIndex?: RebuildDerivativeReuseIndex;
+}
+
+interface RebuildDerivativeReuseIndex {
+  byRelativePath: Map<string, ImageRecord>;
+  bySignature: Map<string, ImageRecord[]>;
+  claimedImageIds: Set<number>;
 }
 
 interface FullScanMetrics {
@@ -188,6 +195,10 @@ interface DerivativeProcessingSummary {
   generatedPreviews: number;
   generatedThumbnails: number;
   queuedJobs: number;
+}
+
+interface FullScanContextOptions {
+  rebuildDerivativeReuseIndex?: RebuildDerivativeReuseIndex;
 }
 
 type ScanPhase = 'idle' | 'migration' | 'discovery' | 'derivatives';
@@ -346,6 +357,10 @@ function formatToggle(value: boolean): string {
 
 function joinLogParts(parts: Array<string | null | undefined>): string {
   return parts.filter((part): part is string => Boolean(part)).join(' | ');
+}
+
+function createReusableDerivativeSignature(fileSize: number, mtimeMs: number, extension: string): string {
+  return `${fileSize}:${Math.round(mtimeMs)}:${extension.toLowerCase()}`;
 }
 
 class ScannerService {
@@ -1324,10 +1339,13 @@ class ScannerService {
       ])
     );
 
+    const rebuildDerivativeReuseIndex = this.createRebuildDerivativeReuseIndex(imageRepository.listActive());
     maintenanceRepository.resetLibraryIndex();
     appSettingsRepository.remove(LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY);
 
-    const summary = await this.performFullScan(reason, options);
+    const summary = await this.performFullScan(reason, options, {
+      rebuildDerivativeReuseIndex
+    });
     if (summary.status !== 'failed' && summary.status !== 'skipped_unavailable') {
       this.clearLibraryRebuildRequirement();
     }
@@ -1428,7 +1446,11 @@ class ScannerService {
     return summary;
   }
 
-  private async performFullScan(reason: string, options: FullScanOptions): Promise<ScanSummary> {
+  private async performFullScan(
+    reason: string,
+    options: FullScanOptions,
+    contextOptions: FullScanContextOptions = {}
+  ): Promise<ScanSummary> {
     const runId = scanRunRepository.start();
     const summary = createEmptySummary();
     const errors: string[] = [];
@@ -1464,7 +1486,8 @@ class ScannerService {
       galleryRootChanged,
       hasStoredGalleryRoot,
       moveReconciliationEnabled: false,
-      claimedMoveImageIds: new Set<number>()
+      claimedMoveImageIds: new Set<number>(),
+      rebuildDerivativeReuseIndex: contextOptions.rebuildDerivativeReuseIndex
     };
     const treatStoriesAsFolders = this.shouldTreatStoriesAsFolders();
     const excludedFolderRules = this.getEffectiveExcludedFolderRules();
@@ -2046,6 +2069,72 @@ class ScannerService {
     }
   }
 
+  private createRebuildDerivativeReuseIndex(images: ImageRecord[]): RebuildDerivativeReuseIndex {
+    const byRelativePath = new Map<string, ImageRecord>();
+    const bySignature = new Map<string, ImageRecord[]>();
+
+    for (const image of images) {
+      byRelativePath.set(normalizePath(image.relative_path), image);
+
+      const signature = createReusableDerivativeSignature(image.file_size, image.mtime_ms, image.extension);
+      const signatureMatches = bySignature.get(signature) ?? [];
+      signatureMatches.push(image);
+      bySignature.set(signature, signatureMatches);
+    }
+
+    return {
+      byRelativePath,
+      bySignature,
+      claimedImageIds: new Set<number>()
+    };
+  }
+
+  private hasReusableDerivativeSignature(image: ImageRecord, file: IndexedFileCandidate, extension: string): boolean {
+    return createReusableDerivativeSignature(image.file_size, image.mtime_ms, image.extension) ===
+      createReusableDerivativeSignature(file.stats.size, file.stats.mtimeMs, extension);
+  }
+
+  private findRebuildDerivativeReuseCandidate(
+    file: IndexedFileCandidate,
+    extension: string,
+    context: ImageProcessingContext
+  ): ImageRecord | undefined {
+    const index = context.rebuildDerivativeReuseIndex;
+    if (!index) {
+      return undefined;
+    }
+
+    const normalizedRelativePath = normalizePath(file.relativePath);
+    const existingByRelativePath = index.byRelativePath.get(normalizedRelativePath);
+    if (existingByRelativePath && !index.claimedImageIds.has(existingByRelativePath.id)) {
+      index.claimedImageIds.add(existingByRelativePath.id);
+      return existingByRelativePath;
+    }
+
+    const signature = createReusableDerivativeSignature(file.stats.size, file.stats.mtimeMs, extension);
+    const candidates = (index.bySignature.get(signature) ?? [])
+      .filter((candidate) => candidate.relative_path !== normalizedRelativePath && !index.claimedImageIds.has(candidate.id));
+
+    if (candidates.length === 0) {
+      return undefined;
+    }
+
+    const requestedBasename = path.basename(file.relativePath).toLowerCase();
+    const basenameMatches = candidates.filter((candidate) => candidate.filename.toLowerCase() === requestedBasename);
+    const selectedCandidate =
+      candidates.length === 1
+        ? candidates[0]
+        : basenameMatches.length === 1
+          ? basenameMatches[0]
+          : undefined;
+
+    if (selectedCandidate) {
+      index.claimedImageIds.add(selectedCandidate.id);
+    }
+
+    return selectedCandidate;
+  }
+
   private async findMoveCandidate(
     file: IndexedFileCandidate,
     extension: string,
@@ -2106,7 +2195,14 @@ class ScannerService {
     const mediaType = getMediaTypeFromExtension(extension);
     const existingByPath = imageRepository.getByRelativePath(file.relativePath);
     const moveCandidate = existingByPath ? undefined : await this.findMoveCandidate(file, extension, context);
-    const existing = existingByPath ?? moveCandidate;
+    const rebuildDerivativeReuseCandidate = existingByPath || moveCandidate
+      ? undefined
+      : this.findRebuildDerivativeReuseCandidate(file, extension, context);
+    const existing = existingByPath ?? moveCandidate ?? rebuildDerivativeReuseCandidate;
+    const canReuseDerivativeFiles = Boolean(moveCandidate) ||
+      (rebuildDerivativeReuseCandidate
+        ? this.hasReusableDerivativeSignature(rebuildDerivativeReuseCandidate, file, extension)
+        : false);
     const absolutePathChanged = existingByPath ? normalizePath(existingByPath.absolute_path) !== normalizePath(file.absolutePath) : false;
     const assetKey = existing?.asset_key ?? generateAssetKey();
     const thumbnailPath = existing?.thumbnail_path ?? getThumbnailPathForAssetKey(assetKey);
@@ -2299,21 +2395,21 @@ class ScannerService {
       placeResolutionService.resolveImage(image);
     }
 
-      return {
-        status: existing ? 'updated' : 'new',
-        derivativeJob: appConfig.derivativeMode === 'lazy'
-          ? null
-          : {
-              absolutePath: file.absolutePath,
-              relativePath: file.relativePath,
-              thumbnailPath,
-              previewPath,
-              force: existing ? true : options.forceNewFileDerivatives,
-              kind: 'all'
-            },
-        refreshedIndexedRow: false,
-        relativePath: file.relativePath
-      };
+    return {
+      status: existing ? 'updated' : 'new',
+      derivativeJob: appConfig.derivativeMode === 'lazy'
+        ? null
+        : {
+            absolutePath: file.absolutePath,
+            relativePath: file.relativePath,
+            thumbnailPath,
+            previewPath,
+            force: existing ? !canReuseDerivativeFiles : options.forceNewFileDerivatives,
+            kind: 'all'
+          },
+      refreshedIndexedRow: false,
+      relativePath: file.relativePath
+    };
   }
 }
 

@@ -1011,7 +1011,7 @@
     <ConfirmDialog
       v-if="confirmRebuildOpen"
       title="Rebuild the current library index?"
-      message="This will clear the indexed database tables for folders, posts, likes, and scan history, then rescan the active gallery root. Existing thumbnails and previews at the configured storage paths will be reused when their mirrored files already exist, and only missing derivatives will be generated. Original files in the gallery will not be deleted."
+      message="This will clear the indexed database tables for folders, posts, likes, and scan history, then rescan the active gallery root. Existing thumbnails and previews from the previous index will be reused when they still match the current files, and only missing or changed derivatives will be generated. Original files in the gallery will not be deleted."
       confirm-label="Rebuild Library Index"
       loading-label="Rebuilding..."
       :loading="rebuilding"
@@ -1646,7 +1646,7 @@ const rebuildActionNote = computed(() => {
     return 'Recommended because the gallery location changed.';
   }
 
-  return 'Use this to reset the index and reuse any existing derivatives at the current storage paths.';
+  return 'Use this to reset the index and reuse matching derivatives from the previous library index.';
 });
 const thumbnailRebuildActionNote = computed(() => {
   if (waitingForInitialStatus.value) {

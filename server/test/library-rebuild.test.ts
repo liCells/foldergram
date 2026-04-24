@@ -9,6 +9,7 @@ import {
   getPreviewRelativePath,
   getThumbnailRelativePath
 } from '../src/utils/image-utils.js';
+import { LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY } from '../src/constants/app-setting-keys.js';
 
 type AppConfigModule = typeof import('../src/config/env.js');
 type ScannerServiceModule = typeof import('../src/services/scanner-service.js');
@@ -23,6 +24,7 @@ describe.sequential('library rebuild reuses existing derivatives', () => {
   let appConfig: AppConfigModule['appConfig'];
   let scannerService: ScannerServiceModule['scannerService'];
   let imageRepository: RepositoriesModule['imageRepository'];
+  let appSettingsRepository: RepositoriesModule['appSettingsRepository'];
 
   beforeAll(async () => {
     tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'insta-library-rebuild-'));
@@ -53,7 +55,7 @@ describe.sequential('library rebuild reuses existing derivatives', () => {
 
     ({ appConfig } = await import('../src/config/env.js'));
     ({ scannerService } = await import('../src/services/scanner-service.js'));
-    ({ imageRepository } = await import('../src/db/repositories.js'));
+    ({ imageRepository, appSettingsRepository } = await import('../src/db/repositories.js'));
 
     await Promise.all([
       fs.mkdir(appConfig.galleryRoot, { recursive: true }),
@@ -74,10 +76,13 @@ describe.sequential('library rebuild reuses existing derivatives', () => {
       };
     });
 
-    generateDerivativesMock.mockImplementation(async (sourcePath: string, relativePath: string, force = false) => {
+    generateDerivativesMock.mockImplementation(async (sourcePath: string, relativePath: string, force = false, overrides?: {
+      thumbnailPath?: string;
+      previewPath?: string;
+    }) => {
       const mediaType = getMediaTypeFromExtension(path.extname(relativePath));
-      const thumbnailPath = getThumbnailRelativePath(relativePath);
-      const previewPath = getPreviewRelativePath(relativePath, mediaType);
+      const thumbnailPath = overrides?.thumbnailPath ?? getThumbnailRelativePath(relativePath);
+      const previewPath = overrides?.previewPath ?? getPreviewRelativePath(relativePath, mediaType);
       const thumbnailAbsolutePath = path.join(appConfig.thumbnailsDir, thumbnailPath);
       const previewAbsolutePath = path.join(appConfig.previewsDir, previewPath);
       const shouldWriteThumbnail = force || !(await pathExists(thumbnailAbsolutePath));
@@ -115,16 +120,9 @@ describe.sequential('library rebuild reuses existing derivatives', () => {
     await fs.rm(tempRoot, { recursive: true, force: true });
   });
 
-  it('keeps matching thumbnails/previews and only generates missing derivatives during a rebuild', async () => {
+  it('generates missing asset-key derivatives without forcing writes during a rebuild with no previous index', async () => {
     await createSourceFile('summer/photo-1.jpg');
     await createSourceFile('summer/clip-1.mp4');
-
-    const existingThumbnailPath = path.join(appConfig.thumbnailsDir, getThumbnailRelativePath('summer/photo-1.jpg'));
-    const existingPreviewPath = path.join(appConfig.previewsDir, getPreviewRelativePath('summer/photo-1.jpg', 'image'));
-    await fs.mkdir(path.dirname(existingThumbnailPath), { recursive: true });
-    await fs.mkdir(path.dirname(existingPreviewPath), { recursive: true });
-    await fs.writeFile(existingThumbnailPath, 'existing-thumb:summer/photo-1.jpg');
-    await fs.writeFile(existingPreviewPath, 'existing-preview:summer/photo-1.jpg');
 
     const lastScan = await scannerService.rebuildLibraryIndex();
 
@@ -137,13 +135,95 @@ describe.sequential('library rebuild reuses existing derivatives', () => {
       expect(force).toBe(false);
     }
 
-    await expect(fs.readFile(existingThumbnailPath, 'utf8')).resolves.toBe('existing-thumb:summer/photo-1.jpg');
-    await expect(fs.readFile(existingPreviewPath, 'utf8')).resolves.toBe('existing-preview:summer/photo-1.jpg');
+    for (const image of imageRepository.listActive()) {
+      await expect(fs.readFile(path.join(appConfig.thumbnailsDir, image.thumbnail_path), 'utf8')).resolves.toBe(`thumb:${image.relative_path}`);
+      await expect(fs.readFile(path.join(appConfig.previewsDir, image.preview_path), 'utf8')).resolves.toBe(`preview:${image.relative_path}`);
+    }
+  });
 
-    const generatedVideoThumbnailPath = path.join(appConfig.thumbnailsDir, getThumbnailRelativePath('summer/clip-1.mp4'));
-    const generatedVideoPreviewPath = path.join(appConfig.previewsDir, getPreviewRelativePath('summer/clip-1.mp4', 'video'));
-    await expect(fs.readFile(generatedVideoThumbnailPath, 'utf8')).resolves.toBe('thumb:summer/clip-1.mp4');
-    await expect(fs.readFile(generatedVideoPreviewPath, 'utf8')).resolves.toBe('preview:summer/clip-1.mp4');
+  it('reuses asset-key derivative paths from the previous index when rebuilding after the gallery root moved', async () => {
+    await createSourceFile('summer/photo-1.jpg');
+    await createSourceFile('summer/clip-1.mp4');
+
+    await scannerService.scanAll('initial', {
+      repairUnchangedDerivatives: false
+    });
+
+    const beforeRows = imageRepository.listActive();
+    expect(beforeRows).toHaveLength(2);
+    const beforeByRelativePath = new Map(beforeRows.map((image) => [image.relative_path, image]));
+    for (const image of beforeRows) {
+      await expect(fs.readFile(path.join(appConfig.thumbnailsDir, image.thumbnail_path), 'utf8')).resolves.toBe(`thumb:${image.relative_path}`);
+      await expect(fs.readFile(path.join(appConfig.previewsDir, image.preview_path), 'utf8')).resolves.toBe(`preview:${image.relative_path}`);
+    }
+
+    generateDerivativesMock.mockClear();
+    appSettingsRepository.set(LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY, path.join(tempRoot, 'old-gallery-root'));
+
+    const lastScan = await scannerService.rebuildLibraryIndex();
+
+    expect(lastScan?.status).toBe('completed');
+    expect(lastScan?.scanned_files).toBe(2);
+    expect(generateDerivativesMock).toHaveBeenCalledTimes(2);
+
+    for (const [, relativePath, force, overrides] of generateDerivativesMock.mock.calls) {
+      const previous = beforeByRelativePath.get(relativePath as string);
+      expect(previous).toBeDefined();
+      expect(force).toBe(false);
+      expect(overrides).toMatchObject({
+        thumbnailPath: previous!.thumbnail_path,
+        previewPath: previous!.preview_path
+      });
+    }
+
+    const afterRows = imageRepository.listActive();
+    expect(afterRows).toHaveLength(2);
+
+    for (const image of afterRows) {
+      const previous = beforeByRelativePath.get(image.relative_path);
+      expect(previous).toBeDefined();
+      expect(image.asset_key).toBe(previous!.asset_key);
+      expect(image.thumbnail_path).toBe(previous!.thumbnail_path);
+      expect(image.preview_path).toBe(previous!.preview_path);
+      await expect(fs.readFile(path.join(appConfig.thumbnailsDir, image.thumbnail_path), 'utf8')).resolves.toBe(`thumb:${image.relative_path}`);
+      await expect(fs.readFile(path.join(appConfig.previewsDir, image.preview_path), 'utf8')).resolves.toBe(`preview:${image.relative_path}`);
+    }
+  });
+
+  it('does not force derivative regeneration when a file is reconciled as moved', async () => {
+    const initialRelativePath = 'phones/set-a/photo.jpg';
+    const movedRelativePath = 'phones/photo.jpg';
+
+    await createSourceFile(initialRelativePath);
+    await scannerService.scanAll('initial', {
+      repairUnchangedDerivatives: false
+    });
+
+    const original = imageRepository.getByRelativePath(initialRelativePath);
+    expect(original).toBeDefined();
+
+    await fs.mkdir(path.join(appConfig.galleryRoot, 'phones'), { recursive: true });
+    await fs.rename(
+      path.join(appConfig.galleryRoot, initialRelativePath),
+      path.join(appConfig.galleryRoot, movedRelativePath)
+    );
+    appSettingsRepository.set(LAST_SUCCESSFUL_GALLERY_ROOT_SETTING_KEY, appConfig.galleryRoot);
+    generateDerivativesMock.mockClear();
+
+    const lastScan = await scannerService.scanAll('move', {
+      repairUnchangedDerivatives: false
+    });
+
+    expect(lastScan?.status).toBe('completed');
+    const moved = imageRepository.getByRelativePath(movedRelativePath);
+    expect(moved?.id).toBe(original?.id);
+    expect(moved?.asset_key).toBe(original?.asset_key);
+    expect(moved?.thumbnail_path).toBe(original?.thumbnail_path);
+    expect(moved?.preview_path).toBe(original?.preview_path);
+    expect(generateDerivativesMock).toHaveBeenCalledTimes(1);
+    expect(generateDerivativesMock.mock.calls[0]?.[2]).toBe(false);
+    await expect(fs.readFile(path.join(appConfig.thumbnailsDir, moved!.thumbnail_path), 'utf8')).resolves.toBe(`thumb:${initialRelativePath}`);
+    await expect(fs.readFile(path.join(appConfig.previewsDir, moved!.preview_path), 'utf8')).resolves.toBe(`preview:${initialRelativePath}`);
   });
 
   async function createSourceFile(relativePath: string): Promise<void> {
