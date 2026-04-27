@@ -1,163 +1,181 @@
 <template>
-  <!-- Mobile top nav — hidden on desktop (md+) -->
-  <header class="topbar hidden max-md:flex items-center justify-between gap-4 sticky top-0 z-20 px-4 py-[0.95rem] bg-bg backdrop-blur-[12px] border-b border-border">
-    <RouterLink class="topbar__brand inline-flex items-center justify-center w-12 h-12 shrink-0 p-[0.3rem] rounded-[1rem] color-inherit transition-[background-color,transform] duration-180 hover:bg-surface-hover hover:-translate-y-px" to="/" aria-label="Foldergram home">
-      <BrandMark />
-    </RouterLink>
-    <div v-if="moreMenuOpen" class="fixed inset-0 z-30" @click="closeMoreMenu" />
-    <div class="relative z-40 flex min-w-0 max-w-[calc(100vw-6rem)] flex-wrap items-center justify-end gap-[0.35rem]">
+  <!-- Mobile bottom nav — hidden on desktop (md+) -->
+  <nav class="mobile-nav" aria-label="Primary navigation">
+    <div v-if="moreMenuOpen" class="mobile-nav__backdrop" @click="closeMoreMenu" />
+
+    <div class="mobile-nav__bar">
       <RouterLink custom to="/" v-slot="{ href, navigate, isActive }">
         <a
           :href="href"
-          class="topbar__icon-link inline-flex items-center justify-center w-11 h-12 rounded-[1rem] border-0 bg-transparent color-inherit cursor-pointer transition-colors duration-150 hover:bg-white/8"
-          :class="isActive ? topbarActiveClass : ''"
-          aria-label="Home"
-          @click="navigate"
+          class="mobile-nav__item mobile-nav__brand"
+          :class="isActive ? mobileNavActiveClass : ''"
+          aria-label="Foldergram home"
+          @click="handleNavNavigate($event, navigate)"
         >
-          <span class="w-[1.45rem] h-[1.45rem]" :class="isActive ? 'i-fluent-home-16-filled' : 'i-fluent-home-16-regular'" aria-hidden="true" />
+          <BrandMark />
         </a>
       </RouterLink>
-      <RouterLink custom :to="{ name: 'reels' }" v-slot="{ href, navigate, isActive }">
-        <a
-          :href="href"
-          class="topbar__icon-link inline-flex items-center justify-center w-11 h-12 rounded-[1rem] border-0 bg-transparent color-inherit cursor-pointer transition-colors duration-150 hover:bg-white/8"
-          :class="isActive ? topbarActiveClass : ''"
-          aria-label="Reels"
-          @click="navigate"
-        >
-          <span class="w-[1.45rem] h-[1.45rem]" :class="isActive ? 'i-fluent-play-circle-24-filled' : 'i-fluent-play-circle-24-regular'" aria-hidden="true" />
-        </a>
-      </RouterLink>
-      <RouterLink custom :to="{ name: 'explore' }" v-slot="{ href, navigate, isActive }">
-        <a
-          :href="href"
-          class="topbar__icon-link inline-flex items-center justify-center w-11 h-12 rounded-[1rem] border-0 bg-transparent color-inherit cursor-pointer transition-colors duration-150 hover:bg-white/8"
-          :class="isActive ? topbarActiveClass : ''"
-          aria-label="Search"
-          @click="navigate"
-        >
-          <span class="w-[1.45rem] h-[1.45rem]" :class="isActive ? 'i-fluent-search-16-filled' : 'i-fluent-search-16-regular'" aria-hidden="true" />
-        </a>
-      </RouterLink>
-      <RouterLink custom :to="{ name: 'library' }" v-slot="{ href, navigate, isActive }">
-        <a
-          :href="href"
-          class="topbar__icon-link inline-flex items-center justify-center w-11 h-12 rounded-[1rem] border-0 bg-transparent color-inherit cursor-pointer transition-colors duration-150 hover:bg-white/8"
-          :class="isActive ? topbarActiveClass : ''"
-          aria-label="Library"
-          @click="navigate"
-        >
-          <span class="w-[1.45rem] h-[1.45rem]" :class="isActive ? 'i-fluent-folder-16-filled' : 'i-fluent-folder-16-regular'" aria-hidden="true" />
-        </a>
-      </RouterLink>
-      <RouterLink v-if="showPlacesNav" custom :to="{ name: 'places' }" v-slot="{ href, navigate, isActive }">
-        <a
-          :href="href"
-          class="topbar__icon-link inline-flex items-center justify-center w-11 h-12 rounded-[1rem] border-0 bg-transparent color-inherit cursor-pointer transition-colors duration-150 hover:bg-white/8"
-          :class="isActive || isPlacesRoute ? topbarActiveClass : ''"
-          aria-label="Places"
-          @click="navigate"
-        >
-          <span class="w-[1.45rem] h-[1.45rem]" :class="isActive || isPlacesRoute ? 'i-fluent-location-20-filled' : 'i-fluent-location-20-regular'" aria-hidden="true" />
-        </a>
-      </RouterLink>
-      <RouterLink v-if="authStore.canUseSavedItems" custom :to="{ name: 'likes' }" v-slot="{ href, navigate, isActive }">
-        <a
-          :href="href"
-          class="topbar__icon-link inline-flex items-center justify-center w-11 h-12 rounded-[1rem] border-0 bg-transparent color-inherit cursor-pointer transition-colors duration-150 hover:bg-white/8"
-          :class="isActive ? topbarActiveClass : ''"
-          :aria-label="`${likesStore.collectionLabel} (${likesStore.items.length})`"
-          @click="navigate"
-        >
-          <span class="w-[1.45rem] h-[1.45rem]" :class="isActive ? 'i-fluent-heart-20-filled' : 'i-fluent-heart-20-regular'" aria-hidden="true" />
-        </a>
-      </RouterLink>
-      <div class="relative">
-        <button
-          class="topbar__icon-link inline-flex items-center justify-center w-11 h-12 rounded-[1rem] border-0 bg-transparent color-inherit cursor-pointer transition-colors duration-150 hover:bg-white/8"
-          :class="moreMenuOpen ? topbarActiveClass : ''"
-          type="button"
-          aria-label="More"
-          aria-haspopup="menu"
-          :aria-expanded="moreMenuOpen"
-          @click="toggleMoreMenu"
-        >
-          <span class="i-fluent-line-horizontal-3-20-filled w-[1.45rem] h-[1.45rem]" aria-hidden="true" />
-        </button>
 
-        <div
-          v-if="moreMenuOpen"
-          class="absolute right-0 top-[calc(100%+0.45rem)] w-[18rem] overflow-hidden rounded-[1.55rem] border border-border bg-[color-mix(in_srgb,var(--surface)_96%,var(--bg)_4%)] shadow-[0_28px_70px_rgba(0,0,0,0.24)]"
-        >
-          <RouterLink
-            v-if="authStore.canDeleteMedia"
-            class="flex items-center gap-[0.95rem] px-[1.2rem] py-[1rem] text-[0.98rem] text-text transition-colors duration-150 hover:bg-surface-hover"
-            :to="{ name: 'trash' }"
-            @click="closeMoreMenu"
+      <div class="mobile-nav__links">
+        <RouterLink custom :to="{ name: 'reels' }" v-slot="{ href, navigate, isActive }">
+          <a
+            :href="href"
+            class="mobile-nav__item"
+            :class="isActive ? mobileNavActiveClass : ''"
+            aria-label="Reels"
+            @click="handleNavNavigate($event, navigate)"
           >
-            <span class="i-fluent-delete-16-regular w-[1.18rem] h-[1.18rem] shrink-0" aria-hidden="true" />
-            <span>Trash</span>
-          </RouterLink>
+            <span class="mobile-nav__icon" :class="isActive ? 'i-fluent-play-circle-24-filled' : 'i-fluent-play-circle-24-regular'" aria-hidden="true" />
+          </a>
+        </RouterLink>
 
-          <RouterLink v-if="authStore.canAccessSettings" custom :to="{ name: 'settings' }" v-slot="{ href, navigate, isActive }">
-            <a
-              :href="href"
-              class="flex items-center gap-[0.95rem] px-[1.2rem] py-[1rem] text-[0.98rem] text-text transition-colors duration-150 hover:bg-surface-hover"
-              @click="handleSettingsNavigate($event, navigate)"
+        <RouterLink custom :to="{ name: 'explore' }" v-slot="{ href, navigate, isActive }">
+          <a
+            :href="href"
+            class="mobile-nav__item"
+            :class="isActive ? mobileNavActiveClass : ''"
+            aria-label="Search"
+            @click="handleNavNavigate($event, navigate)"
+          >
+            <span class="mobile-nav__icon" :class="isActive ? 'i-fluent-search-16-filled' : 'i-fluent-search-16-regular'" aria-hidden="true" />
+          </a>
+        </RouterLink>
+
+        <RouterLink custom :to="{ name: 'library' }" v-slot="{ href, navigate, isActive }">
+          <a
+            :href="href"
+            class="mobile-nav__item"
+            :class="isActive ? mobileNavActiveClass : ''"
+            aria-label="Library"
+            @click="handleNavNavigate($event, navigate)"
+          >
+            <span class="mobile-nav__icon" :class="isActive ? 'i-fluent-folder-16-filled' : 'i-fluent-folder-16-regular'" aria-hidden="true" />
+          </a>
+        </RouterLink>
+
+        <RouterLink v-if="showPlacesNav" custom :to="{ name: 'places' }" v-slot="{ href, navigate, isActive }">
+          <a
+            :href="href"
+            class="mobile-nav__item mobile-nav__item--places"
+            :class="isActive || isPlacesRoute ? mobileNavActiveClass : ''"
+            aria-label="Places"
+            @click="handleNavNavigate($event, navigate)"
+          >
+            <span class="mobile-nav__icon" :class="isActive || isPlacesRoute ? 'i-fluent-location-20-filled' : 'i-fluent-location-20-regular'" aria-hidden="true" />
+          </a>
+        </RouterLink>
+
+        <RouterLink v-if="authStore.canUseSavedItems" custom :to="{ name: 'likes' }" v-slot="{ href, navigate, isActive }">
+          <a
+            :href="href"
+            class="mobile-nav__item mobile-nav__item--likes"
+            :class="isActive ? mobileNavActiveClass : ''"
+            :aria-label="`${likesStore.collectionLabel} (${likesStore.items.length})`"
+            @click="handleNavNavigate($event, navigate)"
+          >
+            <span class="mobile-nav__icon" :class="isActive ? 'i-fluent-heart-20-filled' : 'i-fluent-heart-20-regular'" aria-hidden="true" />
+          </a>
+        </RouterLink>
+
+        <div class="mobile-nav__more">
+          <button
+            class="mobile-nav__item mobile-nav__more-button"
+            :class="moreButtonClasses"
+            type="button"
+            aria-label="More"
+            aria-haspopup="menu"
+            :aria-expanded="moreMenuOpen"
+            :data-open="moreMenuOpen ? 'true' : 'false'"
+            @click="toggleMoreMenu"
+          >
+            <span class="mobile-nav__icon i-fluent-line-horizontal-3-20-filled" aria-hidden="true" />
+          </button>
+
+          <div v-if="moreMenuOpen" class="mobile-nav__menu">
+            <RouterLink v-if="authStore.canUseSavedItems" custom :to="{ name: 'likes' }" v-slot="{ href, navigate, isActive }">
+              <a
+                :href="href"
+                class="mobile-nav__menu-item mobile-nav__menu-item--likes"
+                :class="isActive ? menuItemActiveClass : ''"
+                @click="handleNavNavigate($event, navigate)"
+              >
+                <span class="mobile-nav__menu-icon" :class="isActive ? 'i-fluent-heart-20-filled' : 'i-fluent-heart-20-regular'" aria-hidden="true" />
+                <span>{{ likesStore.collectionLabel }}</span>
+                <small class="mobile-nav__menu-badge">{{ likesStore.items.length }}</small>
+              </a>
+            </RouterLink>
+
+            <RouterLink
+              v-if="authStore.canDeleteMedia"
+              class="mobile-nav__menu-item"
+              :to="{ name: 'trash' }"
+              @click="closeMoreMenu"
+            >
+              <span class="mobile-nav__menu-icon i-fluent-delete-16-regular" aria-hidden="true" />
+              <span>Trash</span>
+            </RouterLink>
+
+            <RouterLink v-if="authStore.canAccessSettings" custom :to="{ name: 'settings' }" v-slot="{ href, navigate, isActive }">
+              <a
+                :href="href"
+                class="mobile-nav__menu-item"
+                :class="isActive ? menuItemActiveClass : ''"
+                @click="handleSettingsNavigate($event, navigate)"
+              >
+                <span
+                  class="mobile-nav__menu-icon"
+                  :class="isActive ? 'i-fluent-settings-20-filled' : 'i-fluent-settings-20-regular'"
+                  aria-hidden="true"
+                />
+                <span>Settings</span>
+              </a>
+            </RouterLink>
+
+            <button
+              v-if="authStore.canUnlockAdmin"
+              class="mobile-nav__menu-item"
+              type="button"
+              :disabled="authStore.loading"
+              @click="handleUnlockAdmin"
+            >
+              <span class="mobile-nav__menu-icon i-fluent-key-16-regular" aria-hidden="true" />
+              <span>Unlock admin</span>
+            </button>
+
+            <button
+              class="mobile-nav__menu-item"
+              type="button"
+              :aria-label="themeLabel"
+              @click="handleAppearanceToggle"
             >
               <span
-                class="w-[1.18rem] h-[1.18rem] shrink-0"
-                :class="isActive ? 'i-fluent-settings-20-filled' : 'i-fluent-settings-20-regular'"
+                v-if="appStore.theme === 'light'"
+                class="mobile-nav__menu-icon i-fluent-weather-moon-20-regular"
                 aria-hidden="true"
               />
-              <span>Settings</span>
-            </a>
-          </RouterLink>
+              <span
+                v-else
+                class="mobile-nav__menu-icon i-fluent-weather-sunny-20-regular"
+                aria-hidden="true"
+              />
+              <span>Switch appearance</span>
+            </button>
 
-          <button
-            v-if="authStore.canUnlockAdmin"
-            class="flex items-center gap-[0.95rem] w-full px-[1.2rem] py-[1rem] border-0 bg-transparent text-[0.98rem] text-text cursor-pointer text-left transition-colors duration-150 hover:bg-surface-hover disabled:opacity-60 disabled:cursor-wait"
-            type="button"
-            :disabled="authStore.loading"
-            @click="handleUnlockAdmin"
-          >
-            <span class="i-fluent-key-16-regular w-[1.18rem] h-[1.18rem] shrink-0" aria-hidden="true" />
-            <span>Unlock admin</span>
-          </button>
-
-          <button
-            class="flex items-center gap-[0.95rem] w-full px-[1.2rem] py-[1rem] border-0 bg-transparent text-[0.98rem] text-text cursor-pointer text-left transition-colors duration-150 hover:bg-surface-hover"
-            type="button"
-            :aria-label="themeLabel"
-            @click="handleAppearanceToggle"
-          >
-            <span
-              v-if="appStore.theme === 'light'"
-              class="i-fluent-weather-moon-20-regular w-[1.18rem] h-[1.18rem] shrink-0"
-              aria-hidden="true"
-            />
-            <span
-              v-else
-              class="i-fluent-weather-sunny-20-regular w-[1.18rem] h-[1.18rem] shrink-0"
-              aria-hidden="true"
-            />
-            <span>Switch appearance</span>
-          </button>
-
-          <button
-            v-if="authStore.authenticated"
-            class="flex items-center gap-[0.95rem] w-full px-[1.2rem] py-[1rem] border-0 bg-transparent text-[0.98rem] text-text cursor-pointer text-left transition-colors duration-150 hover:bg-surface-hover disabled:opacity-60 disabled:cursor-wait"
-            type="button"
-            :disabled="authStore.loading"
-            @click="handleSignOut"
-          >
-            <span class="i-fluent-arrow-exit-20-regular w-[1.18rem] h-[1.18rem] shrink-0" aria-hidden="true" />
-            <span>{{ signOutLabel }}</span>
-          </button>
+            <button
+              v-if="authStore.authenticated"
+              class="mobile-nav__menu-item"
+              type="button"
+              :disabled="authStore.loading"
+              @click="handleSignOut"
+            >
+              <span class="mobile-nav__menu-icon i-fluent-arrow-exit-20-regular" aria-hidden="true" />
+              <span>{{ signOutLabel }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </header>
+  </nav>
 </template>
 
 <script setup lang="ts">
@@ -180,7 +198,14 @@ const themeLabel = computed(() => (appStore.theme === 'light' ? 'Switch to dark 
 const signOutLabel = computed(() => (authStore.accessMode === 'public' ? 'Return to public view' : 'Sign out'));
 const showPlacesNav = computed(() => placesStore.items.length > 0 && placesStore.listError === null);
 const isPlacesRoute = computed(() => route.name === 'places' || route.name === 'place');
-const topbarActiveClass = 'router-link-active bg-[rgba(255,255,255,0.08)]';
+const isLikesRoute = computed(() => route.name === 'likes');
+const isStaticMoreRoute = computed(() => route.name === 'trash' || route.name === 'settings');
+const mobileNavActiveClass = 'mobile-nav__item--active';
+const menuItemActiveClass = 'mobile-nav__menu-item--active';
+const moreButtonClasses = computed(() => ({
+  [mobileNavActiveClass]: moreMenuOpen.value || isStaticMoreRoute.value || isLikesRoute.value,
+  'mobile-nav__more-button--likes-active': isLikesRoute.value
+}));
 
 function closeMoreMenu() {
   moreMenuOpen.value = false;
@@ -198,6 +223,11 @@ function handleAppearanceToggle() {
 function handleUnlockAdmin() {
   authStore.openUnlockDialog();
   closeMoreMenu();
+}
+
+function handleNavNavigate(event: MouseEvent, navigate: (event?: MouseEvent) => void) {
+  closeMoreMenu();
+  navigate(event);
 }
 
 function handleSettingsNavigate(event: MouseEvent, navigate: (event?: MouseEvent) => void) {
@@ -237,3 +267,191 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleWindowKeydown);
 });
 </script>
+
+<style scoped>
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .mobile-nav {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 30;
+    display: block;
+    padding:
+      0.5rem max(0.72rem, env(safe-area-inset-right))
+      calc(0.5rem + env(safe-area-inset-bottom))
+      max(0.72rem, env(safe-area-inset-left));
+    border-top: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg) 92%, var(--surface) 8%);
+    color: var(--text);
+    backdrop-filter: blur(16px);
+  }
+
+  .mobile-nav__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+  }
+
+  .mobile-nav__bar {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 3rem minmax(0, 1fr);
+    gap: 0.4rem;
+    width: min(100%, 42rem);
+    min-height: 3.25rem;
+    margin: 0 auto;
+  }
+
+  .mobile-nav__links {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.18rem;
+  }
+
+  .mobile-nav__item {
+    display: inline-flex;
+    width: 2.75rem;
+    height: 3.05rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 1rem;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition:
+      background-color 0.16s ease,
+      color 0.16s ease,
+      transform 0.16s ease;
+  }
+
+  .mobile-nav__brand {
+    width: 3rem;
+    color: var(--text);
+  }
+
+  .mobile-nav__brand :deep(svg) {
+    width: 1.95rem;
+    height: 1.95rem;
+  }
+
+  .mobile-nav__icon {
+    width: 1.45rem;
+    height: 1.45rem;
+  }
+
+  .mobile-nav__item--active {
+    background: color-mix(in srgb, var(--accent-soft) 78%, transparent 22%);
+    color: var(--accent-strong);
+    font-weight: 700;
+  }
+
+  .mobile-nav__item--likes {
+    display: none;
+  }
+
+  .mobile-nav__more {
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  .mobile-nav__more-button--likes-active:not([data-open='true']) {
+    background: color-mix(in srgb, var(--accent-soft) 78%, transparent 22%);
+    color: var(--accent-strong);
+  }
+
+  .mobile-nav__menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 0.72rem);
+    z-index: 3;
+    width: min(18rem, calc(100vw - 1.4rem));
+    max-height: min(31rem, calc(100dvh - 7rem));
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 1.35rem;
+    background: color-mix(in srgb, var(--surface) 96%, var(--bg) 4%);
+    box-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
+  }
+
+  .mobile-nav__menu-item {
+    display: flex;
+    width: 100%;
+    min-height: 3.35rem;
+    align-items: center;
+    gap: 0.95rem;
+    padding: 0.9rem 1.05rem;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.96rem;
+    text-align: left;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .mobile-nav__menu-item:hover,
+  .mobile-nav__menu-item--active,
+  .mobile-nav__menu-item.router-link-active {
+    background: var(--surface-hover);
+  }
+
+  .mobile-nav__menu-item:disabled {
+    cursor: wait;
+    opacity: 0.6;
+  }
+
+  .mobile-nav__menu-icon {
+    width: 1.18rem;
+    height: 1.18rem;
+    flex: 0 0 auto;
+  }
+
+  .mobile-nav__menu-badge {
+    min-width: 1.45rem;
+    margin-left: auto;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent-soft) 82%, transparent 18%);
+    color: var(--accent-strong);
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.35;
+    text-align: center;
+  }
+
+  @media (hover: hover) {
+    .mobile-nav__item:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+      transform: translateY(-1px);
+    }
+  }
+
+  @media (min-width: 360px) {
+    .mobile-nav__item--likes {
+      display: inline-flex;
+    }
+
+    .mobile-nav__menu-item--likes {
+      display: none;
+    }
+
+    .mobile-nav__more-button--likes-active:not([data-open='true']) {
+      background: transparent;
+      color: var(--muted);
+      font-weight: 400;
+    }
+  }
+}
+</style>

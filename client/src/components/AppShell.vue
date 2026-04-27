@@ -1,6 +1,6 @@
 <template>
   <!-- Desktop: fixed sidebar + content with margin-left -->
-  <!-- Mobile: no sidebar, TopNav handles nav -->
+  <!-- Mobile: no sidebar, fixed bottom nav handles navigation -->
   <div
     class="app-shell flex min-h-screen overflow-x-clip"
     :class="{
@@ -18,8 +18,8 @@
         :class="[
           isImmersiveShell
             ? 'px-0 pt-0 pb-0 md:px-0 md:pt-0 md:pb-0'
-            : 'px-10 pt-7 pb-16 md:px-[0.9rem] md:pt-4 md:pb-10',
-          showStickyScanStatus && !isReelsShell ? 'pb-36 md:pb-40' : ''
+            : 'px-10 pt-7 pb-28 md:px-[0.9rem] md:pt-4 md:pb-10',
+          showStickyScanStatus && !isReelsShell ? 'pb-48 md:pb-40' : ''
         ]"
       >
         <slot />
@@ -28,7 +28,7 @@
 
     <div
       v-if="showStickyScanStatus"
-      class="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4"
+      class="app-shell__scan-status pointer-events-none fixed inset-x-0 z-30 flex justify-center px-4"
       role="status"
       aria-live="polite"
     >
@@ -123,6 +123,10 @@ const stickyScanBarState = computed(() => getScanBarState(activeScan.value));
 </script>
 
 <style scoped>
+.app-shell {
+  --mobile-bottom-nav-height: calc(4.1rem + env(safe-area-inset-bottom));
+}
+
 .app-shell--reels {
   height: 100dvh;
   min-height: 100dvh;
@@ -143,6 +147,21 @@ const stickyScanBarState = computed(() => getScanBarState(activeScan.value));
 
 .app-shell__scan-bar--indeterminate {
   animation: app-shell-scan-indeterminate 1.15s ease-in-out infinite;
+}
+
+.app-shell__scan-status {
+  bottom: 1rem;
+}
+
+@media (max-width: 767.98px) {
+  .app-shell--reels .app-shell__content {
+    height: calc(100dvh - var(--mobile-bottom-nav-height));
+    min-height: calc(100dvh - var(--mobile-bottom-nav-height));
+  }
+
+  .app-shell__scan-status {
+    bottom: calc(var(--mobile-bottom-nav-height) + 1.65rem);
+  }
 }
 
 @keyframes app-shell-scan-indeterminate {
