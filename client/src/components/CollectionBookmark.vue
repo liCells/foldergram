@@ -4,7 +4,7 @@
     ref="rootElement"
     class="collection-bookmark"
     :class="[`collection-bookmark--${placement}`, { 'collection-bookmark--open': popoverOpen }]"
-    @focusin="openPopover"
+    @focusin="handleFocusIn"
     @focusout="handleFocusOut"
     @pointerenter="handlePointerEnter"
     @pointerleave="handlePointerLeave"
@@ -37,6 +37,7 @@
         v-if="popoverOpen"
         ref="popoverElement"
         class="collection-bookmark__popover"
+        :data-placement="popoverPlacement"
         :style="popoverStyle"
         role="dialog"
         aria-label="Collections"
@@ -128,6 +129,7 @@ const buttonElement = ref<HTMLButtonElement | null>(null);
 const popoverElement = ref<HTMLElement | null>(null);
 const createInputElement = ref<HTMLInputElement | null>(null);
 const popoverOpen = ref(false);
+const popoverPlacement = ref<'top' | 'bottom'>('top');
 const popoverStyle = ref<Record<string, string>>({});
 const creating = ref(false);
 const creatingCollection = ref(false);
@@ -135,9 +137,14 @@ const collectionName = ref('');
 const localError = ref<string | null>(null);
 const longPressTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 const suppressNextClick = ref(false);
+let openTimer: ReturnType<typeof setTimeout> | null = null;
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
 const popoverViewportMargin = 12;
 const popoverGap = 10;
+const popoverOpenDelayMs = 1000;
+const popoverMinHeightPx = 116;
+const popoverPreferredMaxHeightPx = 324;
+const popoverArrowEdgePaddingPx = 20;
 
 const canUseCollections = computed(() => authStore.canUseSharedCollections || authStore.canUseLocalCollections);
 const isSaved = computed(() => collectionsStore.isSaved(props.item.id));
@@ -165,6 +172,25 @@ function clearCloseTimer() {
   }
 }
 
+function clearOpenTimer() {
+  if (openTimer) {
+    clearTimeout(openTimer);
+    openTimer = null;
+  }
+}
+
+function scheduleOpen() {
+  clearCloseTimer();
+  if (popoverOpen.value || openTimer) {
+    return;
+  }
+
+  openTimer = setTimeout(() => {
+    openTimer = null;
+    void openPopover();
+  }, popoverOpenDelayMs);
+}
+
 function scheduleClose() {
   clearCloseTimer();
   closeTimer = setTimeout(() => {
@@ -175,6 +201,7 @@ function scheduleClose() {
 }
 
 async function openPopover() {
+  clearOpenTimer();
   clearCloseTimer();
   popoverOpen.value = true;
   localError.value = null;
@@ -188,11 +215,21 @@ async function openPopover() {
 }
 
 function closePopover() {
+  clearOpenTimer();
   clearCloseTimer();
   popoverOpen.value = false;
+  popoverPlacement.value = 'top';
   popoverStyle.value = {};
   creating.value = false;
   localError.value = null;
+}
+
+function clamp(value: number, min: number, max: number) {
+  if (max < min) {
+    return min;
+  }
+
+  return Math.min(Math.max(value, min), max);
 }
 
 function updatePopoverPosition() {
@@ -204,16 +241,39 @@ function updatePopoverPosition() {
 
   const buttonRect = button.getBoundingClientRect();
   const popoverRect = popover.getBoundingClientRect();
+  const measuredWidth = popoverRect.width || popover.offsetWidth;
+  const measuredHeight = popoverRect.height || popover.offsetHeight || popoverPreferredMaxHeightPx;
+  const availableAbove = Math.max(buttonRect.top - popoverViewportMargin - popoverGap, 0);
+  const availableBelow = Math.max(window.innerHeight - buttonRect.bottom - popoverViewportMargin - popoverGap, 0);
+  const nextPlacement = availableAbove >= measuredHeight || availableAbove >= availableBelow ? 'top' : 'bottom';
+  const availableHeight = nextPlacement === 'top' ? availableAbove : availableBelow;
+  const maxHeight = availableHeight >= popoverMinHeightPx
+    ? Math.min(availableHeight, popoverPreferredMaxHeightPx)
+    : Math.max(availableHeight, popoverMinHeightPx);
+  const constrainedHeight = Math.min(measuredHeight, maxHeight);
   const centeredLeft = buttonRect.left + buttonRect.width / 2 - popoverRect.width / 2;
-  const left = Math.min(
-    Math.max(centeredLeft, popoverViewportMargin),
-    window.innerWidth - popoverRect.width - popoverViewportMargin
+  const left = clamp(
+    centeredLeft,
+    popoverViewportMargin,
+    window.innerWidth - measuredWidth - popoverViewportMargin
   );
-  const top = Math.max(buttonRect.top - popoverRect.height - popoverGap, popoverViewportMargin);
+  const top = nextPlacement === 'top'
+    ? Math.max(buttonRect.top - constrainedHeight - popoverGap, popoverViewportMargin)
+    : Math.min(buttonRect.bottom + popoverGap, window.innerHeight - constrainedHeight - popoverViewportMargin);
+  const buttonCenter = buttonRect.left + buttonRect.width / 2;
+  const arrowLeft = clamp(
+    buttonCenter - left,
+    popoverArrowEdgePaddingPx,
+    measuredWidth - popoverArrowEdgePaddingPx
+  );
 
+  popoverPlacement.value = nextPlacement;
   popoverStyle.value = {
+    '--collection-bookmark-arrow-left': `${Math.round(arrowLeft)}px`,
     left: `${Math.round(left)}px`,
-    top: `${Math.round(top)}px`
+    top: `${Math.round(top)}px`,
+    minHeight: `${Math.min(popoverMinHeightPx, Math.round(maxHeight))}px`,
+    maxHeight: `${Math.round(maxHeight)}px`
   };
 }
 
@@ -227,12 +287,19 @@ function removePopoverPositionListeners() {
   window.removeEventListener('scroll', updatePopoverPosition, true);
 }
 
+function handleFocusIn() {
+  scheduleOpen();
+}
+
 function handlePointerEnter() {
-  void openPopover();
+  scheduleOpen();
 }
 
 function handlePointerLeave() {
-  scheduleClose();
+  clearOpenTimer();
+  if (popoverOpen.value) {
+    scheduleClose();
+  }
 }
 
 function handleFocusOut(event: FocusEvent) {
@@ -244,10 +311,14 @@ function handleFocusOut(event: FocusEvent) {
     return;
   }
 
-  scheduleClose();
+  clearOpenTimer();
+  if (popoverOpen.value) {
+    scheduleClose();
+  }
 }
 
 async function handleBookmarkClick() {
+  clearOpenTimer();
   if (suppressNextClick.value) {
     suppressNextClick.value = false;
     return;
@@ -350,6 +421,7 @@ watch(popoverOpen, (isOpen) => {
 });
 
 onBeforeUnmount(() => {
+  clearOpenTimer();
   clearCloseTimer();
   clearLongPressTimer();
   removePopoverPositionListeners();

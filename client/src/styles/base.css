@@ -1558,8 +1558,9 @@ img[data-loaded="true"] {
   top: 0;
   left: 0;
   z-index: 120;
-  width: min(23rem, calc(100vw - 1.5rem));
-  max-height: min(25rem, calc(100vh - 6rem));
+  width: min(21rem, calc(100vw - 1.5rem));
+  min-height: 7.25rem;
+  max-height: min(20.25rem, calc(100vh - 1.5rem));
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 0.35rem;
@@ -1574,14 +1575,23 @@ img[data-loaded="true"] {
 .collection-bookmark__popover::after {
   content: "";
   position: absolute;
-  left: 50%;
-  bottom: -0.42rem;
+  left: var(--collection-bookmark-arrow-left, 50%);
   width: 0.85rem;
   height: 0.85rem;
   background: #252525;
   transform: translateX(-50%) rotate(45deg);
+}
+
+.collection-bookmark__popover[data-placement='top']::after {
+  bottom: -0.42rem;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.collection-bookmark__popover[data-placement='bottom']::after {
+  top: -0.42rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .collection-bookmark__header {
@@ -1651,10 +1661,26 @@ img[data-loaded="true"] {
 
 .collection-bookmark__rows {
   min-height: 0;
-  overflow-y: auto;
+  max-height: 230px;
+  overflow: hidden auto;
   display: grid;
   gap: 0.25rem;
   padding-right: 0.1rem;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.collection-bookmark__rows::-webkit-scrollbar {
+  width: 0.42rem;
+}
+
+.collection-bookmark__rows::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.collection-bookmark__rows::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .collection-bookmark__row {

@@ -69,11 +69,12 @@ describe('CollectionBookmark', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
     document.body.innerHTML = '';
   });
 
-  it('opens on hover and focus, hides the default collection row, and closes on leave or Escape', async () => {
+  it('opens on hover and focus after a delay, hides the default collection row, and closes on leave or Escape', async () => {
     const item = createFeedItem(42);
     const collectionsStore = useCollectionsStore();
     const savedCollection = createCollection('saved', 'Saved', true);
@@ -107,6 +108,11 @@ describe('CollectionBookmark', () => {
     });
 
     await wrapper.get('.collection-bookmark').trigger('pointerenter');
+    vi.advanceTimersByTime(999);
+    await flushPromises();
+    expect(document.querySelector('.collection-bookmark__popover')).toBeNull();
+
+    vi.advanceTimersByTime(1);
     await flushPromises();
 
     expect(document.body.textContent).toContain('Collections');
@@ -119,11 +125,57 @@ describe('CollectionBookmark', () => {
     expect(document.querySelector('.collection-bookmark__popover')).toBeNull();
 
     await wrapper.get('.collection-bookmark').trigger('focusin');
+    vi.advanceTimersByTime(1_000);
     await flushPromises();
     expect(document.querySelector('.collection-bookmark__popover')).not.toBeNull();
 
     await wrapper.get('.collection-bookmark').trigger('keydown', { key: 'Escape' });
     await flushPromises();
+    expect(document.querySelector('.collection-bookmark__popover')).toBeNull();
+
+    wrapper.unmount();
+  });
+
+  it('lets a normal click save immediately without opening the delayed popover', async () => {
+    const item = createFeedItem(43);
+    const collectionsStore = useCollectionsStore();
+    const savedCollection = createCollection('saved', 'Saved', true);
+    const membershipPayload = {
+      imageId: item.id,
+      isSaved: true,
+      items: [createMembership(savedCollection, true)]
+    };
+
+    collectionsStore.$patch({
+      items: [savedCollection]
+    });
+
+    const toggleDefaultSaveSpy = vi.spyOn(collectionsStore, 'toggleDefaultSave').mockResolvedValue(undefined);
+    vi.spyOn(collectionsStore, 'fetchMembership').mockResolvedValue(membershipPayload);
+
+    const wrapper = mount(CollectionBookmark, {
+      attachTo: document.body,
+      props: {
+        item,
+        placement: 'feed'
+      },
+      global: {
+        stubs: {
+          ResilientImage: {
+            template: '<img data-test="cover" />'
+          }
+        }
+      }
+    });
+
+    await wrapper.get('.collection-bookmark').trigger('focusin');
+    await wrapper.get('.collection-bookmark__button').trigger('click');
+    await flushPromises();
+
+    vi.advanceTimersByTime(1_100);
+    await flushPromises();
+
+    expect(toggleDefaultSaveSpy).toHaveBeenCalledTimes(1);
     expect(document.querySelector('.collection-bookmark__popover')).toBeNull();
 
     wrapper.unmount();
@@ -185,6 +237,7 @@ describe('CollectionBookmark', () => {
     });
 
     await wrapper.get('.collection-bookmark').trigger('focusin');
+    vi.advanceTimersByTime(1_000);
     await flushPromises();
 
     const createButton = document.body.querySelector<HTMLButtonElement>('.collection-bookmark__create-button');
@@ -246,6 +299,7 @@ describe('CollectionBookmark', () => {
     });
 
     await wrapper.get('.collection-bookmark').trigger('focusin');
+    vi.advanceTimersByTime(1_000);
     await flushPromises();
 
     const row = document.body.querySelector<HTMLButtonElement>('.collection-bookmark__row');
@@ -255,6 +309,106 @@ describe('CollectionBookmark', () => {
 
     expect(document.querySelector('.collection-bookmark__popover')).not.toBeNull();
     expect(document.body.textContent).toContain('Unable to update collection');
+
+    wrapper.unmount();
+  });
+
+  it('positions the popover below the icon when there is not enough space above', async () => {
+    const item = createFeedItem(86);
+    const collectionsStore = useCollectionsStore();
+    const savedCollection = createCollection('saved', 'Saved', true);
+    const travelCollection = createCollection('travel', 'Travel');
+    const membershipPayload = {
+      imageId: item.id,
+      isSaved: true,
+      items: [createMembership(savedCollection, true), createMembership(travelCollection, false)]
+    };
+
+    collectionsStore.$patch({
+      items: [savedCollection, travelCollection],
+      membershipByImageId: {
+        [item.id]: membershipPayload
+      }
+    });
+
+    vi.spyOn(collectionsStore, 'fetchMembership').mockResolvedValue(membershipPayload);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mockRect() {
+      const element = this as HTMLElement;
+
+      if (element.classList.contains('collection-bookmark__button')) {
+        return {
+          x: 200,
+          y: 40,
+          top: 40,
+          left: 200,
+          width: 40,
+          height: 40,
+          right: 240,
+          bottom: 80,
+          toJSON: () => ({})
+        } as DOMRect;
+      }
+
+      if (element.classList.contains('collection-bookmark__popover')) {
+        return {
+          x: 0,
+          y: 0,
+          top: 0,
+          left: 0,
+          width: 280,
+          height: 220,
+          right: 280,
+          bottom: 220,
+          toJSON: () => ({})
+        } as DOMRect;
+      }
+
+      return {
+        x: 0,
+        y: 0,
+        top: 0,
+        left: 0,
+        width: 0,
+        height: 0,
+        right: 0,
+        bottom: 0,
+        toJSON: () => ({})
+      } as DOMRect;
+    });
+
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 400
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: 320
+    });
+
+    const wrapper = mount(CollectionBookmark, {
+      attachTo: document.body,
+      props: {
+        item,
+        placement: 'feed'
+      },
+      global: {
+        stubs: {
+          ResilientImage: {
+            template: '<img data-test="cover" />'
+          }
+        }
+      }
+    });
+
+    await wrapper.get('.collection-bookmark').trigger('focusin');
+    vi.advanceTimersByTime(1_000);
+    await flushPromises();
+
+    const popover = document.body.querySelector<HTMLElement>('.collection-bookmark__popover');
+    expect(popover).not.toBeNull();
+    expect(popover?.dataset.placement).toBe('bottom');
+    expect(popover?.style.top).toBe('90px');
+    expect(popover?.style.maxHeight).toBe('218px');
 
     wrapper.unmount();
   });
