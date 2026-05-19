@@ -288,6 +288,10 @@
               />
             </svg>
           </a>
+          <CollectionBookmark
+            :item="item"
+            placement="feed"
+          />
         </div>
       </div>
 
@@ -416,6 +420,7 @@ import { formatMediaDuration } from '../utils/media';
 import { resolveFeedAspectRatio } from '../utils/media-layout';
 import { getOriginalMediaDownloadUrl, getOriginalMediaUrl } from '../utils/original-media';
 import Avatar from './Avatar.vue';
+import CollectionBookmark from './CollectionBookmark.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ResilientImage from './ResilientImage.vue';
 

@@ -14,8 +14,30 @@ import {
   TREAT_STORIES_AS_FOLDERS_SETTING_KEY
 } from '../constants/app-setting-keys.js';
 import { appConfig } from '../config/env.js';
-import { appSettingsRepository, folderRepository, folderScanStateRepository, imageRepository, likeRepository, placeRepository, scanRunRepository } from '../db/repositories.js';
-import type { FeedImage, FolderImageOrder, FolderRecord, FolderSummaryRecord, ImageDetail, MediaType, PlaceKind, PlaybackStrategy, TrashImage } from '../types/models.js';
+import {
+  appSettingsRepository,
+  collectionConstants,
+  collectionRepository,
+  folderRepository,
+  folderScanStateRepository,
+  imageRepository,
+  likeRepository,
+  placeRepository,
+  scanRunRepository
+} from '../db/repositories.js';
+import type {
+  CollectionMembershipRecord,
+  CollectionSummaryRecord,
+  FeedImage,
+  FolderImageOrder,
+  FolderRecord,
+  FolderSummaryRecord,
+  ImageDetail,
+  MediaType,
+  PlaceKind,
+  PlaybackStrategy,
+  TrashImage
+} from '../types/models.js';
 import {
   getEffectiveExcludedFolderRules,
   parseExcludedFolderRulesFromSetting,
@@ -383,10 +405,11 @@ function isSameOrDescendantFolderPath(rootFolderPath: string, candidateFolderPat
 }
 
 function mapFeedImage(image: IndexedFeedImage, derivativeVersion = getDerivativeAssetVersion()): FeedImage {
-  const { playbackStrategy, placeId, placeSlug, placeName, placeKind, placeIsApproximate, ...rest } = image;
+  const { playbackStrategy, placeId, placeSlug, placeName, placeKind, placeIsApproximate, isSaved, ...rest } = image;
   return {
     ...rest,
     isAnimated: Boolean(rest.isAnimated),
+    isSaved: Boolean(isSaved),
     folderBreadcrumb: getPathBreadcrumb(rest.folderPath),
     thumbnailUrl: toPublicMediaUrl('/thumbnails', rest.thumbnailUrl, derivativeVersion),
     previewUrl: buildPreviewUrl({
@@ -399,11 +422,12 @@ function mapFeedImage(image: IndexedFeedImage, derivativeVersion = getDerivative
 }
 
 function mapImageDetail(image: IndexedImageDetail, derivativeVersion = getDerivativeAssetVersion()): ImageDetail {
-  const { playbackStrategy, exifJson, placeId, placeSlug, placeName, placeKind, placeIsApproximate, ...rest } = image;
+  const { playbackStrategy, exifJson, placeId, placeSlug, placeName, placeKind, placeIsApproximate, isSaved, ...rest } = image;
   const useOriginalForImages = appConfig.imageDetailSource === 'original';
   return {
     ...rest,
     isAnimated: Boolean(rest.isAnimated),
+    isSaved: Boolean(isSaved),
     exif: deserializeImageExifData(exifJson),
     folderBreadcrumb: getPathBreadcrumb(rest.folderPath),
     thumbnailUrl: toPublicMediaUrl('/thumbnails', rest.thumbnailUrl, derivativeVersion),
@@ -419,10 +443,11 @@ function mapImageDetail(image: IndexedImageDetail, derivativeVersion = getDeriva
 }
 
 function mapTrashImage(image: IndexedTrashImage, derivativeVersion = getDerivativeAssetVersion()): TrashImage {
-  const { playbackStrategy, placeId, placeSlug, placeName, placeKind, placeIsApproximate, ...rest } = image;
+  const { playbackStrategy, placeId, placeSlug, placeName, placeKind, placeIsApproximate, isSaved, ...rest } = image;
   return {
     ...rest,
     isAnimated: Boolean(rest.isAnimated),
+    isSaved: Boolean(isSaved),
     folderBreadcrumb: getPathBreadcrumb(rest.folderPath),
     thumbnailUrl: toPublicMediaUrl('/thumbnails', rest.thumbnailUrl, derivativeVersion),
     previewUrl: buildPreviewUrl({
@@ -538,6 +563,46 @@ function formatMonthYear(date: Date): string {
 
 function mapFeedItems(items: IndexedFeedImage[], derivativeVersion = getDerivativeAssetVersion()): FeedImage[] {
   return items.map((item) => mapFeedImage(item, derivativeVersion));
+}
+
+function mapCollectionSummary(collection: CollectionSummaryRecord, derivativeVersion = getDerivativeAssetVersion()) {
+  const previewImages = collection.preview_image_ids
+    ? collection.preview_image_ids
+      .split(',')
+      .map((value) => Number.parseInt(value, 10))
+      .filter((value, index, values) => Number.isInteger(value) && value > 0 && values.indexOf(value) === index)
+      .map((id) => {
+        const previewDetail = imageRepository.getImageDetail(id, undefined, false);
+        return previewDetail ? mapImageDetail(previewDetail, derivativeVersion) : null;
+      })
+      .filter((image): image is ImageDetail => image !== null)
+    : [];
+  const coverImage = previewImages[0]
+    ?? (collection.cover_image_id
+      ? (() => {
+          const coverDetail = imageRepository.getImageDetail(collection.cover_image_id, undefined, false);
+          return coverDetail ? mapImageDetail(coverDetail, derivativeVersion) : null;
+        })()
+      : null);
+
+  return {
+    id: collection.id,
+    slug: collection.slug,
+    name: collection.name,
+    isDefault: collection.is_default === 1,
+    itemCount: collection.item_count,
+    coverImage,
+    previewImages,
+    createdAt: collection.created_at,
+    updatedAt: collection.updated_at
+  };
+}
+
+function mapCollectionMembership(collection: CollectionMembershipRecord, derivativeVersion = getDerivativeAssetVersion()) {
+  return {
+    ...mapCollectionSummary(collection, derivativeVersion),
+    containsImage: collection.contains_image === 1
+  };
 }
 
 function buildPaginatedPayload(items: FeedImage[], page: number, limit: number, total: number) {
@@ -1366,6 +1431,214 @@ export const galleryService = {
     const items = imageRepository.listTrashed(page, limit).map((image) => mapTrashImage(image as IndexedTrashImage, derivativeVersion));
 
     return buildTrashPaginatedPayload(items, page, limit, total);
+  },
+
+  getCollections() {
+    if (!storageService.getState().libraryAvailable) {
+      return {
+        items: []
+      };
+    }
+
+    const derivativeVersion = getDerivativeAssetVersion();
+    return {
+      items: collectionRepository.listSummaries().map((collection) => mapCollectionSummary(collection, derivativeVersion))
+    };
+  },
+
+  getCollectionImages(slug: string, page: number, limit: number) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const collection = collectionRepository.getBySlug(slug);
+    if (!collection) {
+      return null;
+    }
+
+    const total = collectionRepository.countImages(slug);
+    const derivativeVersion = getDerivativeAssetVersion();
+
+    return {
+      collection: mapCollectionSummary(
+        collectionRepository.listSummaries().find((entry) => entry.slug === slug) ?? {
+          ...collection,
+          item_count: total,
+          cover_image_id: null,
+          cover_thumbnail_path: null,
+          preview_image_ids: null
+        },
+        derivativeVersion
+      ),
+      ...buildPaginatedPayload(
+        collectionRepository.listImages(slug, page, limit).map((image) => mapFeedImage(image, derivativeVersion)),
+        page,
+        limit,
+        total
+      )
+    };
+  },
+
+  getImageCollections(id: number) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const image = imageRepository.getById(id);
+    if (!image || image.is_deleted || image.is_trashed) {
+      return null;
+    }
+
+    const derivativeVersion = getDerivativeAssetVersion();
+    return {
+      imageId: id,
+      isSaved: collectionRepository.isImageSaved(id),
+      items: collectionRepository.listMembershipsForImage(id).map((collection) => mapCollectionMembership(collection, derivativeVersion))
+    };
+  },
+
+  createCollection(name: string) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const collection = collectionRepository.create(name);
+    const summary = collectionRepository.listSummaries().find((entry) => entry.id === collection.id);
+    return summary ? mapCollectionSummary(summary) : null;
+  },
+
+  updateCollection(slug: string, name: string) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const collection = collectionRepository.updateName(slug, name);
+    if (!collection) {
+      return null;
+    }
+
+    const summary = collectionRepository.listSummaries().find((entry) => entry.id === collection.id);
+    return summary ? mapCollectionSummary(summary) : null;
+  },
+
+  deleteCollection(slug: string) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const summary = collectionRepository.listSummaries().find((entry) => entry.slug === slug);
+    if (!summary) {
+      return null;
+    }
+
+    const deleted = collectionRepository.delete(slug);
+    if (!deleted) {
+      return null;
+    }
+
+    return mapCollectionSummary(summary);
+  },
+
+  saveImage(id: number) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const image = imageRepository.getById(id);
+    if (!image || image.is_deleted || image.is_trashed) {
+      return null;
+    }
+
+    const collection = collectionRepository.saveToDefault(id);
+    const summary = collectionRepository.listSummaries().find((entry) => entry.id === collection.id);
+
+    return {
+      id,
+      imageId: id,
+      isSaved: collectionRepository.isImageSaved(id),
+      collection: summary ? mapCollectionSummary(summary) : undefined
+    };
+  },
+
+  unsaveImage(id: number) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const image = imageRepository.getById(id);
+    if (!image || image.is_deleted || image.is_trashed) {
+      return null;
+    }
+
+    collectionRepository.unsaveEverywhere(id);
+
+    return {
+      id,
+      imageId: id,
+      isSaved: false
+    };
+  },
+
+  addImageToCollection(slug: string, id: number) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const image = imageRepository.getById(id);
+    if (!image || image.is_deleted || image.is_trashed) {
+      return null;
+    }
+
+    const collection = slug === collectionConstants.defaultCollectionSlug
+      ? collectionRepository.saveToDefault(id)
+      : collectionRepository.addImage(slug, id);
+    if (!collection) {
+      return null;
+    }
+
+    const summary = collectionRepository.listSummaries().find((entry) => entry.id === collection.id);
+
+    return {
+      id,
+      imageId: id,
+      isSaved: true,
+      collection: summary ? mapCollectionSummary(summary) : undefined
+    };
+  },
+
+  removeImageFromCollection(slug: string, id: number) {
+    if (!storageService.getState().libraryAvailable) {
+      return null;
+    }
+
+    const image = imageRepository.getById(id);
+    if (!image || image.is_deleted || image.is_trashed) {
+      return null;
+    }
+
+    const collection = collectionRepository.getBySlug(slug);
+    if (!collection) {
+      return null;
+    }
+
+    if (collection.is_default === 1) {
+      collectionRepository.unsaveEverywhere(id);
+      return {
+        id,
+        imageId: id,
+        isSaved: false
+      };
+    }
+
+    collectionRepository.removeImage(slug, id);
+    const summary = collectionRepository.listSummaries().find((entry) => entry.id === collection.id);
+
+    return {
+      id,
+      imageId: id,
+      isSaved: collectionRepository.isImageSaved(id),
+      collection: summary ? mapCollectionSummary(summary) : undefined
+    };
   },
 
   getLikes() {

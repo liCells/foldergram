@@ -216,6 +216,39 @@
         </a>
       </RouterLink>
 
+      <RouterLink
+        v-if="authStore.canUseSharedCollections || authStore.canUseLocalCollections"
+        custom
+        :to="{ name: 'collections' }"
+        v-slot="{ href, navigate, isActive }"
+      >
+        <a
+          :href="href"
+          class="sidebar__link sidebar-item"
+          :class="isActive || isCollectionsRoute ? sidebarActiveClass : ''"
+          @click="navigate"
+        >
+          <span
+            class="sidebar__icon flex-shrink-0 w-[1.52rem] h-[1.52rem]"
+            :class="
+              isActive || isCollectionsRoute
+                ? 'i-fluent-bookmark-20-filled'
+                : 'i-fluent-bookmark-20-regular'
+            "
+            aria-hidden="true"
+          />
+          <span
+            class="sidebar__label max-w-0 overflow-hidden whitespace-nowrap text-[0.9rem] opacity-0 group-hover:max-w-[12rem] group-hover:opacity-100"
+            style="
+              transition:
+                opacity 0.18s ease,
+                max-width 0.22s ease;
+            "
+            >Collections</span
+          >
+        </a>
+      </RouterLink>
+
       <span
         class="sidebar__section-label sidebar__meta inline-flex min-h-[1rem] items-center self-start mt-7 max-w-0 overflow-hidden whitespace-nowrap px-[0.75rem] text-[0.68rem] leading-[1.2] font-semibold uppercase tracking-[0.12em] text-muted opacity-0 group-hover:max-w-[12rem] group-hover:opacity-100"
         style="
@@ -423,6 +456,9 @@
   )
   const isPlacesRoute = computed(() =>
     route.name === "places" || route.name === "place",
+  )
+  const isCollectionsRoute = computed(() =>
+    route.name === "collections" || route.name === "collection",
   )
   const signOutLabel = computed(() =>
     authStore.accessMode === "public" ? "Return to public view" : "Sign out",

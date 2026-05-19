@@ -140,6 +140,26 @@ export interface LikeRecord {
   created_at: string;
 }
 
+export interface CollectionRecord {
+  id: number;
+  slug: string;
+  name: string;
+  is_default: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CollectionSummaryRecord extends CollectionRecord {
+  item_count: number;
+  cover_image_id: number | null;
+  cover_thumbnail_path: string | null;
+  preview_image_ids: string | null;
+}
+
+export interface CollectionMembershipRecord extends CollectionSummaryRecord {
+  contains_image: number;
+}
+
 export interface FeedImage {
   id: number;
   folderId: number;
@@ -157,6 +177,7 @@ export interface FeedImage {
   previewUrl: string;
   sortTimestamp: number;
   takenAt: number | null;
+  isSaved: boolean;
   place?: PlaceSummary | null;
 }
 

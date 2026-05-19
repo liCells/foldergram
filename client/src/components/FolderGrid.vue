@@ -1,5 +1,5 @@
 <template>
-  <section class="grid gap-[1px] grid-cols-3 md:grid-cols-4">
+  <section class="grid gap-[1px]" :class="columns === 'three' ? 'grid-cols-3' : 'grid-cols-3 md:grid-cols-4'">
     <RouterLink v-for="item in items" :key="item.id" custom :to="buildImageRoute(item.id)" v-slot="{ href, navigate }">
       <a
         :href="href"
@@ -38,9 +38,11 @@ withDefaults(
   defineProps<{
     items: FeedItem[];
     variant?: 'square' | 'posts' | 'reels';
+    columns?: 'adaptive' | 'three';
   }>(),
   {
-    variant: 'square'
+    variant: 'square',
+    columns: 'adaptive'
   }
 );
 

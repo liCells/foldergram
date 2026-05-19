@@ -59,6 +59,7 @@ export interface FeedItem {
   previewUrl: string;
   sortTimestamp: number;
   takenAt: number | null;
+  isSaved?: boolean;
   place?: PlaceSummary | null;
 }
 
@@ -210,6 +211,59 @@ export interface PlacesRebuildResult {
 
 export interface LikesPayload {
   items: FeedItem[];
+}
+
+export interface CollectionSummary {
+  id: number;
+  slug: string;
+  name: string;
+  isDefault: boolean;
+  itemCount: number;
+  coverImage: FeedItem | null;
+  previewImages: FeedItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CollectionMembership extends CollectionSummary {
+  containsImage: boolean;
+}
+
+export interface CollectionsPayload {
+  items: CollectionSummary[];
+}
+
+export interface ImageCollectionsPayload {
+  imageId: number;
+  isSaved: boolean;
+  items: CollectionMembership[];
+}
+
+export interface CollectionImagesPayload extends PaginatedFeed {
+  collection: CollectionSummary;
+}
+
+export interface CreateCollectionResult {
+  ok: boolean;
+  collection: CollectionSummary;
+}
+
+export interface UpdateCollectionResult {
+  ok: boolean;
+  collection: CollectionSummary;
+}
+
+export interface DeleteCollectionResult {
+  ok: boolean;
+  collection: CollectionSummary;
+}
+
+export interface CollectionMutationResult {
+  ok: boolean;
+  id?: number;
+  imageId: number;
+  isSaved: boolean;
+  collection?: CollectionSummary;
 }
 
 export interface ImageDetail extends FeedItem {
@@ -365,6 +419,8 @@ export interface AuthCapabilities {
   canAccessSettings: boolean;
   canUseSharedLikes: boolean;
   canUseLocalFavorites: boolean;
+  canUseSharedCollections?: boolean;
+  canUseLocalCollections?: boolean;
 }
 
 export interface AuthStatus {

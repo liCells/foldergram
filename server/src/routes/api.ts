@@ -80,6 +80,9 @@ const storiesModeBodySchema = z.object({
 const excludedFoldersBodySchema = z.object({
   rules: z.array(z.string()).default([])
 });
+const collectionBodySchema = z.object({
+  name: z.string().trim().min(1).max(80)
+});
 
 const slugSchema = z.object({
   slug: z.string().min(1).max(240)
@@ -562,6 +565,99 @@ router.get('/likes', requireCapability('canUseSharedLikes', 'Authentication requ
   response.json(galleryService.getLikes());
 });
 
+router.get('/collections', requireCapability('canUseSharedCollections', 'Authentication required.'), (_request, response) => {
+  response.json(galleryService.getCollections());
+});
+
+router.post('/collections', requireCapability('canUseSharedCollections', 'Authentication required.'), (request, response) => {
+  const body = collectionBodySchema.parse(request.body);
+  const collection = galleryService.createCollection(body.name);
+
+  if (!collection) {
+    response.status(404).json({ message: 'Collection could not be created' });
+    return;
+  }
+
+  response.json({
+    ok: true,
+    collection
+  });
+});
+
+router.patch('/collections/:slug', requireCapability('canUseSharedCollections', 'Authentication required.'), (request, response) => {
+  const params = slugSchema.parse(request.params);
+  const body = collectionBodySchema.parse(request.body);
+  const collection = galleryService.updateCollection(params.slug, body.name);
+
+  if (!collection) {
+    response.status(404).json({ message: 'Collection not found' });
+    return;
+  }
+
+  response.json({
+    ok: true,
+    collection
+  });
+});
+
+router.delete('/collections/:slug', requireCapability('canUseSharedCollections', 'Authentication required.'), (request, response) => {
+  const params = slugSchema.parse(request.params);
+  const collection = galleryService.deleteCollection(params.slug);
+
+  if (!collection) {
+    response.status(404).json({ message: 'Collection not found' });
+    return;
+  }
+
+  response.json({
+    ok: true,
+    collection
+  });
+});
+
+router.get('/collections/:slug/images', requireCapability('canUseSharedCollections', 'Authentication required.'), (request, response) => {
+  const params = slugSchema.parse(request.params);
+  const query = paginationQuerySchema.parse(request.query);
+  const payload = galleryService.getCollectionImages(params.slug, query.page, query.limit);
+
+  if (!payload) {
+    response.status(404).json({ message: 'Collection not found' });
+    return;
+  }
+
+  response.json(payload);
+});
+
+router.post('/collections/:slug/images/:id', requireCapability('canUseSharedCollections', 'Authentication required.'), (request, response) => {
+  const params = slugSchema.merge(imageIdSchema).parse(request.params);
+  const payload = galleryService.addImageToCollection(params.slug, params.id);
+
+  if (!payload) {
+    response.status(404).json({ message: 'Collection or image not found' });
+    return;
+  }
+
+  response.json({
+    ok: true,
+    ...payload
+  });
+});
+
+router.delete('/collections/:slug/images/:id', requireCapability('canUseSharedCollections', 'Authentication required.'), (request, response) => {
+  const params = slugSchema.merge(imageIdSchema).parse(request.params);
+  const payload = galleryService.removeImageFromCollection(params.slug, params.id);
+
+  if (!payload) {
+    response.status(404).json({ message: 'Collection or image not found' });
+    return;
+  }
+
+  response.json({
+    ok: true,
+    ...payload
+  });
+});
+
 router.get('/trash/images', requireCapability('canDeleteMedia', 'Admin access is required.'), (request, response) => {
   const query = paginationQuerySchema.parse(request.query);
   response.json(galleryService.getTrashImages(query.page, query.limit));
@@ -578,6 +674,48 @@ router.get('/images/:id', (request, response) => {
   }
 
   response.json(image);
+});
+
+router.get('/images/:id/collections', requireCapability('canUseSharedCollections', 'Authentication required.'), (request, response) => {
+  const params = imageIdSchema.parse(request.params);
+  const payload = galleryService.getImageCollections(params.id);
+
+  if (!payload) {
+    response.status(404).json({ message: 'Post not found' });
+    return;
+  }
+
+  response.json(payload);
+});
+
+router.post('/images/:id/save', requireCapability('canUseSharedCollections', 'Authentication required.'), (request, response) => {
+  const params = imageIdSchema.parse(request.params);
+  const payload = galleryService.saveImage(params.id);
+
+  if (!payload) {
+    response.status(404).json({ message: 'Image not found' });
+    return;
+  }
+
+  response.json({
+    ok: true,
+    ...payload
+  });
+});
+
+router.delete('/images/:id/save', requireCapability('canUseSharedCollections', 'Authentication required.'), (request, response) => {
+  const params = imageIdSchema.parse(request.params);
+  const payload = galleryService.unsaveImage(params.id);
+
+  if (!payload) {
+    response.status(404).json({ message: 'Image not found' });
+    return;
+  }
+
+  response.json({
+    ok: true,
+    ...payload
+  });
 });
 
 router.post('/images/:id/like', requireCapability('canUseSharedLikes', 'Authentication required.'), (request, response) => {

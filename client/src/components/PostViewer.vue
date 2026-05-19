@@ -415,31 +415,38 @@
 
         <!-- Actions -->
         <div
-          class="viewer__sidebar-actions flex items-center justify-between gap-4 px-5 pt-[0.7rem] pb-5 mt-auto"
+          class="viewer__sidebar-actions flex items-center justify-between gap-3 px-5 pt-[0.7rem] pb-5 mt-auto"
         >
-          <!-- Like -->
-          <button
-            v-if="authStore.canUseSavedItems"
-            class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer transition-[opacity,transform,color] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
-            :class="{ 'text-[#e5484d]': likesStore.isLiked(image.id) }"
-            type="button"
-            :aria-label="likesStore.toggleAriaLabel(likesStore.isLiked(image.id))"
-            :aria-pressed="likesStore.isLiked(image.id)"
-            :disabled="likesStore.isPending(image.id)"
-            @click="likesStore.toggleLike(image)"
-          >
-            <span
-              class="w-[1.55rem] h-[1.55rem]"
-              :class="
-                likesStore.isLiked(image.id)
-                  ? 'i-fluent-heart-20-filled'
-                  : 'i-fluent-heart-20-regular'
-              "
-              aria-hidden="true"
+          <div class="viewer__sidebar-actions-group flex items-center gap-[0.55rem]">
+            <!-- Like -->
+            <button
+              v-if="authStore.canUseSavedItems"
+              class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer transition-[opacity,transform,color] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
+              :class="{ 'text-[#e5484d]': likesStore.isLiked(image.id) }"
+              type="button"
+              :aria-label="likesStore.toggleAriaLabel(likesStore.isLiked(image.id))"
+              :aria-pressed="likesStore.isLiked(image.id)"
+              :disabled="likesStore.isPending(image.id)"
+              @click="likesStore.toggleLike(image)"
+            >
+              <span
+                class="w-[1.55rem] h-[1.55rem]"
+                :class="
+                  likesStore.isLiked(image.id)
+                    ? 'i-fluent-heart-20-filled'
+                    : 'i-fluent-heart-20-regular'
+                "
+                aria-hidden="true"
+              />
+            </button>
+            <CollectionBookmark
+              v-if="image"
+              :item="image"
+              placement="viewer"
             />
-          </button>
+          </div>
 
-          <div class="viewer__sidebar-actions-group flex items-center gap-4">
+          <div class="viewer__sidebar-actions-group flex items-center gap-[0.55rem]">
             <!-- Set as cover -->
             <button
               v-if="authStore.canManageLibrary"
@@ -561,6 +568,7 @@
   import { useFoldersStore } from "../stores/folders"
   import { getOriginalMediaDownloadUrl, getOriginalMediaUrl } from "../utils/original-media"
   import Avatar from "./Avatar.vue"
+  import CollectionBookmark from "./CollectionBookmark.vue"
   import ResilientImage from "./ResilientImage.vue"
   import { formatMediaDuration, videoPreviewWouldDownscale } from "../utils/media"
 

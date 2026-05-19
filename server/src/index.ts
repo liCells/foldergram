@@ -20,6 +20,7 @@ import { createServer } from "node:http";
 
 import { appConfig } from "./config/env.js";
 import { createApp } from "./app.js";
+import { collectionRepository } from "./db/repositories.js";
 import { log } from "./services/log-service.js";
 import { scannerService } from "./services/scanner-service.js";
 import { watcherService } from "./services/watcher-service.js";
@@ -50,6 +51,11 @@ async function bootstrap(): Promise<void> {
   const app = createApp();
   const server = createServer(app);
   const portVariableName = appConfig.nodeEnv === "production" ? "SERVER_PORT" : "DEV_SERVER_PORT";
+  collectionRepository.ensureDefaultCollection();
+  const repairedCollectionMemberships = collectionRepository.repairDefaultMemberships();
+  if (repairedCollectionMemberships > 0) {
+    log.info(`Repaired ${repairedCollectionMemberships} saved collection memberships`);
+  }
 
   server.on("error", (error: NodeJS.ErrnoException) => {
     if (error.code === "EADDRINUSE") {

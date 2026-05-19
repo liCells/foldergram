@@ -32,7 +32,9 @@ function createCapabilities(role: AuthRole): AuthCapabilities {
       canDeleteMedia: true,
       canAccessSettings: true,
       canUseSharedLikes: true,
-      canUseLocalFavorites: false
+      canUseLocalFavorites: false,
+      canUseSharedCollections: true,
+      canUseLocalCollections: false
     };
   }
 
@@ -42,7 +44,9 @@ function createCapabilities(role: AuthRole): AuthCapabilities {
       canDeleteMedia: false,
       canAccessSettings: false,
       canUseSharedLikes: true,
-      canUseLocalFavorites: false
+      canUseLocalFavorites: false,
+      canUseSharedCollections: true,
+      canUseLocalCollections: false
     };
   }
 
@@ -51,7 +55,9 @@ function createCapabilities(role: AuthRole): AuthCapabilities {
     canDeleteMedia: false,
     canAccessSettings: false,
     canUseSharedLikes: false,
-    canUseLocalFavorites: true
+    canUseLocalFavorites: true,
+    canUseSharedCollections: false,
+    canUseLocalCollections: true
   };
 }
 
@@ -97,7 +103,13 @@ export const useAuthStore = defineStore('auth', {
     canAccessSettings: (state) => state.capabilities.canAccessSettings,
     canUseSharedLikes: (state) => state.capabilities.canUseSharedLikes,
     canUseLocalFavorites: (state) => state.capabilities.canUseLocalFavorites,
-    canUseSavedItems: (state) => state.capabilities.canUseSharedLikes || state.capabilities.canUseLocalFavorites,
+    canUseSharedCollections: (state) => state.capabilities.canUseSharedCollections === true,
+    canUseLocalCollections: (state) => state.capabilities.canUseLocalCollections === true,
+    canUseSavedItems: (state) =>
+      state.capabilities.canUseSharedLikes ||
+      state.capabilities.canUseLocalFavorites ||
+      state.capabilities.canUseSharedCollections === true ||
+      state.capabilities.canUseLocalCollections === true,
     canUnlockAdmin: (state) => state.enabled && !state.capabilities.canAccessSettings
   },
   actions: {

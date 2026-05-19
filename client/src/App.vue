@@ -31,6 +31,7 @@ import { canAccessRoute } from './router';
 import PostView from './views/PostView.vue';
 import { useAppStore } from './stores/app';
 import { useAuthStore } from './stores/auth';
+import { useCollectionsStore } from './stores/collections';
 import { useExploreStore } from './stores/explore';
 import { useLikesStore } from './stores/likes';
 import { useFoldersStore } from './stores/folders';
@@ -42,6 +43,7 @@ import { useViewerStore } from './stores/viewer';
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
+const collectionsStore = useCollectionsStore();
 const exploreStore = useExploreStore();
 const feedStore = useFeedStore();
 const likesStore = useLikesStore();
@@ -100,6 +102,7 @@ function resetProtectedState() {
   feedStore.resetForRebuild();
   foldersStore.resetForRebuild();
   likesStore.resetForRebuild();
+  collectionsStore.resetForRebuild();
   momentsStore.resetForRebuild();
   reelsStore.reset();
   exploreStore.reset();
@@ -112,8 +115,10 @@ async function loadProtectedState(force = false) {
 
   if (authStore.canUseSavedItems) {
     tasks.push(likesStore.initialize(force));
+    tasks.push(collectionsStore.initialize(force));
   } else {
     likesStore.resetForRebuild();
+    collectionsStore.resetForRebuild();
   }
 
   await Promise.all(tasks);
@@ -212,7 +217,9 @@ watch(
       authStore.capabilities.canAccessSettings,
       authStore.capabilities.canDeleteMedia,
       authStore.capabilities.canUseSharedLikes,
-      authStore.capabilities.canUseLocalFavorites
+      authStore.capabilities.canUseLocalFavorites,
+      authStore.capabilities.canUseSharedCollections,
+      authStore.capabilities.canUseLocalCollections
     ] as const,
   async () => {
     if (!authStore.ready) {

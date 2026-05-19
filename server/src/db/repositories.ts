@@ -1,7 +1,11 @@
 import { databaseManager } from './database.js';
 import { normalizePath, safeJoin } from '../utils/path-utils.js';
+import { resolveUniqueSlug, slugifyFolderName } from '../utils/slug.js';
 import type {
   AppSettingRecord,
+  CollectionMembershipRecord,
+  CollectionRecord,
+  CollectionSummaryRecord,
   FeedImage,
   FolderAvatarSource,
   FolderImageOrder,
@@ -24,6 +28,8 @@ import type {
 
 const database = databaseManager.connection;
 const EFFECTIVE_FEED_TIME_SQL = 'COALESCE(images.taken_at, images.sort_timestamp)';
+const DEFAULT_COLLECTION_SLUG = 'saved';
+const DEFAULT_COLLECTION_NAME = 'Saved';
 const COVER_FILENAMES = ['cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp', 'cover.gif'] as const;
 const COVER_FILENAME_SQL = COVER_FILENAMES.map((name) => `'${name}'`).join(', ');
 const NORMAL_FOLDER_ROLE_SQL = "folders.role = 'normal'";
@@ -125,6 +131,15 @@ const MEDIA_SEARCH_FIELD_SQL = [
   EXIF_CAMERA_MODEL_SEARCH_SQL,
   EXIF_LENS_MODEL_SEARCH_SQL
 ] as const;
+const IMAGE_SAVED_SELECT_SQL = `
+    CASE WHEN EXISTS (
+      SELECT 1
+      FROM collections
+      INNER JOIN collection_items ON collection_items.collection_id = collections.id
+      WHERE collections.is_default = 1
+        AND collection_items.image_id = images.id
+    ) THEN 1 ELSE 0 END AS isSaved
+`;
 const FEED_IMAGE_SELECT_SQL = `
   SELECT
     images.id,
@@ -143,6 +158,7 @@ const FEED_IMAGE_SELECT_SQL = `
     images.playback_strategy AS playbackStrategy,
     images.sort_timestamp AS sortTimestamp,
     images.taken_at AS takenAt,
+    ${IMAGE_SAVED_SELECT_SQL},
     places.id AS placeId,
     places.slug AS placeSlug,
     places.display_name AS placeName,
@@ -1133,6 +1149,7 @@ export const imageRepository = {
         images.playback_strategy AS playbackStrategy,
         images.sort_timestamp AS sortTimestamp,
         images.taken_at AS takenAt,
+        ${IMAGE_SAVED_SELECT_SQL},
         places.id AS placeId,
         places.slug AS placeSlug,
         places.display_name AS placeName,
@@ -1175,6 +1192,7 @@ export const imageRepository = {
         search_results.playbackStrategy,
         search_results.sortTimestamp,
         search_results.takenAt,
+        search_results.isSaved,
         search_results.placeId,
         search_results.placeSlug,
         search_results.placeName,
@@ -1198,6 +1216,7 @@ export const imageRepository = {
           images.playback_strategy AS playbackStrategy,
           images.sort_timestamp AS sortTimestamp,
           images.taken_at AS takenAt,
+          ${IMAGE_SAVED_SELECT_SQL},
           places.id AS placeId,
           places.slug AS placeSlug,
           places.display_name AS placeName,
@@ -1371,6 +1390,7 @@ export const imageRepository = {
         images.playback_strategy AS playbackStrategy,
         images.sort_timestamp AS sortTimestamp,
         images.taken_at AS takenAt,
+        ${IMAGE_SAVED_SELECT_SQL},
         images.trashed_at AS trashedAt,
         places.id AS placeId,
         places.slug AS placeSlug,
@@ -1659,6 +1679,7 @@ export const imageRepository = {
         images.absolute_path AS originalUrl,
         images.sort_timestamp AS sortTimestamp,
         images.taken_at AS takenAt,
+        ${IMAGE_SAVED_SELECT_SQL},
         places.id AS placeId,
         places.slug AS placeSlug,
         places.display_name AS placeName,
@@ -1817,7 +1838,8 @@ export const likeRepository = {
         images.preview_path AS previewUrl,
         images.playback_strategy AS playbackStrategy,
         images.sort_timestamp AS sortTimestamp,
-        images.taken_at AS takenAt
+        images.taken_at AS takenAt,
+        ${IMAGE_SAVED_SELECT_SQL}
       FROM likes
       INNER JOIN images ON images.id = likes.image_id
       INNER JOIN folders ON folders.id = images.folder_id
@@ -1866,7 +1888,8 @@ export const likeRepository = {
         images.preview_path AS previewUrl,
         images.playback_strategy AS playbackStrategy,
         images.sort_timestamp AS sortTimestamp,
-        images.taken_at AS takenAt
+        images.taken_at AS takenAt,
+        ${IMAGE_SAVED_SELECT_SQL}
       FROM likes
       INNER JOIN images ON images.id = likes.image_id
       INNER JOIN folders ON folders.id = images.folder_id
@@ -1902,6 +1925,386 @@ export const likeRepository = {
     return Number(result.changes ?? 0);
   }
 };
+
+export const collectionRepository = {
+  ensureDefaultCollection(): CollectionRecord {
+    const existingDefault = database.prepare('SELECT * FROM collections WHERE is_default = 1 LIMIT 1').get() as CollectionRecord | undefined;
+    if (existingDefault) {
+      if (existingDefault.name !== DEFAULT_COLLECTION_NAME) {
+        database.prepare('UPDATE collections SET name = ?, updated_at = ? WHERE id = ?').run(DEFAULT_COLLECTION_NAME, nowIso(), existingDefault.id);
+      }
+
+      return this.getById(existingDefault.id) as CollectionRecord;
+    }
+
+    const savedCollection = this.getBySlug(DEFAULT_COLLECTION_SLUG);
+    if (savedCollection) {
+      database
+        .prepare('UPDATE collections SET name = ?, is_default = 1, updated_at = ? WHERE id = ?')
+        .run(DEFAULT_COLLECTION_NAME, nowIso(), savedCollection.id);
+      return this.getById(savedCollection.id) as CollectionRecord;
+    }
+
+    database
+      .prepare('INSERT INTO collections (slug, name, is_default, created_at, updated_at) VALUES (?, ?, 1, ?, ?)')
+      .run(DEFAULT_COLLECTION_SLUG, DEFAULT_COLLECTION_NAME, nowIso(), nowIso());
+
+    return this.getBySlug(DEFAULT_COLLECTION_SLUG) as CollectionRecord;
+  },
+
+  getById(id: number): CollectionRecord | undefined {
+    return database.prepare('SELECT * FROM collections WHERE id = ?').get(id) as CollectionRecord | undefined;
+  },
+
+  getDefaultCollection(): CollectionRecord {
+    return this.ensureDefaultCollection();
+  },
+
+  repairDefaultMemberships(): number {
+    const defaultCollection = this.ensureDefaultCollection();
+    const timestamp = nowIso();
+    const result = database
+      .prepare(
+        `
+        INSERT OR IGNORE INTO collection_items (collection_id, image_id, created_at)
+        SELECT ?, custom_items.image_id, ?
+        FROM collection_items AS custom_items
+        INNER JOIN collections AS custom_collections ON custom_collections.id = custom_items.collection_id
+        LEFT JOIN collection_items AS default_items
+          ON default_items.collection_id = ? AND default_items.image_id = custom_items.image_id
+        WHERE custom_collections.is_default = 0
+          AND default_items.image_id IS NULL
+        `
+      )
+      .run(defaultCollection.id, timestamp, defaultCollection.id);
+
+    const repairedCount = Number(result.changes ?? 0);
+    if (repairedCount > 0) {
+      database.prepare('UPDATE collections SET updated_at = ? WHERE id = ?').run(timestamp, defaultCollection.id);
+    }
+
+    return repairedCount;
+  },
+
+  getBySlug(slug: string): CollectionRecord | undefined {
+    return database.prepare('SELECT * FROM collections WHERE slug = ?').get(slug) as CollectionRecord | undefined;
+  },
+
+  create(name: string): CollectionRecord {
+    this.ensureDefaultCollection();
+    const normalizedName = name.trim().toLocaleLowerCase();
+    const existingName = database
+      .prepare('SELECT id FROM collections WHERE LOWER(name) = ? LIMIT 1')
+      .get(normalizedName) as { id: number } | undefined;
+    if (existingName) {
+      throw new Error('Collection name already exists.');
+    }
+
+    const existingSlugs = new Set((database.prepare('SELECT slug FROM collections').all() as Array<{ slug: string }>).map((row) => row.slug));
+    const slug = resolveUniqueSlug(name, existingSlugs, slugifyFolderName);
+    const timestamp = nowIso();
+
+    database
+      .prepare('INSERT INTO collections (slug, name, is_default, created_at, updated_at) VALUES (?, ?, 0, ?, ?)')
+      .run(slug, name, timestamp, timestamp);
+
+    return this.getBySlug(slug) as CollectionRecord;
+  },
+
+  updateName(slug: string, name: string): CollectionRecord | undefined {
+    this.ensureDefaultCollection();
+    const collection = this.getBySlug(slug);
+    if (!collection || collection.is_default === 1) {
+      return undefined;
+    }
+
+    const normalizedName = name.trim().toLocaleLowerCase();
+    const existingName = database
+      .prepare('SELECT id FROM collections WHERE LOWER(name) = ? AND id != ? LIMIT 1')
+      .get(normalizedName, collection.id) as { id: number } | undefined;
+    if (existingName) {
+      throw new Error('Collection name already exists.');
+    }
+
+    database
+      .prepare('UPDATE collections SET name = ?, updated_at = ? WHERE id = ?')
+      .run(name.trim(), nowIso(), collection.id);
+
+    return this.getById(collection.id);
+  },
+
+  delete(slug: string): CollectionRecord | undefined {
+    const collection = this.getBySlug(slug);
+    if (!collection || collection.is_default === 1) {
+      return undefined;
+    }
+
+    database.prepare('DELETE FROM collections WHERE id = ?').run(collection.id);
+
+    return collection;
+  },
+
+  listSummaries(): CollectionSummaryRecord[] {
+    this.ensureDefaultCollection();
+    return database
+      .prepare(
+        `
+        SELECT
+          collections.*,
+          (
+            SELECT COUNT(*)
+            FROM collection_items
+            INNER JOIN images ON images.id = collection_items.image_id
+            INNER JOIN folders ON folders.id = images.folder_id
+            WHERE collection_items.collection_id = collections.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+          ) AS item_count,
+          (
+            SELECT images.id
+            FROM collection_items
+            INNER JOIN images ON images.id = collection_items.image_id
+            INNER JOIN folders ON folders.id = images.folder_id
+            WHERE collection_items.collection_id = collections.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+            ORDER BY collection_items.created_at DESC, collection_items.image_id DESC
+            LIMIT 1
+          ) AS cover_image_id,
+          (
+            SELECT images.thumbnail_path
+            FROM collection_items
+            INNER JOIN images ON images.id = collection_items.image_id
+            INNER JOIN folders ON folders.id = images.folder_id
+            WHERE collection_items.collection_id = collections.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+            ORDER BY collection_items.created_at DESC, collection_items.image_id DESC
+            LIMIT 1
+          ) AS cover_thumbnail_path,
+          (
+            SELECT GROUP_CONCAT(preview_images.image_id)
+            FROM (
+              SELECT collection_items.image_id
+              FROM collection_items
+              INNER JOIN images ON images.id = collection_items.image_id
+              INNER JOIN folders ON folders.id = images.folder_id
+              WHERE collection_items.collection_id = collections.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+              ORDER BY collection_items.created_at DESC, collection_items.image_id DESC
+              LIMIT 4
+            ) AS preview_images
+          ) AS preview_image_ids
+        FROM collections
+        ORDER BY collections.is_default DESC, collections.updated_at DESC, collections.id DESC
+        `
+      )
+      .all() as unknown as CollectionSummaryRecord[];
+  },
+
+  listMembershipsForImage(imageId: number): CollectionMembershipRecord[] {
+    this.ensureDefaultCollection();
+    return database
+      .prepare(
+        `
+        SELECT
+          collections.*,
+          (
+            SELECT COUNT(*)
+            FROM collection_items
+            INNER JOIN images ON images.id = collection_items.image_id
+            INNER JOIN folders ON folders.id = images.folder_id
+            WHERE collection_items.collection_id = collections.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+          ) AS item_count,
+          (
+            SELECT images.id
+            FROM collection_items
+            INNER JOIN images ON images.id = collection_items.image_id
+            INNER JOIN folders ON folders.id = images.folder_id
+            WHERE collection_items.collection_id = collections.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+            ORDER BY collection_items.created_at DESC, collection_items.image_id DESC
+            LIMIT 1
+          ) AS cover_image_id,
+          (
+            SELECT images.thumbnail_path
+            FROM collection_items
+            INNER JOIN images ON images.id = collection_items.image_id
+            INNER JOIN folders ON folders.id = images.folder_id
+            WHERE collection_items.collection_id = collections.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+            ORDER BY collection_items.created_at DESC, collection_items.image_id DESC
+            LIMIT 1
+          ) AS cover_thumbnail_path,
+          (
+            SELECT GROUP_CONCAT(preview_images.image_id)
+            FROM (
+              SELECT collection_items.image_id
+              FROM collection_items
+              INNER JOIN images ON images.id = collection_items.image_id
+              INNER JOIN folders ON folders.id = images.folder_id
+              WHERE collection_items.collection_id = collections.id AND ${VISIBLE_IMAGE_WHERE_SQL}
+              ORDER BY collection_items.created_at DESC, collection_items.image_id DESC
+              LIMIT 4
+            ) AS preview_images
+          ) AS preview_image_ids,
+          CASE WHEN EXISTS (
+            SELECT 1
+            FROM collection_items
+            WHERE collection_items.collection_id = collections.id
+              AND collection_items.image_id = ?
+          ) THEN 1 ELSE 0 END AS contains_image
+        FROM collections
+        ORDER BY collections.is_default DESC, collections.updated_at DESC, collections.id DESC
+        `
+      )
+      .all(imageId) as unknown as CollectionMembershipRecord[];
+  },
+
+  listImages(slug: string, page: number, limit: number): FeedImage[] {
+    this.ensureDefaultCollection();
+    const offset = (page - 1) * limit;
+    return database
+      .prepare(
+        `
+        ${FEED_IMAGE_SELECT_SQL}
+        INNER JOIN collection_items ON collection_items.image_id = images.id
+        INNER JOIN collections ON collections.id = collection_items.collection_id
+        WHERE collections.slug = ? AND ${VISIBLE_IMAGE_WHERE_SQL}
+        ORDER BY collection_items.created_at DESC, collection_items.image_id DESC
+        LIMIT ? OFFSET ?
+        `
+      )
+      .all(slug, limit, offset) as unknown as FeedImage[];
+  },
+
+  countImages(slug: string): number {
+    this.ensureDefaultCollection();
+    return Number(
+      (
+        database
+          .prepare(
+            `
+            SELECT COUNT(*) AS count
+            FROM collection_items
+            INNER JOIN collections ON collections.id = collection_items.collection_id
+            INNER JOIN images ON images.id = collection_items.image_id
+            INNER JOIN folders ON folders.id = images.folder_id
+            WHERE collections.slug = ? AND ${VISIBLE_IMAGE_WHERE_SQL}
+            `
+          )
+          .get(slug) as { count: number }
+      ).count
+    );
+  },
+
+  isImageSaved(imageId: number): boolean {
+    this.ensureDefaultCollection();
+    const row = database
+      .prepare(
+        `
+        SELECT 1 AS found
+        FROM collection_items
+        INNER JOIN collections ON collections.id = collection_items.collection_id
+        WHERE collections.is_default = 1 AND collection_items.image_id = ?
+        LIMIT 1
+        `
+      )
+      .get(imageId) as { found: number } | undefined;
+    return row?.found === 1;
+  },
+
+  saveToDefault(imageId: number): CollectionRecord {
+    const defaultCollection = this.ensureDefaultCollection();
+    const timestamp = nowIso();
+
+    database
+      .prepare(
+        `
+        INSERT INTO collection_items (collection_id, image_id, created_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(collection_id, image_id) DO UPDATE SET
+          created_at = excluded.created_at
+        `
+      )
+      .run(defaultCollection.id, imageId, timestamp);
+    database.prepare('UPDATE collections SET updated_at = ? WHERE id = ?').run(timestamp, defaultCollection.id);
+
+    return this.getById(defaultCollection.id) as CollectionRecord;
+  },
+
+  unsaveEverywhere(imageId: number): void {
+    const timestamp = nowIso();
+    database
+      .prepare(
+        `
+        UPDATE collections
+        SET updated_at = ?
+        WHERE id IN (
+          SELECT collection_id
+          FROM collection_items
+          WHERE image_id = ?
+        )
+        `
+      )
+      .run(timestamp, imageId);
+    database.prepare('DELETE FROM collection_items WHERE image_id = ?').run(imageId);
+  },
+
+  addImage(collectionSlug: string, imageId: number): CollectionRecord | undefined {
+    const defaultCollection = this.ensureDefaultCollection();
+    const collection = this.getBySlug(collectionSlug);
+    if (!collection) {
+      return undefined;
+    }
+
+    const timestamp = nowIso();
+    if (collection.id !== defaultCollection.id) {
+      const defaultInsertResult = database
+        .prepare(
+          `
+          INSERT OR IGNORE INTO collection_items (collection_id, image_id, created_at)
+          VALUES (?, ?, ?)
+          `
+        )
+        .run(defaultCollection.id, imageId, timestamp);
+
+      if (Number(defaultInsertResult.changes ?? 0) > 0) {
+        database.prepare('UPDATE collections SET updated_at = ? WHERE id = ?').run(timestamp, defaultCollection.id);
+      }
+    }
+
+    database
+      .prepare(
+        `
+        INSERT INTO collection_items (collection_id, image_id, created_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(collection_id, image_id) DO UPDATE SET
+          created_at = excluded.created_at
+        `
+      )
+      .run(collection.id, imageId, timestamp);
+    database.prepare('UPDATE collections SET updated_at = ? WHERE id = ?').run(timestamp, collection.id);
+
+    return this.getById(collection.id);
+  },
+
+  removeImage(collectionSlug: string, imageId: number): CollectionRecord | undefined {
+    this.ensureDefaultCollection();
+    const collection = this.getBySlug(collectionSlug);
+    if (!collection) {
+      return undefined;
+    }
+
+    database.prepare('DELETE FROM collection_items WHERE collection_id = ? AND image_id = ?').run(collection.id, imageId);
+    database.prepare('UPDATE collections SET updated_at = ? WHERE id = ?').run(nowIso(), collection.id);
+
+    return this.getById(collection.id);
+  },
+
+  removeByFolder(folderId: number): number {
+    const result = database.prepare(
+      'DELETE FROM collection_items WHERE image_id IN (SELECT id FROM images WHERE folder_id = ?)'
+    ).run(folderId);
+    return Number(result.changes ?? 0);
+  }
+};
+
+export const collectionConstants = {
+  defaultCollectionSlug: DEFAULT_COLLECTION_SLUG,
+  defaultCollectionName: DEFAULT_COLLECTION_NAME
+} as const;
 
 export const appSettingsRepository = {
   get(key: string): string | null {

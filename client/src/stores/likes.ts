@@ -38,7 +38,8 @@ function isFeedItem(value: unknown): value is FeedItem {
     typeof item.thumbnailUrl === 'string' &&
     typeof item.previewUrl === 'string' &&
     typeof item.sortTimestamp === 'number' &&
-    (item.takenAt === null || item.takenAt === undefined || typeof item.takenAt === 'number')
+    (item.takenAt === null || item.takenAt === undefined || typeof item.takenAt === 'number') &&
+    (item.isSaved === undefined || typeof item.isSaved === 'boolean')
   );
 }
 
@@ -66,7 +67,10 @@ function readLocalFavorites(): FeedItem[] {
 
       seenIds.add(entry.id);
       return true;
-    });
+    }).map((item) => ({
+      ...item,
+      isSaved: item.isSaved ?? false
+    }));
   } catch {
     return [];
   }

@@ -158,6 +158,10 @@ class DatabaseManager {
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_places_slug ON places(slug)');
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_places_display_name ON places(display_name)');
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_places_geonames_id ON places(geonames_id)');
+    this.database.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_single_default ON collections(is_default) WHERE is_default = 1');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_collections_updated_at ON collections(updated_at DESC)');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_collection_items_image ON collection_items(image_id)');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_collection_items_created ON collection_items(collection_id, created_at DESC, image_id DESC)');
   }
 }
 

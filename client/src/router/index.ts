@@ -4,6 +4,8 @@ import HomeView from '../views/HomeView.vue';
 import PostView from '../views/PostView.vue';
 import LibraryView from '../views/LibraryView.vue';
 import LikesView from '../views/LikesView.vue';
+import CollectionsView from '../views/CollectionsView.vue';
+import CollectionView from '../views/CollectionView.vue';
 import ExploreView from '../views/ExploreView.vue';
 import FolderView from '../views/FolderView.vue';
 import MomentView from '../views/MomentView.vue';
@@ -79,6 +81,23 @@ export const router = createRouter({
       }
     },
     {
+      path: '/collections',
+      name: 'collections',
+      component: CollectionsView,
+      meta: {
+        requiresSavedItems: true
+      }
+    },
+    {
+      path: '/collections/:slug',
+      name: 'collection',
+      component: CollectionView,
+      props: true,
+      meta: {
+        requiresSavedItems: true
+      }
+    },
+    {
       path: '/trash',
       name: 'trash',
       component: TrashView,
@@ -146,7 +165,7 @@ export function canAccessRoute(route: Pick<RouteLocationNormalized, 'meta'>): bo
   const requiredCapability = getRouteRequiredCapability(route);
 
   if (requiredCapability) {
-    return authStore.capabilities[requiredCapability];
+    return authStore.capabilities[requiredCapability] === true;
   }
 
   if (routeRequiresSavedItems(route)) {

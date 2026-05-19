@@ -109,6 +109,24 @@ CREATE TABLE IF NOT EXISTS likes (
   FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS collections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS collection_items (
+  collection_id INTEGER NOT NULL,
+  image_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (collection_id, image_id),
+  FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+  FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_folders_slug ON folders(slug);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_folder_path ON folders(folder_path);
 CREATE INDEX IF NOT EXISTS idx_folders_role ON folders(role);
@@ -136,4 +154,8 @@ CREATE INDEX IF NOT EXISTS idx_places_display_name ON places(display_name);
 CREATE INDEX IF NOT EXISTS idx_places_geonames_id ON places(geonames_id);
 CREATE INDEX IF NOT EXISTS idx_folder_scan_state_updated_at ON folder_scan_state(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_likes_created_at ON likes(created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_single_default ON collections(is_default) WHERE is_default = 1;
+CREATE INDEX IF NOT EXISTS idx_collections_updated_at ON collections(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_collection_items_image ON collection_items(image_id);
+CREATE INDEX IF NOT EXISTS idx_collection_items_created ON collection_items(collection_id, created_at DESC, image_id DESC);
 `;

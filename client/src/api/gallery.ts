@@ -3,9 +3,15 @@ import type {
   AppStats,
   AuthMutationResult,
   AuthStatus,
+  CollectionImagesPayload,
+  CollectionMutationResult,
+  CollectionsPayload,
+  CreateCollectionResult,
+  DeleteCollectionResult,
   FolderStoriesPayload,
   FolderStoryFeedPayload,
   HomeFeedDefaultSetting,
+  UpdateCollectionResult,
   UpdateExcludedFoldersSettingResult,
   ReelsFeedDefaultSetting,
   StoriesModeSetting,
@@ -16,6 +22,7 @@ import type {
   FolderImageOrder,
   FolderImageOrderDefaultSetting,
   ImageDetail,
+  ImageCollectionsPayload,
   LikeMutationResult,
   LikesPayload,
   ManualScanResult,
@@ -186,6 +193,40 @@ export function fetchLikes() {
   return requestJson<LikesPayload>('/api/likes');
 }
 
+export function fetchCollections() {
+  return requestJson<CollectionsPayload>('/api/collections');
+}
+
+export function createCollection(name: string) {
+  return requestJson<CreateCollectionResult>('/api/collections', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+}
+
+export function updateCollection(slug: string, name: string) {
+  return requestJson<UpdateCollectionResult>(`/api/collections/${encodeURIComponent(slug)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+}
+
+export function deleteCollection(slug: string) {
+  return requestJson<DeleteCollectionResult>(`/api/collections/${encodeURIComponent(slug)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function fetchCollectionImages(slug: string, page = 1, limit = 24) {
+  return requestJson<CollectionImagesPayload>(`/api/collections/${encodeURIComponent(slug)}/images?page=${page}&limit=${limit}`);
+}
+
+export function fetchImageCollections(id: number) {
+  return requestJson<ImageCollectionsPayload>(`/api/images/${id}/collections`);
+}
+
 export function fetchTrashImages(page = 1, limit = 24) {
   return requestJson<TrashImagesPayload>(`/api/trash/images?page=${page}&limit=${limit}`);
 }
@@ -198,6 +239,30 @@ export function likeImage(id: number) {
 
 export function unlikeImage(id: number) {
   return requestJson<LikeMutationResult>(`/api/images/${id}/like`, {
+    method: 'DELETE'
+  });
+}
+
+export function saveImage(id: number) {
+  return requestJson<CollectionMutationResult>(`/api/images/${id}/save`, {
+    method: 'POST'
+  });
+}
+
+export function unsaveImage(id: number) {
+  return requestJson<CollectionMutationResult>(`/api/images/${id}/save`, {
+    method: 'DELETE'
+  });
+}
+
+export function addImageToCollection(slug: string, id: number) {
+  return requestJson<CollectionMutationResult>(`/api/collections/${encodeURIComponent(slug)}/images/${id}`, {
+    method: 'POST'
+  });
+}
+
+export function removeImageFromCollection(slug: string, id: number) {
+  return requestJson<CollectionMutationResult>(`/api/collections/${encodeURIComponent(slug)}/images/${id}`, {
     method: 'DELETE'
   });
 }

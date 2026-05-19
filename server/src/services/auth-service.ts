@@ -24,6 +24,8 @@ export interface AuthCapabilities {
   canAccessSettings: boolean;
   canUseSharedLikes: boolean;
   canUseLocalFavorites: boolean;
+  canUseSharedCollections: boolean;
+  canUseLocalCollections: boolean;
 }
 
 interface AuthConfigSnapshot {
@@ -95,7 +97,9 @@ function createCapabilities(role: AuthRole): AuthCapabilities {
       canDeleteMedia: true,
       canAccessSettings: true,
       canUseSharedLikes: true,
-      canUseLocalFavorites: false
+      canUseLocalFavorites: false,
+      canUseSharedCollections: true,
+      canUseLocalCollections: false
     };
   }
 
@@ -105,7 +109,9 @@ function createCapabilities(role: AuthRole): AuthCapabilities {
       canDeleteMedia: false,
       canAccessSettings: false,
       canUseSharedLikes: true,
-      canUseLocalFavorites: false
+      canUseLocalFavorites: false,
+      canUseSharedCollections: true,
+      canUseLocalCollections: false
     };
   }
 
@@ -114,7 +120,9 @@ function createCapabilities(role: AuthRole): AuthCapabilities {
     canDeleteMedia: false,
     canAccessSettings: false,
     canUseSharedLikes: false,
-    canUseLocalFavorites: true
+    canUseLocalFavorites: true,
+    canUseSharedCollections: false,
+    canUseLocalCollections: true
   };
 }
 
