@@ -32,6 +32,7 @@ class FakeMediaPlayerElement extends HTMLElement {
   playCallCount = 0;
   pauseCallCount = 0;
   currentTime = 0;
+  duration = 0;
 
   async play() {
     this.playCallCount += 1;
@@ -53,6 +54,7 @@ class FakeMediaControlsGroupElement extends HTMLElement {}
 class FakeMediaPlayButtonElement extends HTMLElement {}
 class FakeMediaMuteButtonElement extends HTMLElement {}
 class FakeMediaFullscreenButtonElement extends HTMLElement {}
+class FakeMediaTimeSliderElement extends HTMLElement {}
 
 if (!customElements.get('media-player')) {
   customElements.define('media-player', FakeMediaPlayerElement);
@@ -84,6 +86,10 @@ if (!customElements.get('media-mute-button')) {
 
 if (!customElements.get('media-fullscreen-button')) {
   customElements.define('media-fullscreen-button', FakeMediaFullscreenButtonElement);
+}
+
+if (!customElements.get('media-time-slider')) {
+  customElements.define('media-time-slider', FakeMediaTimeSliderElement);
 }
 
 function createFeedItem(id: number): FeedItem {
@@ -151,6 +157,13 @@ function createVideoDetail(id: number): ImageDetail {
     playbackStrategy: 'preview',
     previousImageId: null,
     nextImageId: null
+  };
+}
+
+function createHdVideoDetail(id: number): ImageDetail {
+  return {
+    ...createVideoDetail(id),
+    playbackStrategy: 'original'
   };
 }
 
@@ -279,6 +292,71 @@ describe('PostViewer', () => {
     expect(player.playCallCount).toBeGreaterThanOrEqual(2);
     expect(player.paused).toBe(false);
     expect(wrapper.find('.viewer__pause-indicator').exists()).toBe(false);
+  });
+
+  it('renders the bottom progress UI and keeps slider clicks from toggling viewer playback', async () => {
+    const wrapper = mount(PostViewer, {
+      props: {
+        image: createVideoDetail(24),
+        isModal: true
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    const player = wrapper.get('media-player').element as unknown as FakeMediaPlayerElement;
+    expect(wrapper.find('media-time-slider').exists()).toBe(true);
+    expect(wrapper.get('.video-progress-footer__time').text()).toBe('0:00 / 0:09');
+
+    await wrapper.get('media-time-slider').trigger('click');
+    await flushPromises();
+
+    expect(player.pauseCallCount).toBe(0);
+
+    player.dispatchEvent(new CustomEvent('time-update', {
+      detail: {
+        currentTime: 8,
+        played: { length: 0, start: () => 0, end: () => 0 }
+      }
+    }));
+    await flushPromises();
+
+    expect(wrapper.get('.video-progress-footer__time').text()).toBe('0:08 / 0:09');
+
+    player.dispatchEvent(new Event('ended'));
+    await flushPromises();
+
+    expect(wrapper.get('.video-progress-footer__time').text()).toBe('0:09 / 0:09');
+  });
+
+  it('preserves the playback position when switching between preview and HD sources', async () => {
+    const wrapper = mount(PostViewer, {
+      props: {
+        image: createHdVideoDetail(25),
+        isModal: true
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    const player = wrapper.get('media-player').element as unknown as FakeMediaPlayerElement;
+    player.currentTime = 4.25;
+    player.paused = false;
+
+    await wrapper.get('button[aria-label="Switch to HD original"]').trigger('click');
+    await flushPromises();
+
+    player.dispatchEvent(new Event('loaded-metadata'));
+    await flushPromises();
+
+    expect(player.currentTime).toBe(4.25);
+    expect(player.playCallCount).toBeGreaterThanOrEqual(2);
   });
 
   it('shows the paused indicator when autoplay is blocked on load', async () => {

@@ -164,9 +164,13 @@
               :poster="displayImage.thumbnailUrl"
               :muted="appStore.videoMuted"
               autoplay
-              loop
               playsinline
               preload="metadata"
+              @ended="handleStoryVideoEnded"
+              @loadedmetadata="handleStoryVideoLoadedMetadata"
+              @pause="handleStoryVideoPause"
+              @play="handleStoryVideoPlay"
+              @timeupdate="handleStoryVideoTimeUpdate"
             />
             <ResilientImage
               v-else-if="displayImage"
@@ -260,7 +264,7 @@ import { getOriginalMediaDownloadUrl } from '../utils/original-media';
 import Avatar from './Avatar.vue';
 import ResilientImage from './ResilientImage.vue';
 
-const STORY_AUTO_ADVANCE_MS = 4200;
+const STORY_IMAGE_AUTO_ADVANCE_MS = 4200;
 const CAPSULE_SWITCH_ANIMATION_MS = 360;
 const CAPSULE_VIEW_TRANSITION_NAME = 'rail-highlight-stage';
 
@@ -278,7 +282,8 @@ const emit = defineEmits<{
 const appStore = useAppStore();
 const activeCapsuleId = ref(props.initialId);
 const activeImageIndex = ref(0);
-const autoplayProgress = ref(0);
+const activeSlideDurationMs = ref(STORY_IMAGE_AUTO_ADVANCE_MS);
+const activeSlideElapsedMs = ref(0);
 const isPaused = ref(false);
 const activeCapsuleTransitionId = ref<string | null>(null);
 const transitionPending = ref(false);
@@ -287,7 +292,7 @@ const videoElement = ref<HTMLVideoElement | null>(null);
 
 let previousBodyOverflow = '';
 let animationFrameId = 0;
-let autoplayStartedAt = 0;
+let imageAutoplayStartedAt = 0;
 
 const activeCapsuleIndex = computed(() => props.items.findIndex((item) => item.id === activeCapsuleId.value));
 const activeCapsule = computed(() => {
@@ -401,7 +406,11 @@ function segmentProgress(index: number) {
     return 0;
   }
 
-  return autoplayProgress.value;
+  if (activeSlideDurationMs.value <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(activeSlideElapsedMs.value / activeSlideDurationMs.value, 1));
 }
 
 function stopAutoplay() {
@@ -411,19 +420,47 @@ function stopAutoplay() {
   }
 }
 
-function startAutoplay() {
-  stopAutoplay();
+function resolveStoryDurationMs(image: FeedItem | null) {
+  if (!image) {
+    return STORY_IMAGE_AUTO_ADVANCE_MS;
+  }
 
-  if (!displayImage.value || isPaused.value) {
+  if (image.mediaType === 'video' && typeof image.durationMs === 'number' && image.durationMs > 0) {
+    return image.durationMs;
+  }
+
+  return STORY_IMAGE_AUTO_ADVANCE_MS;
+}
+
+function syncStoryVideoTiming(player: HTMLVideoElement | null = videoElement.value) {
+  if (!player || displayImage.value?.mediaType !== 'video') {
     return;
   }
 
-  autoplayStartedAt = performance.now() - autoplayProgress.value * STORY_AUTO_ADVANCE_MS;
+  const durationMs = Number.isFinite(player.duration) && player.duration > 0
+    ? player.duration * 1000
+    : resolveStoryDurationMs(displayImage.value);
+
+  activeSlideDurationMs.value = durationMs;
+
+  if (Number.isFinite(player.currentTime) && player.currentTime >= 0) {
+    activeSlideElapsedMs.value = Math.min(durationMs, player.currentTime * 1000);
+  }
+}
+
+function startImageAutoplay() {
+  stopAutoplay();
+
+  if (!displayImage.value || displayImage.value.mediaType !== 'image' || isPaused.value) {
+    return;
+  }
+
+  imageAutoplayStartedAt = performance.now() - activeSlideElapsedMs.value;
 
   const tick = async (now: number) => {
-    autoplayProgress.value = Math.min(1, (now - autoplayStartedAt) / STORY_AUTO_ADVANCE_MS);
+    activeSlideElapsedMs.value = Math.min(activeSlideDurationMs.value, now - imageAutoplayStartedAt);
 
-    if (autoplayProgress.value >= 1) {
+    if (activeSlideElapsedMs.value >= activeSlideDurationMs.value) {
       stopAutoplay();
       await showNextImageFromAutoplay();
       return;
@@ -436,8 +473,13 @@ function startAutoplay() {
 }
 
 function syncAutoplayForCurrentImage() {
-  autoplayProgress.value = 0;
-  startAutoplay();
+  stopAutoplay();
+  activeSlideElapsedMs.value = 0;
+  activeSlideDurationMs.value = resolveStoryDurationMs(displayImage.value);
+
+  if (displayImage.value?.mediaType === 'image') {
+    startImageAutoplay();
+  }
 }
 
 function togglePaused() {
@@ -453,7 +495,10 @@ function togglePaused() {
     return;
   }
 
-  startAutoplay();
+  if (displayImage.value.mediaType === 'image') {
+    startImageAutoplay();
+  }
+
   syncMediaPlayback();
 }
 
@@ -593,7 +638,7 @@ async function showNextImageInternal(fromAutoplay: boolean) {
   }
 
   if (fromAutoplay) {
-    autoplayProgress.value = 1;
+    activeSlideElapsedMs.value = activeSlideDurationMs.value;
   }
 }
 
@@ -656,6 +701,41 @@ function syncMediaPlayback() {
   void player.play().catch(() => {
     // Ignore autoplay rejections so the viewer can continue advancing.
   });
+}
+
+function handleStoryVideoLoadedMetadata() {
+  syncStoryVideoTiming();
+}
+
+function handleStoryVideoTimeUpdate() {
+  syncStoryVideoTiming();
+}
+
+function handleStoryVideoPlay() {
+  isPaused.value = false;
+  syncStoryVideoTiming();
+}
+
+function handleStoryVideoPause() {
+  if (displayImage.value?.mediaType !== 'video') {
+    return;
+  }
+
+  if (videoElement.value?.ended) {
+    return;
+  }
+
+  isPaused.value = true;
+  syncStoryVideoTiming();
+}
+
+async function handleStoryVideoEnded() {
+  if (displayImage.value?.mediaType !== 'video') {
+    return;
+  }
+
+  activeSlideElapsedMs.value = activeSlideDurationMs.value;
+  await showNextImageFromAutoplay();
 }
 
 function lockBodyScroll() {

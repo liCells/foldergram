@@ -4,6 +4,7 @@
   <div
     class="app-shell flex min-h-screen overflow-x-clip"
     :class="{
+      'app-shell--standalone': isStandaloneDisplay,
       'app-shell--explore': isExploreShell,
       'app-shell--reels': isReelsShell
     }"
@@ -80,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
 import SidebarNav from './SidebarNav.vue';
@@ -97,6 +98,7 @@ import {
 
 const appStore = useAppStore();
 const route = useRoute();
+const isStandaloneDisplay = ref(false);
 const isExploreShell = computed(() => route.meta.shell === 'explore');
 const isReelsShell = computed(() => route.meta.shell === 'reels');
 const isImmersiveShell = computed(() => isExploreShell.value || isReelsShell.value);
@@ -120,11 +122,23 @@ const stickyScanSummary = computed(() => getScanSummary(activeScan.value));
 const stickyScanActionLine = computed(() => getScanActionLine(activeScan.value));
 const stickyScanMetricLine = computed(() => getScanMetricLine(activeScan.value));
 const stickyScanBarState = computed(() => getScanBarState(activeScan.value));
+
+onMounted(() => {
+  const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
+  isStandaloneDisplay.value =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    navigatorWithStandalone.standalone === true;
+});
 </script>
 
 <style scoped>
 .app-shell {
-  --mobile-bottom-nav-height: calc(4.1rem + env(safe-area-inset-bottom));
+  --mobile-safe-area-bottom: 0px;
+  --mobile-bottom-nav-height: calc(3.55rem + var(--mobile-safe-area-bottom));
+}
+
+.app-shell--standalone {
+  --mobile-safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .app-shell--reels {
