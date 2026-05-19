@@ -37,6 +37,7 @@ class FakeMediaPlayerElement extends HTMLElement {
 
 class FakeMediaProviderElement extends HTMLElement {}
 class FakeMediaPosterElement extends HTMLElement {}
+class FakeMediaTimeSliderElement extends HTMLElement {}
 
 if (!customElements.get('media-player')) {
   customElements.define('media-player', FakeMediaPlayerElement);
@@ -48,6 +49,10 @@ if (!customElements.get('media-provider')) {
 
 if (!customElements.get('media-poster')) {
   customElements.define('media-poster', FakeMediaPosterElement);
+}
+
+if (!customElements.get('media-time-slider')) {
+  customElements.define('media-time-slider', FakeMediaTimeSliderElement);
 }
 
 function createFeedItem(id: number): FeedItem {
@@ -206,6 +211,31 @@ describe('ReelPlayerCard', () => {
     await flushPromises();
 
     expect(player.playCallCount).toBeGreaterThanOrEqual(2);
+    expect(player.paused).toBe(false);
+    expect(wrapper.find('.reel-player-card__pause-indicator').exists()).toBe(false);
+  });
+
+  it('keeps seek-bar interaction from toggling reel playback', async () => {
+    const wrapper = mount(ReelPlayerCard, {
+      props: {
+        item: createFeedItem(12),
+        folder: createFolder(),
+        active: true
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    const player = getPlayerElement(wrapper);
+    expect(player.pauseCallCount).toBe(0);
+
+    await wrapper.get('.reel-player-card__seekbar-track').trigger('click');
+    await flushPromises();
+
+    expect(player.pauseCallCount).toBe(0);
     expect(player.paused).toBe(false);
     expect(wrapper.find('.reel-player-card__pause-indicator').exists()).toBe(false);
   });

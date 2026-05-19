@@ -160,76 +160,84 @@
                 :src.prop="image.thumbnailUrl"
                 :alt.prop="image.filename"
               />
-              <media-controls class="viewer__player-controls" data-swipe-ignore="true">
-                <media-controls-group class="viewer__player-controls-group">
-                  <media-play-button
-                    class="viewer__player-control"
-                    aria-label="Toggle playback"
-                  >
-                    <span
-                      class="viewer__player-control-icon viewer__player-play-icon viewer__player-play-icon--play i-fluent-play-16-filled"
-                      aria-hidden="true"
-                    />
-                    <span
-                      class="viewer__player-control-icon viewer__player-play-icon viewer__player-play-icon--pause i-fluent-pause-16-filled"
-                      aria-hidden="true"
-                    />
-                  </media-play-button>
-                  <media-mute-button
-                    class="viewer__player-control"
-                    aria-label="Toggle sound"
-                  >
-                    <span
-                      class="viewer__player-control-icon viewer__player-mute-icon viewer__player-mute-icon--on i-fluent-speaker-2-16-regular"
-                      aria-hidden="true"
-                    />
-                    <span
-                      class="viewer__player-control-icon viewer__player-mute-icon viewer__player-mute-icon--off i-fluent-speaker-mute-16-regular"
-                      aria-hidden="true"
-                    />
-                  </media-mute-button>
-                </media-controls-group>
-                <media-controls-group class="viewer__player-controls-group">
-                  <button
-                    v-if="showHdButton"
-                    class="viewer__player-control"
-                    :class="{ 'viewer__player-control--active': isPlayingHd }"
-                    type="button"
-                    :aria-label="
-                      isPlayingHd
-                        ? 'Switch to preview quality'
-                        : 'Switch to HD original'
-                    "
-                    :aria-pressed="isPlayingHd"
-                    :title="isPlayingHd ? 'Preview quality' : 'HD original'"
-                    @click.stop="toggleHdSource"
-                  >
-                    <span
-                      class="viewer__player-control-icon"
-                      :class="
+              <VideoProgressFooter
+                variant="viewer"
+                :time-label="videoTimeLabel"
+                data-swipe-ignore="true"
+              >
+                <template #leading>
+                  <div class="viewer__player-controls-group">
+                    <media-play-button
+                      class="viewer__player-control"
+                      aria-label="Toggle playback"
+                    >
+                      <span
+                        class="viewer__player-control-icon viewer__player-play-icon viewer__player-play-icon--play i-fluent-play-16-filled"
+                        aria-hidden="true"
+                      />
+                      <span
+                        class="viewer__player-control-icon viewer__player-play-icon viewer__player-play-icon--pause i-fluent-pause-16-filled"
+                        aria-hidden="true"
+                      />
+                    </media-play-button>
+                  </div>
+                </template>
+                <template #trailing>
+                  <div class="viewer__player-controls-group">
+                    <media-mute-button
+                      class="viewer__player-control"
+                      aria-label="Toggle sound"
+                    >
+                      <span
+                        class="viewer__player-control-icon viewer__player-mute-icon viewer__player-mute-icon--on i-fluent-speaker-2-16-regular"
+                        aria-hidden="true"
+                      />
+                      <span
+                        class="viewer__player-control-icon viewer__player-mute-icon viewer__player-mute-icon--off i-fluent-speaker-mute-16-regular"
+                        aria-hidden="true"
+                      />
+                    </media-mute-button>
+                    <button
+                      v-if="showHdButton"
+                      class="viewer__player-control"
+                      :class="{ 'viewer__player-control--active': isPlayingHd }"
+                      type="button"
+                      :aria-label="
                         isPlayingHd
-                          ? 'i-fluent-hd-16-filled'
-                          : 'i-fluent-hd-16-regular'
+                          ? 'Switch to preview quality'
+                          : 'Switch to HD original'
                       "
-                      aria-hidden="true"
-                    />
-                  </button>
-                  <media-fullscreen-button
-                    class="viewer__player-control"
-                    aria-label="Toggle fullscreen"
-                    target="media"
-                  >
-                    <span
-                      class="viewer__player-control-icon viewer__player-fullscreen-icon viewer__player-fullscreen-icon--enter i-fluent-full-screen-maximize-16-regular"
-                      aria-hidden="true"
-                    />
-                    <span
-                      class="viewer__player-control-icon viewer__player-fullscreen-icon viewer__player-fullscreen-icon--exit i-fluent-full-screen-minimize-16-regular"
-                      aria-hidden="true"
-                    />
-                  </media-fullscreen-button>
-                </media-controls-group>
-              </media-controls>
+                      :aria-pressed="isPlayingHd"
+                      :title="isPlayingHd ? 'Preview quality' : 'HD original'"
+                      @click.stop="toggleHdSource"
+                    >
+                      <span
+                        class="viewer__player-control-icon"
+                        :class="
+                          isPlayingHd
+                            ? 'i-fluent-hd-16-filled'
+                            : 'i-fluent-hd-16-regular'
+                        "
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <media-fullscreen-button
+                      class="viewer__player-control"
+                      aria-label="Toggle fullscreen"
+                      target="media"
+                    >
+                      <span
+                        class="viewer__player-control-icon viewer__player-fullscreen-icon viewer__player-fullscreen-icon--enter i-fluent-full-screen-maximize-16-regular"
+                        aria-hidden="true"
+                      />
+                      <span
+                        class="viewer__player-control-icon viewer__player-fullscreen-icon viewer__player-fullscreen-icon--exit i-fluent-full-screen-minimize-16-regular"
+                        aria-hidden="true"
+                      />
+                    </media-fullscreen-button>
+                  </div>
+                </template>
+              </VideoProgressFooter>
             </media-player>
             <div
               v-if="showVideoPausedIndicator"
@@ -570,7 +578,8 @@
   import Avatar from "./Avatar.vue"
   import CollectionBookmark from "./CollectionBookmark.vue"
   import ResilientImage from "./ResilientImage.vue"
-  import { formatMediaDuration, videoPreviewWouldDownscale } from "../utils/media"
+  import VideoProgressFooter from "./VideoProgressFooter.vue"
+  import { formatMediaDuration, formatVideoTimestamp, videoPreviewWouldDownscale } from "../utils/media"
 
   const props = defineProps<{
     image: ImageDetail | null
@@ -601,6 +610,8 @@
   const isSidebarSheetDragging = ref(false)
   const isPlayingHd = ref(false)
   const isVideoPaused = ref(false)
+  const videoDurationMs = ref(props.image?.durationMs ?? 0)
+  const videoCurrentTimeMs = ref(0)
   const sidebarSheetDragOffset = ref(0)
   const settingCover = ref(false)
 
@@ -620,6 +631,7 @@
   }
 
   let videoMuteSyncToken = 0
+  let playerReady = false
   let pendingVideoRestore: { currentTime: number; wasPaused: boolean } | null = null
   let removePlayerEventListeners: (() => void) | null = null
   let sidebarSheetPointerId: number | null = null
@@ -649,6 +661,12 @@
   )
   const showVideoPausedIndicator = computed(
     () => props.image?.mediaType === 'video' && isVideoPaused.value,
+  )
+  const videoTimeLabel = computed(() =>
+    formatVideoTimestamp(
+      videoDurationMs.value > 0 ? videoDurationMs.value : props.image?.durationMs,
+      videoCurrentTimeMs.value,
+    ),
   )
 
   const videoSrc = computed(() => {
@@ -893,10 +911,24 @@
           "media-play-button",
           "media-mute-button",
           "media-fullscreen-button",
-          "media-controls",
+          "media-time-slider",
         ].join(", "),
       ),
     )
+  }
+
+  function syncVideoTimelineState(player: MediaPlayerElement | null = playerElement.value) {
+    if (!player) {
+      return
+    }
+
+    if (Number.isFinite(player.duration) && player.duration > 0) {
+      videoDurationMs.value = player.duration * 1000
+    }
+
+    if (Number.isFinite(player.currentTime) && player.currentTime >= 0) {
+      videoCurrentTimeMs.value = player.currentTime * 1000
+    }
   }
 
   function formatExifNumber(
@@ -1359,7 +1391,10 @@
 
   function handlePlayerVolumeChange() {
     const player = playerElement.value
-    if (!player || videoMuteSyncToken !== 0) {
+    // Ignore volume-change events that fire before the player has fully initialized.
+    // Vidstack can emit these during its own setup with muted=false, which would
+    // overwrite the persisted muted preference read from localStorage.
+    if (!player || !playerReady || videoMuteSyncToken !== 0) {
       return
     }
 
@@ -1389,6 +1424,7 @@
       const restoreState = pendingVideoRestore
       pendingVideoRestore = null
       player.currentTime = restoreState.currentTime
+      syncVideoTimelineState(player)
 
       if (!restoreState.wasPaused) {
         void player.play().catch(() => { /* ignore */ })
@@ -1411,16 +1447,43 @@
     }
 
     const handleReady = () => {
+      playerReady = true
       void handlePlayerReadyForPlayback()
     }
     const handlePlay = () => {
       isVideoPaused.value = false
+      syncVideoTimelineState(player)
     }
     const handlePause = () => {
       isVideoPaused.value = props.image?.mediaType === "video"
+      syncVideoTimelineState(player)
     }
     const handleVolume = () => {
       handlePlayerVolumeChange()
+    }
+    const handleDuration = (event: Event) => {
+      if (event instanceof CustomEvent && typeof event.detail === "number" && event.detail > 0) {
+        videoDurationMs.value = event.detail * 1000
+      }
+
+      syncVideoTimelineState(player)
+    }
+    const handleTimeUpdate = (event: Event) => {
+      if (
+        event instanceof CustomEvent &&
+        typeof event.detail === "object" &&
+        event.detail !== null &&
+        "currentTime" in event.detail &&
+        typeof event.detail.currentTime === "number"
+      ) {
+        videoCurrentTimeMs.value = event.detail.currentTime * 1000
+        return
+      }
+
+      syncVideoTimelineState(player)
+    }
+    const handleEnded = () => {
+      videoCurrentTimeMs.value = videoDurationMs.value
     }
 
     player.addEventListener("loaded-metadata", handleReady)
@@ -1428,6 +1491,9 @@
     player.addEventListener("play", handlePlay)
     player.addEventListener("pause", handlePause)
     player.addEventListener("volume-change", handleVolume)
+    player.addEventListener("duration-change", handleDuration)
+    player.addEventListener("time-update", handleTimeUpdate)
+    player.addEventListener("ended", handleEnded)
 
     removePlayerEventListeners = () => {
       player.removeEventListener("loaded-metadata", handleReady)
@@ -1435,6 +1501,9 @@
       player.removeEventListener("play", handlePlay)
       player.removeEventListener("pause", handlePause)
       player.removeEventListener("volume-change", handleVolume)
+      player.removeEventListener("duration-change", handleDuration)
+      player.removeEventListener("time-update", handleTimeUpdate)
+      player.removeEventListener("ended", handleEnded)
     }
 
     if (player.hasAttribute("data-can-play")) {
@@ -1451,6 +1520,8 @@
       resetMediaSheetRevealGesture()
       isPlayingHd.value = false
       isVideoPaused.value = false
+      videoDurationMs.value = props.image?.durationMs ?? 0
+      videoCurrentTimeMs.value = 0
       pendingVideoRestore = null
       void attemptVideoPlayback()
     },
@@ -1469,6 +1540,9 @@
   )
 
   watch(playerElement, player => {
+    videoDurationMs.value = props.image?.durationMs ?? 0
+    videoCurrentTimeMs.value = 0
+    playerReady = false
     bindPlayerEventListeners(player)
   })
 

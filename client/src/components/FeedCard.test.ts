@@ -23,6 +23,8 @@ class FakeMediaPlayerElement extends HTMLElement {
   paused = true;
   playCallCount = 0;
   pauseCallCount = 0;
+  currentTime = 0;
+  duration = 0;
 
   async play() {
     this.playCallCount += 1;
@@ -42,6 +44,7 @@ class FakeMediaControlsGroupElement extends HTMLElement {}
 class FakeMediaPlayButtonElement extends HTMLElement {}
 class FakeMediaMuteButtonElement extends HTMLElement {}
 class FakeMediaFullscreenButtonElement extends HTMLElement {}
+class FakeMediaTimeSliderElement extends HTMLElement {}
 
 if (!customElements.get('media-player')) {
   customElements.define('media-player', FakeMediaPlayerElement);
@@ -73,6 +76,10 @@ if (!customElements.get('media-mute-button')) {
 
 if (!customElements.get('media-fullscreen-button')) {
   customElements.define('media-fullscreen-button', FakeMediaFullscreenButtonElement);
+}
+
+if (!customElements.get('media-time-slider')) {
+  customElements.define('media-time-slider', FakeMediaTimeSliderElement);
 }
 
 function createVideoItem(id: number): FeedItem {
@@ -221,6 +228,46 @@ describe('FeedCard', () => {
     expect(player.playCallCount).toBeGreaterThanOrEqual(2);
     expect(player.paused).toBe(false);
     expect(wrapper.find('.feed-card__pause-indicator').exists()).toBe(false);
+  });
+
+  it('renders the bottom progress UI and keeps slider clicks from pausing the home video', async () => {
+    const wrapper = mount(FeedCard, {
+      props: {
+        item: createVideoItem(8051),
+        avatarUrl: null,
+        context: 'home',
+        isActiveVideo: true
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    const player = wrapper.get('media-player').element as unknown as FakeMediaPlayerElement;
+    expect(wrapper.find('media-time-slider').exists()).toBe(true);
+    expect(wrapper.get('.video-progress-footer__time').text()).toBe('0:00 / 0:31');
+
+    await wrapper.get('media-time-slider').trigger('click');
+    await flushPromises();
+
+    expect(player.pauseCallCount).toBe(0);
+
+    player.dispatchEvent(new CustomEvent('time-update', {
+      detail: {
+        currentTime: 30,
+        played: { length: 0, start: () => 0, end: () => 0 }
+      }
+    }));
+    await flushPromises();
+
+    expect(wrapper.get('.video-progress-footer__time').text()).toBe('0:30 / 0:31');
+
+    player.dispatchEvent(new Event('ended'));
+    await flushPromises();
+
+    expect(wrapper.get('.video-progress-footer__time').text()).toBe('0:31 / 0:31');
   });
 
   it('renders a story ring on the home avatar and emits an in-place story open event', async () => {

@@ -26,6 +26,21 @@
             :src.prop="item.thumbnailUrl"
             :alt.prop="item.filename"
           />
+          <!-- TikTok-style bottom seek bar -->
+          <div class="reel-player-card__seekbar-shell">
+            <media-time-slider
+              class="reel-player-card__seekbar"
+              aria-label="Seek video"
+              @click.stop
+              @pointerdown.stop
+              @pointerup.stop
+            >
+              <div class="reel-player-card__seekbar-track" />
+              <div class="reel-player-card__seekbar-track reel-player-card__seekbar-progress" />
+              <div class="reel-player-card__seekbar-track reel-player-card__seekbar-fill" />
+              <div class="reel-player-card__seekbar-thumb" />
+            </media-time-slider>
+          </div>
         </media-player>
 
         <div
@@ -278,7 +293,11 @@ async function toggleSound() {
   }
 }
 
-async function handleSurfaceClick() {
+async function handleSurfaceClick(event?: MouseEvent) {
+  if (event && isInteractiveTarget(event.target)) {
+    return;
+  }
+
   const player = playerElement.value;
   if (!player || !props.active) {
     return;
@@ -296,7 +315,7 @@ async function handleSurfaceClick() {
 }
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && Boolean(target.closest('a, button'));
+  return target instanceof HTMLElement && Boolean(target.closest('a, button, media-time-slider'));
 }
 
 function handleSurfaceKeydown(event: KeyboardEvent) {
@@ -642,5 +661,102 @@ onBeforeUnmount(() => {
     width: 1.9rem;
     height: 1.9rem;
   }
+}
+
+/* ── Bottom seek bar ──────────────────────────────────────── */
+
+.reel-player-card__seekbar-shell {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.reel-player-card__seekbar {
+  position: relative;
+  display: block;
+  width: 100%;
+  /* tall hit-target for comfortable scrubbing */
+  height: 1.25rem;
+  cursor: pointer;
+  touch-action: none;
+  pointer-events: auto;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* shared track base */
+.reel-player-card__seekbar-track {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  top: auto;
+  height: 2.5px;
+  border-radius: 0;
+  transform: none;
+  transition: height 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* expand on hover/drag */
+.reel-player-card__seekbar-shell:hover .reel-player-card__seekbar-track,
+.reel-player-card__seekbar[data-active] .reel-player-card__seekbar-track,
+.reel-player-card__seekbar[data-dragging] .reel-player-card__seekbar-track {
+  height: 6px;
+}
+
+/* track layers */
+.reel-player-card__seekbar .reel-player-card__seekbar-track:first-child {
+  z-index: 0;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.reel-player-card__seekbar-progress {
+  z-index: 1;
+  width: var(--slider-progress, 0%);
+  background: rgba(255, 255, 255, 0.40);
+  will-change: width;
+}
+
+.reel-player-card__seekbar-fill {
+  z-index: 2;
+  width: var(--slider-fill, 0%);
+  background: #fff;
+  will-change: width;
+}
+
+/* thumb — only visible on hover/drag/focus */
+.reel-player-card__seekbar-thumb {
+  position: absolute;
+  bottom: 0;
+  top: auto;
+  left: var(--slider-fill, 0%);
+  z-index: 3;
+  width: 0.78rem;
+  height: 0.78rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 50%);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+  will-change: left;
+}
+
+.reel-player-card__seekbar-shell:hover .reel-player-card__seekbar-thumb,
+.reel-player-card__seekbar[data-active] .reel-player-card__seekbar-thumb,
+.reel-player-card__seekbar[data-dragging] .reel-player-card__seekbar-thumb,
+.reel-player-card__seekbar[data-focus] .reel-player-card__seekbar-thumb,
+.reel-player-card__seekbar:focus-visible .reel-player-card__seekbar-thumb {
+  opacity: 1;
+  transform: translate(-50%, 40%);
+}
+
+.reel-player-card__seekbar[data-focus] .reel-player-card__seekbar-track,
+.reel-player-card__seekbar:focus-visible .reel-player-card__seekbar-track {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
 }
 </style>

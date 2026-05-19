@@ -130,57 +130,59 @@
           :src.prop="item.thumbnailUrl"
           :alt.prop="item.filename"
         />
-        <media-controls
-          v-if="showHomeVideoControls"
-          class="feed-card__player-controls"
-          @click.stop
-          @keydown.stop
+        <VideoProgressFooter
+          variant="feed"
+          :time-label="homeVideoTimeLabel"
         >
-          <media-controls-group class="feed-card__player-controls-group">
-            <media-play-button
-              class="feed-card__player-control"
-              aria-label="Toggle playback"
-            >
-              <span
-                class="feed-card__player-control-icon feed-card__player-play-icon feed-card__player-play-icon--play i-fluent-play-16-filled"
-                aria-hidden="true"
-              />
-              <span
-                class="feed-card__player-control-icon feed-card__player-play-icon feed-card__player-play-icon--pause i-fluent-pause-16-filled"
-                aria-hidden="true"
-              />
-            </media-play-button>
-            <media-mute-button
-              class="feed-card__player-control"
-              aria-label="Toggle sound"
-            >
-              <span
-                class="feed-card__player-control-icon feed-card__player-mute-icon feed-card__player-mute-icon--on i-fluent-speaker-2-16-regular"
-                aria-hidden="true"
-              />
-              <span
-                class="feed-card__player-control-icon feed-card__player-mute-icon feed-card__player-mute-icon--off i-fluent-speaker-mute-16-regular"
-                aria-hidden="true"
-              />
-            </media-mute-button>
-          </media-controls-group>
-          <media-controls-group class="feed-card__player-controls-group">
-            <media-fullscreen-button
-              class="feed-card__player-control"
-              aria-label="Toggle fullscreen"
-              target="media"
-            >
-              <span
-                class="feed-card__player-control-icon feed-card__player-fullscreen-icon feed-card__player-fullscreen-icon--enter i-fluent-full-screen-maximize-16-regular"
-                aria-hidden="true"
-              />
-              <span
-                class="feed-card__player-control-icon feed-card__player-fullscreen-icon feed-card__player-fullscreen-icon--exit i-fluent-full-screen-minimize-16-regular"
-                aria-hidden="true"
-              />
-            </media-fullscreen-button>
-          </media-controls-group>
-        </media-controls>
+          <template #leading>
+            <div v-if="showHomeVideoControls" class="feed-card__player-controls-group">
+              <media-play-button
+                class="feed-card__player-control"
+                aria-label="Toggle playback"
+              >
+                <span
+                  class="feed-card__player-control-icon feed-card__player-play-icon feed-card__player-play-icon--play i-fluent-play-16-filled"
+                  aria-hidden="true"
+                />
+                <span
+                  class="feed-card__player-control-icon feed-card__player-play-icon feed-card__player-play-icon--pause i-fluent-pause-16-filled"
+                  aria-hidden="true"
+                />
+              </media-play-button>
+            </div>
+          </template>
+          <template #trailing>
+            <div v-if="showHomeVideoControls" class="feed-card__player-controls-group">
+              <media-mute-button
+                class="feed-card__player-control"
+                aria-label="Toggle sound"
+              >
+                <span
+                  class="feed-card__player-control-icon feed-card__player-mute-icon feed-card__player-mute-icon--on i-fluent-speaker-2-16-regular"
+                  aria-hidden="true"
+                />
+                <span
+                  class="feed-card__player-control-icon feed-card__player-mute-icon feed-card__player-mute-icon--off i-fluent-speaker-mute-16-regular"
+                  aria-hidden="true"
+                />
+              </media-mute-button>
+              <media-fullscreen-button
+                class="feed-card__player-control"
+                aria-label="Toggle fullscreen"
+                target="media"
+              >
+                <span
+                  class="feed-card__player-control-icon feed-card__player-fullscreen-icon feed-card__player-fullscreen-icon--enter i-fluent-full-screen-maximize-16-regular"
+                  aria-hidden="true"
+                />
+                <span
+                  class="feed-card__player-control-icon feed-card__player-fullscreen-icon feed-card__player-fullscreen-icon--exit i-fluent-full-screen-minimize-16-regular"
+                  aria-hidden="true"
+                />
+              </media-fullscreen-button>
+            </div>
+          </template>
+        </VideoProgressFooter>
       </media-player>
       <div
         v-if="showHomeVideoPausedIndicator"
@@ -188,14 +190,6 @@
         aria-hidden="true"
       >
         <span class="feed-card__pause-icon i-fluent-play-20-filled" />
-      </div>
-      <div
-        class="absolute inset-x-0 top-0 flex items-center justify-between gap-3 px-4 py-3 text-white pointer-events-none bg-[linear-gradient(180deg,rgba(10,14,24,0.82)_0%,rgba(10,14,24,0)_100%)]"
-      >
-        <span class="i-fluent-play-circle-24-filled w-[1.15rem] h-[1.15rem] text-white" aria-hidden="true" />
-        <span v-if="item.durationMs" class="rounded-full bg-black/55 px-[0.55rem] py-[0.18rem] text-[0.76rem] font-semibold">
-          {{ formattedDuration }}
-        </span>
       </div>
     </div>
 
@@ -416,13 +410,14 @@ import { useFoldersStore } from '../stores/folders';
 import { useLikesStore } from '../stores/likes';
 import { useMomentsStore } from '../stores/moments';
 import type { FeedItem } from '../types/api';
-import { formatMediaDuration } from '../utils/media';
+import { formatMediaDuration, formatVideoTimestamp } from '../utils/media';
 import { resolveFeedAspectRatio } from '../utils/media-layout';
 import { getOriginalMediaDownloadUrl, getOriginalMediaUrl } from '../utils/original-media';
 import Avatar from './Avatar.vue';
 import CollectionBookmark from './CollectionBookmark.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ResilientImage from './ResilientImage.vue';
+import VideoProgressFooter from './VideoProgressFooter.vue';
 
 interface HomeVideoVisibilityChange {
   id: number;
@@ -470,12 +465,15 @@ const homePlayerElement = ref<MediaPlayerElement | null>(null);
 const loadedHomeVideoAspectRatio = ref<string | null>(null);
 const isHomeVideoPaused = ref(false);
 const isHomeVideoFullscreen = ref(false);
+const homeVideoDurationMs = ref(props.item.durationMs ?? 0);
+const homeVideoCurrentTimeMs = ref(0);
 const lastHomeImageTapAt = ref(0);
 const heartBurstEl = ref<HTMLElement | null>(null);
 
 let homeImageTapResetTimer: ReturnType<typeof setTimeout> | null = null;
 let homeVideoObserver: IntersectionObserver | null = null;
 let homeVideoMuteSyncToken = 0;
+let homePlayerReady = false;
 let removeHomePlayerEventListeners: (() => void) | null = null;
 
 const imageRoute = computed(() => ({
@@ -514,6 +512,12 @@ const homeVideoSource = computed<PlayerSrc>(() => ({
   src: props.item.previewUrl,
   type: 'video/mp4'
 }));
+const homeVideoTimeLabel = computed(() =>
+  formatVideoTimestamp(
+    homeVideoDurationMs.value > 0 ? homeVideoDurationMs.value : props.item.durationMs,
+    homeVideoCurrentTimeMs.value
+  )
+);
 const showHomeVideoControls = computed(() => props.isActiveVideo || isHomeVideoFullscreen.value);
 const showHomeVideoSurfaceControls = computed(() => props.isActiveVideo || isHomeVideoFullscreen.value);
 const showHomeVideoPausedIndicator = computed(() => showHomeVideoSurfaceControls.value && isHomeVideoPaused.value);
@@ -530,7 +534,9 @@ function isPrimaryPlainClick(event: MouseEvent) {
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && Boolean(
-    target.closest('a, button, input, textarea, select, media-play-button, media-mute-button, media-fullscreen-button, media-controls')
+    target.closest(
+      'a, button, input, textarea, select, media-play-button, media-mute-button, media-fullscreen-button, media-time-slider'
+    )
   );
 }
 
@@ -634,6 +640,20 @@ function syncHomeVideoAspectRatio(player: MediaPlayerElement | null = homePlayer
   loadedHomeVideoAspectRatio.value = resolveFeedAspectRatio(video.videoWidth, video.videoHeight);
 }
 
+function syncHomeVideoTimelineState(player: MediaPlayerElement | null = homePlayerElement.value) {
+  if (!player) {
+    return;
+  }
+
+  if (Number.isFinite(player.duration) && player.duration > 0) {
+    homeVideoDurationMs.value = player.duration * 1000;
+  }
+
+  if (Number.isFinite(player.currentTime) && player.currentTime >= 0) {
+    homeVideoCurrentTimeMs.value = player.currentTime * 1000;
+  }
+}
+
 function stopHomeVideoObserver(options: { clearVisibility?: boolean } = {}) {
   if (homeVideoObserver) {
     homeVideoObserver.disconnect();
@@ -722,6 +742,7 @@ async function syncHomeVideoPlayback() {
 
 function handleHomeVideoPlay() {
   isHomeVideoPaused.value = false;
+  syncHomeVideoTimelineState();
 
   if (!props.isActiveVideo && !isHomeVideoFullscreen.value) {
     void homePlayerElement.value?.pause().catch(() => {
@@ -732,6 +753,34 @@ function handleHomeVideoPlay() {
 
 function handleHomeVideoPause() {
   isHomeVideoPaused.value = showHomeVideoSurfaceControls.value;
+  syncHomeVideoTimelineState();
+}
+
+function handleHomeVideoDurationChange(event: Event) {
+  if (event instanceof CustomEvent && typeof event.detail === 'number' && event.detail > 0) {
+    homeVideoDurationMs.value = event.detail * 1000;
+  }
+
+  syncHomeVideoTimelineState();
+}
+
+function handleHomeVideoTimeUpdate(event: Event) {
+  if (
+    event instanceof CustomEvent &&
+    typeof event.detail === 'object' &&
+    event.detail !== null &&
+    'currentTime' in event.detail &&
+    typeof event.detail.currentTime === 'number'
+  ) {
+    homeVideoCurrentTimeMs.value = event.detail.currentTime * 1000;
+    return;
+  }
+
+  syncHomeVideoTimelineState();
+}
+
+function handleHomeVideoEnded() {
+  homeVideoCurrentTimeMs.value = homeVideoDurationMs.value;
 }
 
 async function handleHomeVideoSurfaceClick(event: MouseEvent) {
@@ -789,7 +838,10 @@ function handleHomeVideoFullscreenChange(event: Event) {
 
 function handleHomeVideoVolumeChange() {
   const player = homePlayerElement.value;
-  if (!player || homeVideoMuteSyncToken !== 0) {
+  // Ignore volume-change events that fire before the player has fully initialized.
+  // Vidstack can emit these during its own setup with muted=false, which would
+  // overwrite the persisted muted preference read from localStorage.
+  if (!player || !homePlayerReady || homeVideoMuteSyncToken !== 0) {
     return;
   }
 
@@ -807,7 +859,9 @@ function bindHomePlayerEventListeners(player: MediaPlayerElement | null) {
   }
 
   const handleReady = () => {
+    homePlayerReady = true;
     syncHomeVideoAspectRatio(player);
+    syncHomeVideoTimelineState(player);
     void syncHomeVideoPlayback();
   };
   const handleVolume = () => {
@@ -819,12 +873,24 @@ function bindHomePlayerEventListeners(player: MediaPlayerElement | null) {
   const handlePause = () => {
     handleHomeVideoPause();
   };
+  const handleDuration = (event: Event) => {
+    handleHomeVideoDurationChange(event);
+  };
+  const handleTimeUpdate = (event: Event) => {
+    handleHomeVideoTimeUpdate(event);
+  };
+  const handleEnded = () => {
+    handleHomeVideoEnded();
+  };
 
   player.addEventListener('loaded-metadata', handleReady);
   player.addEventListener('can-play', handleReady);
   player.addEventListener('volume-change', handleVolume);
   player.addEventListener('play', handlePlay);
   player.addEventListener('pause', handlePause);
+  player.addEventListener('duration-change', handleDuration);
+  player.addEventListener('time-update', handleTimeUpdate);
+  player.addEventListener('ended', handleEnded);
 
   removeHomePlayerEventListeners = () => {
     player.removeEventListener('loaded-metadata', handleReady);
@@ -832,6 +898,9 @@ function bindHomePlayerEventListeners(player: MediaPlayerElement | null) {
     player.removeEventListener('volume-change', handleVolume);
     player.removeEventListener('play', handlePlay);
     player.removeEventListener('pause', handlePause);
+    player.removeEventListener('duration-change', handleDuration);
+    player.removeEventListener('time-update', handleTimeUpdate);
+    player.removeEventListener('ended', handleEnded);
   };
 
   if (player.hasAttribute('data-can-play')) {
@@ -901,6 +970,8 @@ watch(
   () => {
     loadedHomeVideoAspectRatio.value = null;
     isHomeVideoPaused.value = false;
+    homeVideoDurationMs.value = props.item.durationMs ?? 0;
+    homeVideoCurrentTimeMs.value = 0;
   }
 );
 
@@ -930,6 +1001,9 @@ watch(
 watch(homePlayerElement, (player) => {
   loadedHomeVideoAspectRatio.value = null;
   isHomeVideoPaused.value = false;
+  homeVideoDurationMs.value = props.item.durationMs ?? 0;
+  homePlayerReady = false;
+  homeVideoCurrentTimeMs.value = 0;
   bindHomePlayerEventListeners(player);
 });
 

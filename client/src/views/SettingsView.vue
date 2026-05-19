@@ -101,38 +101,86 @@
       </div>
     </section>
 
+    <nav
+      class="sticky top-3 z-20 grid w-full grid-cols-5 gap-1.5 rounded-[1.2rem] border border-border bg-[color-mix(in_srgb,var(--bg)_90%,var(--surface)_10%)] p-1.5 shadow-[0_12px_34px_rgba(15,20,25,0.08)] backdrop-blur-[18px] md:hidden"
+      aria-label="Settings sections"
+    >
+      <button
+        @click="currentCategory = 'library'"
+        class="flex min-h-[3.15rem] items-center justify-center rounded-[0.95rem] border-0 bg-transparent p-0 text-muted transition-colors duration-150 cursor-pointer"
+        :class="currentCategory === 'library' ? 'bg-surface-alt text-text' : 'hover:bg-surface-hover hover:text-text'"
+        aria-label="Scan and Library"
+      >
+        <span class="h-[1.55rem] w-[1.55rem]" :class="currentCategory === 'library' ? 'i-fluent-folder-sync-20-filled' : 'i-fluent-folder-sync-20-regular'" aria-hidden="true"></span>
+      </button>
+      <button
+        @click="currentCategory = 'general'"
+        class="flex min-h-[3.15rem] items-center justify-center rounded-[0.95rem] border-0 bg-transparent p-0 text-muted transition-colors duration-150 cursor-pointer"
+        :class="currentCategory === 'general' ? 'bg-surface-alt text-text' : 'hover:bg-surface-hover hover:text-text'"
+        aria-label="General Settings"
+      >
+        <span class="h-[1.55rem] w-[1.55rem]" :class="currentCategory === 'general' ? 'i-fluent-settings-20-filled' : 'i-fluent-settings-20-regular'" aria-hidden="true"></span>
+      </button>
+      <button
+        @click="currentCategory = 'places'"
+        class="flex min-h-[3.15rem] items-center justify-center rounded-[0.95rem] border-0 bg-transparent p-0 text-muted transition-colors duration-150 cursor-pointer"
+        :class="currentCategory === 'places' ? 'bg-surface-alt text-text' : 'hover:bg-surface-hover hover:text-text'"
+        aria-label="Places"
+      >
+        <span class="h-[1.55rem] w-[1.55rem]" :class="currentCategory === 'places' ? 'i-fluent-location-20-filled' : 'i-fluent-location-20-regular'" aria-hidden="true"></span>
+      </button>
+      <button
+        @click="currentCategory = 'access'"
+        class="flex min-h-[3.15rem] items-center justify-center rounded-[0.95rem] border-0 bg-transparent p-0 text-muted transition-colors duration-150 cursor-pointer"
+        :class="currentCategory === 'access' ? 'bg-surface-alt text-text' : 'hover:bg-surface-hover hover:text-text'"
+        aria-label="Security and Access"
+      >
+        <span class="h-[1.55rem] w-[1.55rem]" :class="currentCategory === 'access' ? 'i-fluent-lock-shield-20-filled' : 'i-fluent-lock-shield-20-regular'" aria-hidden="true"></span>
+      </button>
+      <button
+        @click="currentCategory = 'status'"
+        class="flex min-h-[3.15rem] items-center justify-center rounded-[0.95rem] border-0 bg-transparent p-0 text-muted transition-colors duration-150 cursor-pointer"
+        :class="currentCategory === 'status' ? 'bg-surface-alt text-text' : 'hover:bg-surface-hover hover:text-text'"
+        aria-label="System Status"
+      >
+        <span class="h-[1.55rem] w-[1.55rem]" :class="currentCategory === 'status' ? 'i-fluent-data-usage-20-filled' : 'i-fluent-data-usage-20-regular'" aria-hidden="true"></span>
+      </button>
+    </nav>
+
     <div class="flex flex-col md:flex-row gap-8 items-start mt-[0.5rem]">
       <!-- Navigation Sidebar -->
-      <nav class="flex flex-col gap-2 w-full md:w-[16rem] shrink-0 sticky top-[6.5rem]">
+      <nav
+        class="hidden w-full shrink-0 md:flex md:w-[16rem] md:flex-col md:gap-2 md:sticky md:top-[6.5rem]"
+        aria-label="Settings sections"
+      >
         <button
           @click="currentCategory = 'library'"
-          class="flex items-start gap-3 px-4 py-[0.85rem] rounded-[0.85rem] border-0 text-left transition-colors duration-150 cursor-pointer"
+          class="flex items-start gap-3 rounded-[0.85rem] border-0 px-4 py-[0.85rem] text-left text-[1rem] transition-colors duration-150 cursor-pointer"
           :class="currentCategory === 'library' ? 'bg-surface-alt font-bold text-text' : 'bg-transparent text-muted hover:bg-surface-hover hover:text-text'"
         >
-          <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'library' ? 'i-fluent-folder-sync-20-filled' : 'i-fluent-folder-sync-20-regular'" aria-hidden="true"></span>
-          <span class="flex flex-col gap-[0.1rem]">
+          <span class="mt-[0.1rem] h-[1.25rem] w-[1.25rem] shrink-0" :class="currentCategory === 'library' ? 'i-fluent-folder-sync-20-filled' : 'i-fluent-folder-sync-20-regular'" aria-hidden="true"></span>
+          <span class="flex min-w-0 flex-col gap-[0.1rem]">
             <span>Scan & Library</span>
             <span class="text-[0.75rem] font-normal text-muted">Index media, rebuild thumbnails, and maintain the library index</span>
           </span>
         </button>
         <button
           @click="currentCategory = 'general'"
-          class="flex items-start gap-3 px-4 py-[0.85rem] rounded-[0.85rem] border-0 text-left transition-colors duration-150 cursor-pointer"
+          class="flex items-start gap-3 rounded-[0.85rem] border-0 px-4 py-[0.85rem] text-left text-[1rem] transition-colors duration-150 cursor-pointer"
           :class="currentCategory === 'general' ? 'bg-surface-alt font-bold text-text' : 'bg-transparent text-muted hover:bg-surface-hover hover:text-text'"
         >
-          <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'general' ? 'i-fluent-settings-20-filled' : 'i-fluent-settings-20-regular'" aria-hidden="true"></span>
+          <span class="mt-[0.1rem] h-[1.25rem] w-[1.25rem] shrink-0" :class="currentCategory === 'general' ? 'i-fluent-settings-20-filled' : 'i-fluent-settings-20-regular'" aria-hidden="true"></span>
           <span class="flex flex-col gap-[0.1rem] min-w-0">
-
-              <span class="truncate">General Settings</span>
+            <span class="truncate">General Settings</span>
             <span class="text-[0.75rem] font-normal text-muted">Stories mode, excluded folders, and feed defaults</span>
           </span>
         </button>
         <button
           @click="currentCategory = 'places'"
-          class="flex items-start gap-3 px-4 py-[0.85rem] rounded-[0.85rem] border-0 text-left transition-colors duration-150 cursor-pointer"
+          class="flex items-start gap-3 rounded-[0.85rem] border-0 px-4 py-[0.85rem] text-left text-[1rem] transition-colors duration-150 cursor-pointer"
           :class="currentCategory === 'places' ? 'bg-surface-alt font-bold text-text' : 'bg-transparent text-muted hover:bg-surface-hover hover:text-text'"
         >
-          <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'places' ? 'i-fluent-location-20-filled' : 'i-fluent-location-20-regular'" aria-hidden="true"></span>
+          <span class="mt-[0.1rem] h-[1.25rem] w-[1.25rem] shrink-0" :class="currentCategory === 'places' ? 'i-fluent-location-20-filled' : 'i-fluent-location-20-regular'" aria-hidden="true"></span>
           <span class="flex flex-col gap-[0.1rem] min-w-0">
             <span>Places</span>
             <span class="text-[0.75rem] font-normal text-muted">Offline city lookup and place assignment</span>
@@ -140,22 +188,22 @@
         </button>
         <button
           @click="currentCategory = 'access'"
-          class="flex items-start gap-3 px-4 py-[0.85rem] rounded-[0.85rem] border-0 text-left transition-colors duration-150 cursor-pointer"
+          class="flex items-start gap-3 rounded-[0.85rem] border-0 px-4 py-[0.85rem] text-left text-[1rem] transition-colors duration-150 cursor-pointer"
           :class="currentCategory === 'access' ? 'bg-surface-alt font-bold text-text' : 'bg-transparent text-muted hover:bg-surface-hover hover:text-text'"
         >
-          <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'access' ? 'i-fluent-lock-shield-20-filled' : 'i-fluent-lock-shield-20-regular'" aria-hidden="true"></span>
-          <span class="flex flex-col gap-[0.1rem]">
+          <span class="mt-[0.1rem] h-[1.25rem] w-[1.25rem] shrink-0" :class="currentCategory === 'access' ? 'i-fluent-lock-shield-20-filled' : 'i-fluent-lock-shield-20-regular'" aria-hidden="true"></span>
+          <span class="flex flex-col gap-[0.1rem] min-w-0">
             <span>Security & Access</span>
             <span class="text-[0.75rem] font-normal text-muted">Password locks & viewer roles</span>
           </span>
         </button>
         <button
           @click="currentCategory = 'status'"
-          class="flex items-start gap-3 px-4 py-[0.85rem] rounded-[0.85rem] border-0 text-left transition-colors duration-150 cursor-pointer"
+          class="flex items-start gap-3 rounded-[0.85rem] border-0 px-4 py-[0.85rem] text-left text-[1rem] transition-colors duration-150 cursor-pointer"
           :class="currentCategory === 'status' ? 'bg-surface-alt font-bold text-text' : 'bg-transparent text-muted hover:bg-surface-hover hover:text-text'"
         >
-          <span class="w-[1.25rem] h-[1.25rem] shrink-0 mt-[0.1rem]" :class="currentCategory === 'status' ? 'i-fluent-data-usage-20-filled' : 'i-fluent-data-usage-20-regular'" aria-hidden="true"></span>
-          <span class="flex flex-col gap-[0.1rem]">
+          <span class="mt-[0.1rem] h-[1.25rem] w-[1.25rem] shrink-0" :class="currentCategory === 'status' ? 'i-fluent-data-usage-20-filled' : 'i-fluent-data-usage-20-regular'" aria-hidden="true"></span>
+          <span class="flex flex-col gap-[0.1rem] min-w-0">
             <span>System Status</span>
             <span class="text-[0.75rem] font-normal text-muted">Storage overview & scan history</span>
           </span>
@@ -190,23 +238,23 @@
             </div>
 
             <section v-if="!authStore.enabled" class="grid gap-[1rem]">
-              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-                <label class="grid gap-[0.45rem]">
+              <div class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+                <label class="grid min-w-0 gap-[0.45rem]">
                   <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Admin password</span>
                   <input
                     v-model="enablePassword"
-                    class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                    class="h-12 min-w-0 w-full rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
                     type="password"
                     autocomplete="new-password"
                     placeholder="Minimum 8 characters"
                     :disabled="authStore.loading"
                   />
                 </label>
-                <label class="grid gap-[0.45rem]">
+                <label class="grid min-w-0 gap-[0.45rem]">
                   <span class="text-[0.76rem] font-bold uppercase tracking-[0.08em] text-muted">Confirm password</span>
                   <input
                     v-model="enablePasswordConfirmation"
-                    class="h-12 rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
+                    class="h-12 min-w-0 w-full rounded-[0.95rem] border border-border bg-[color-mix(in_srgb,var(--surface-alt)_84%,transparent_16%)] px-4 text-[0.95rem] text-text outline-none transition-[border-color,box-shadow] duration-180 focus:border-[color-mix(in_srgb,var(--accent)_48%,var(--border)_52%)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-soft)_76%,transparent_24%)]"
                     type="password"
                     autocomplete="new-password"
                     placeholder="Repeat the password"
@@ -217,7 +265,7 @@
 
               <div class="flex flex-col md:flex-row items-center gap-4 max-sm:items-stretch">
                 <p class="m-0 flex-1 text-muted">The admin password is stored as a one-way hash and unlocks this browser with a signed session cookie.</p>
-                <button class="btn-primary min-w-[13rem]" type="button" :disabled="authStore.loading" @click="enableAccessProtection">
+                <button class="btn-primary w-full sm:w-auto sm:min-w-[13rem]" type="button" :disabled="authStore.loading" @click="enableAccessProtection">
                   {{ authStore.loading ? 'Enabling...' : 'Enable Admin Password' }}
                 </button>
               </div>
@@ -880,9 +928,9 @@
               {{ placesStore.actionMessage }}
             </p>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <button
-                class="btn-primary min-w-[12rem]"
+                class="btn-primary w-full sm:w-auto sm:min-w-[12rem]"
                 type="button"
                 :disabled="placesStore.preparing"
                 @click="placesStore.prepareGeodata"
@@ -890,7 +938,7 @@
                 {{ placesStore.preparing ? 'Preparing...' : 'Prepare Geodata' }}
               </button>
               <button
-                class="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] border border-border bg-surface-alt px-4 text-[0.9rem] font-semibold text-text transition-colors duration-180 hover:bg-surface-hover disabled:cursor-wait disabled:opacity-60"
+                class="inline-flex min-h-11 w-full items-center justify-center rounded-[0.95rem] border border-border bg-surface-alt px-4 text-center text-[0.9rem] font-semibold text-text transition-colors duration-180 hover:bg-surface-hover disabled:cursor-wait disabled:opacity-60 sm:w-auto"
                 type="button"
                 :disabled="placesStore.rebuilding || !placesStore.status?.prepared"
                 @click="placesStore.rebuildAssignments"

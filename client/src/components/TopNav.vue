@@ -320,8 +320,8 @@ onUnmounted(() => {
     z-index: 30;
     display: block;
     padding:
-      0.5rem max(0.72rem, env(safe-area-inset-right))
-      calc(0.5rem + env(safe-area-inset-bottom))
+      0.22rem max(0.72rem, env(safe-area-inset-right))
+      calc(0.22rem + var(--mobile-safe-area-bottom, 0px))
       max(0.72rem, env(safe-area-inset-left));
     border-top: 1px solid var(--border);
     background: color-mix(in srgb, var(--bg) 92%, var(--surface) 8%);
@@ -340,9 +340,9 @@ onUnmounted(() => {
     z-index: 2;
     display: grid;
     grid-template-columns: 3rem minmax(0, 1fr);
-    gap: 0.4rem;
+    gap: 0.48rem;
     width: min(100%, 42rem);
-    min-height: 3.25rem;
+    min-height: 2.9rem;
     margin: 0 auto;
   }
 
@@ -350,14 +350,14 @@ onUnmounted(() => {
     display: flex;
     min-width: 0;
     align-items: center;
-    justify-content: flex-end;
-    gap: 0.18rem;
+    justify-content: center;
+    gap: 0.34rem;
   }
 
   .mobile-nav__item {
     display: inline-flex;
     width: 2.75rem;
-    height: 3.05rem;
+    height: 2.7rem;
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
@@ -484,11 +484,11 @@ onUnmounted(() => {
   @media (min-width: 360px) {
     .mobile-nav__bar {
       grid-template-columns: 2.8rem minmax(0, 1fr);
-      gap: 0.28rem;
+      gap: 0.38rem;
     }
 
     .mobile-nav__links {
-      gap: 0.12rem;
+      gap: 0.28rem;
     }
 
     .mobile-nav__item {

@@ -7,6 +7,26 @@ import type { FeedItem, RailCapsule, RailViewerStoreContract } from '../types/ap
 import { useAppStore } from '../stores/app';
 import StoriesModal from './StoriesModal.vue';
 
+function createImageItem(id: number): FeedItem {
+  return {
+    id,
+    folderId: 91,
+    folderSlug: 'animal-planet',
+    folderName: 'Animal Planet',
+    folderPath: 'animal-planet',
+    folderBreadcrumb: null,
+    filename: `story-${id}.jpg`,
+    width: 1080,
+    height: 1920,
+    mediaType: 'image',
+    durationMs: null,
+    thumbnailUrl: `/thumbs/${id}.webp`,
+    previewUrl: `/previews/${id}.webp`,
+    sortTimestamp: 1_777_000_000_000 + id,
+    takenAt: 1_777_000_000_000 + id
+  };
+}
+
 function createVideoItem(id: number): FeedItem {
   return {
     id,
@@ -53,6 +73,62 @@ function createStore(capsules: RailCapsule[], imagesByCapsuleId: Record<string, 
       this.currentImages = imagesByCapsuleId[id] ?? [];
       this.currentHasMore = false;
     }
+  });
+}
+
+function readSegmentScaleX(wrapper: ReturnType<typeof mount>) {
+  const style = wrapper.get('.story-stage__progress-fill').attributes('style') ?? '';
+  const match = /scaleX\(([^)]+)\)/.exec(style);
+  return match ? Number(match[1]) : Number.NaN;
+}
+
+function getActiveStage(wrapper: ReturnType<typeof mount>) {
+  return wrapper.get('article.story-stage');
+}
+
+function getActiveStageTitle(wrapper: ReturnType<typeof mount>) {
+  return getActiveStage(wrapper).get('.story-stage__header-main strong').text();
+}
+
+function mockVideoPlaybackState(video: HTMLVideoElement, options: { duration: number; currentTime?: number }) {
+  let currentTime = options.currentTime ?? 0;
+  let duration = options.duration;
+
+  Object.defineProperty(video, 'currentTime', {
+    configurable: true,
+    get: () => currentTime,
+    set: (value: number) => {
+      currentTime = value;
+    }
+  });
+
+  Object.defineProperty(video, 'duration', {
+    configurable: true,
+    get: () => duration
+  });
+
+  return {
+    setCurrentTime(value: number) {
+      currentTime = value;
+    },
+    setDuration(value: number) {
+      duration = value;
+    }
+  };
+}
+
+function mockStoryAnimationFrames(stepMs: number) {
+  let autoplayNow = 0;
+
+  vi.spyOn(performance, 'now').mockImplementation(() => autoplayNow);
+  vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) =>
+    window.setTimeout(() => {
+      autoplayNow += stepMs;
+      callback(autoplayNow);
+    }, 0)
+  );
+  vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((handle: number) => {
+    window.clearTimeout(handle);
   });
 }
 
@@ -180,23 +256,16 @@ describe('StoriesModal', () => {
     await nextButton.trigger('click');
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Second Stories');
-    expect(wrapper.get('video.story-stage__video').attributes('src')).toBe(secondItem.previewUrl);
+    expect(getActiveStageTitle(wrapper)).toBe('Second Stories');
+    expect(getActiveStage(wrapper).get('video.story-stage__video').attributes('src')).toBe(secondItem.previewUrl);
   });
 
-  it('autoplay advances into the next capsule when the current capsule finishes', async () => {
+  it('autoplay advances image stories into the next capsule when the current capsule finishes', async () => {
     vi.useFakeTimers();
+    mockStoryAnimationFrames(5_000);
 
-    let autoplayNow = 0;
-    vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) =>
-      window.setTimeout(() => {
-        autoplayNow += 5_000;
-        callback(autoplayNow);
-      }, 0)
-    );
-
-    const firstItem = createVideoItem(601);
-    const secondItem = createVideoItem(602);
+    const firstItem = createImageItem(601);
+    const secondItem = createImageItem(602);
     const firstCapsule = createCapsule('capsule-autoplay-one', 'Autoplay One', firstItem);
     const secondCapsule = createCapsule('capsule-autoplay-two', 'Autoplay Two', secondItem);
     const store = createStore([firstCapsule, secondCapsule], {
@@ -227,8 +296,128 @@ describe('StoriesModal', () => {
     await vi.runAllTimersAsync();
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Autoplay Two');
-    expect(wrapper.get('video.story-stage__video').attributes('src')).toBe(secondItem.previewUrl);
+    expect(getActiveStageTitle(wrapper)).toBe('Autoplay Two');
+    expect(getActiveStage(wrapper).find('video.story-stage__video').exists()).toBe(false);
+    expect(getActiveStage(wrapper).find('img[data-test="resilient-image"]').exists()).toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it('uses the active video duration for story progress and waits for ended before advancing', async () => {
+    vi.useFakeTimers();
+
+    const firstItem = createVideoItem(611);
+    const secondItem = createVideoItem(612);
+    const firstCapsule = createCapsule('capsule-video-one', 'Video One', firstItem);
+    const secondCapsule = createCapsule('capsule-video-two', 'Video Two', secondItem);
+    const store = createStore([firstCapsule, secondCapsule], {
+      [firstCapsule.id]: [firstItem],
+      [secondCapsule.id]: [secondItem]
+    });
+
+    const wrapper = mount(StoriesModal, {
+      props: {
+        items: [firstCapsule, secondCapsule],
+        initialId: firstCapsule.id,
+        railSingularLabel: 'Story',
+        store
+      },
+      global: {
+        stubs: {
+          Avatar: {
+            template: '<div data-test="avatar" />'
+          },
+          ResilientImage: {
+            template: '<img data-test="resilient-image" />'
+          }
+        }
+      }
+    });
+
+    await flushPromises();
+
+    const video = wrapper.get('video.story-stage__video').element as HTMLVideoElement;
+    const playback = mockVideoPlaybackState(video, {
+      duration: 12,
+      currentTime: 0
+    });
+
+    video.dispatchEvent(new Event('loadedmetadata'));
+    await flushPromises();
+
+    playback.setCurrentTime(6);
+    video.dispatchEvent(new Event('timeupdate'));
+    await flushPromises();
+
+    expect(readSegmentScaleX(wrapper)).toBeCloseTo(0.5, 3);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await flushPromises();
+
+    expect(getActiveStageTitle(wrapper)).toBe('Video One');
+
+    video.dispatchEvent(new Event('ended'));
+    await flushPromises();
+
+    expect(getActiveStageTitle(wrapper)).toBe('Video Two');
+
+    vi.useRealTimers();
+  });
+
+  it('freezes and resumes image-story progress when playback is paused and resumed', async () => {
+    vi.useFakeTimers();
+    mockStoryAnimationFrames(1_000);
+
+    const imageItem = createImageItem(621);
+    const capsule = createCapsule('capsule-pause', 'Pause Stories', imageItem);
+    const store = createStore([capsule], {
+      [capsule.id]: [imageItem]
+    });
+
+    const wrapper = mount(StoriesModal, {
+      props: {
+        items: [capsule],
+        initialId: capsule.id,
+        railSingularLabel: 'Story',
+        store
+      },
+      global: {
+        stubs: {
+          Avatar: {
+            template: '<div data-test="avatar" />'
+          },
+          ResilientImage: {
+            template: '<img data-test="resilient-image" />'
+          }
+        }
+      }
+    });
+
+    await flushPromises();
+    await vi.runOnlyPendingTimersAsync();
+    await flushPromises();
+
+    await vi.runOnlyPendingTimersAsync();
+    await flushPromises();
+
+    const progressBeforePause = readSegmentScaleX(wrapper);
+    expect(progressBeforePause).toBeGreaterThan(0);
+
+    await wrapper.get('button[aria-label="Pause playback"]').trigger('click');
+    await flushPromises();
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await flushPromises();
+
+    expect(readSegmentScaleX(wrapper)).toBeCloseTo(progressBeforePause, 3);
+
+    await wrapper.get('button[aria-label="Resume playback"]').trigger('click');
+    await flushPromises();
+
+    await vi.runOnlyPendingTimersAsync();
+    await flushPromises();
+
+    expect(readSegmentScaleX(wrapper)).toBeGreaterThan(progressBeforePause);
 
     vi.useRealTimers();
   });
