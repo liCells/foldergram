@@ -81,7 +81,6 @@ import ErrorState from '../components/ErrorState.vue';
 import PostViewer from '../components/PostViewer.vue';
 import { useAppStore } from '../stores/app';
 import { useFeedStore } from '../stores/feed';
-import { useLikesStore } from '../stores/likes';
 import { useFoldersStore } from '../stores/folders';
 import { useMomentsStore } from '../stores/moments';
 import { useViewerStore } from '../stores/viewer';
@@ -97,7 +96,6 @@ const emit = defineEmits<{
 
 const appStore = useAppStore();
 const feedStore = useFeedStore();
-const likesStore = useLikesStore();
 const viewerStore = useViewerStore();
 const foldersStore = useFoldersStore();
 const momentsStore = useMomentsStore();
@@ -188,7 +186,6 @@ async function handleDelete() {
     deleteOriginalFromDisk.value = false;
 
     feedStore.removeImage(deleted.id);
-    likesStore.removeImage(deleted.id);
     const mediaType = currentImage.mediaType === 'video' ? 'video' : 'image';
     const removedFolder = foldersStore.removeImage(deleted.id, deleted.folderSlug, mediaType);
     momentsStore.removeImage(deleted.id);

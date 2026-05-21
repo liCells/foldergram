@@ -38,39 +38,6 @@ vi.mock('../views/LibraryView.vue', async () => {
   };
 });
 
-vi.mock('../views/LikesView.vue', async () => {
-  const { defineComponent } = await import('vue');
-
-  return {
-    default: defineComponent({
-      name: 'LikesView',
-      template: '<div data-test="likes-view">likes-view</div>'
-    })
-  };
-});
-
-vi.mock('../views/CollectionsView.vue', async () => {
-  const { defineComponent } = await import('vue');
-
-  return {
-    default: defineComponent({
-      name: 'CollectionsView',
-      template: '<div data-test="collections-view">collections-view</div>'
-    })
-  };
-});
-
-vi.mock('../views/CollectionView.vue', async () => {
-  const { defineComponent } = await import('vue');
-
-  return {
-    default: defineComponent({
-      name: 'CollectionView',
-      template: '<div data-test="collection-view">collection-view</div>'
-    })
-  };
-});
-
 vi.mock('../views/ExploreView.vue', async () => {
   const { defineComponent } = await import('vue');
 
@@ -248,48 +215,5 @@ describe('router', () => {
     expect(router.currentRoute.value.name).toBe('reels');
     expect(router.currentRoute.value.meta.shell).toBe('reels');
     expect(wrapper.get('[data-test="reels-view-route"]').text()).toBe('reels-view-route');
-  });
-
-  it('requires saved-item access for collections routes', async () => {
-    const authStore = useAuthStore(pinia);
-    authStore.$patch({
-      ready: true,
-      capabilities: {
-        canManageLibrary: false,
-        canDeleteMedia: false,
-        canAccessSettings: false,
-        canUseSharedLikes: false,
-        canUseLocalFavorites: false,
-        canUseSharedCollections: false,
-        canUseLocalCollections: false
-      }
-    });
-
-    expect(canAccessRoute(router.resolve('/collections'))).toBe(false);
-    expect(canAccessRoute(router.resolve('/collections/saved'))).toBe(false);
-
-    await router.replace('/collections');
-    await flushPromises();
-    expect(router.currentRoute.value.name).toBe('home');
-
-    authStore.$patch({
-      capabilities: {
-        canManageLibrary: false,
-        canDeleteMedia: false,
-        canAccessSettings: false,
-        canUseSharedLikes: false,
-        canUseLocalFavorites: false,
-        canUseSharedCollections: false,
-        canUseLocalCollections: true
-      }
-    });
-
-    expect(canAccessRoute(router.resolve('/collections'))).toBe(true);
-    expect(canAccessRoute(router.resolve('/collections/saved'))).toBe(true);
-
-    await router.replace('/collections/saved');
-    await flushPromises();
-    expect(router.currentRoute.value.name).toBe('collection');
-    expect(router.currentRoute.value.params.slug).toBe('saved');
   });
 });

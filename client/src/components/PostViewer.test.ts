@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FeedItem, ImageDetail } from '../types/api';
 import { useAppStore } from '../stores/app';
 import { useFoldersStore } from '../stores/folders';
-import { useLikesStore } from '../stores/likes';
 import PostViewer from './PostViewer.vue';
 
 const mockRouterResolve = vi.fn();
@@ -223,18 +222,12 @@ describe('PostViewer', () => {
     }));
   });
 
-  it('uses likes-page neighbors instead of folder neighbors when opened from likes', () => {
-    const appStore = useAppStore();
-    const likesStore = useLikesStore();
-
-    appStore.setImageModalBackground('/likes/posts');
-    likesStore.syncFromItems([createFeedItem(11), createFeedItem(12), createFeedItem(13)], 'shared');
-
+  it('uses folder neighbors when previous and next posts are available', () => {
     const wrapper = mount(PostViewer, {
       props: {
         image: createImageDetail(12, {
-          previousImageId: null,
-          nextImageId: 99
+          previousImageId: 11,
+          nextImageId: 13
         }),
         isModal: true
       },
@@ -269,29 +262,6 @@ describe('PostViewer', () => {
     await coverButton.trigger('click');
 
     expect(setFolderCoverSpy).toHaveBeenCalledWith('animal-planet', 21);
-  });
-
-  it('renders a download-original control beside the open-original action', () => {
-    const wrapper = mount(PostViewer, {
-      props: {
-        image: createImageDetail(18, {
-          previousImageId: null,
-          nextImageId: null
-        }),
-        isModal: true
-      },
-      global: {
-        stubs: globalStubs
-      }
-    });
-
-    const downloadLink = wrapper.get('a[aria-label="Download original file"]');
-    const originalLink = wrapper.get('a[aria-label="Open original file"]');
-
-    expect(downloadLink.attributes('href')).toBe('/api/originals/18?download=1');
-    expect(downloadLink.attributes('title')).toBe('Download original file');
-    expect(originalLink.attributes('href')).toBe('/api/originals/18');
-    expect(originalLink.attributes('title')).toBe('Open original file');
   });
 
   it('toggles video playback from stage clicks and shows the paused indicator', async () => {

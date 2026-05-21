@@ -1,21 +1,5 @@
 <template>
   <div class="reel-action-rail" @click.stop>
-    <button
-      class="reel-action-rail__button"
-      :class="{ 'reel-action-rail__button--liked': isLiked }"
-      type="button"
-      :aria-label="likesStore.toggleAriaLabel(isLiked)"
-      :aria-pressed="isLiked"
-      :disabled="likesStore.isPending(item.id) || !authStore.canUseSavedItems"
-      @click="handleLike"
-    >
-      <span
-        class="reel-action-rail__icon"
-        :class="isLiked ? 'i-fluent-heart-20-filled' : 'i-fluent-heart-20-regular'"
-        aria-hidden="true"
-      />
-    </button>
-
     <div class="reel-action-rail__info-wrap">
       <button
         class="reel-action-rail__button"
@@ -36,16 +20,6 @@
       </div>
     </div>
 
-    <a
-      class="reel-action-rail__button"
-      :href="downloadOriginalMediaUrl"
-      download
-      aria-label="Download original file"
-      title="Download original file"
-    >
-      <span class="reel-action-rail__icon i-fluent-arrow-download-20-regular" aria-hidden="true" />
-    </a>
-
     <RouterLink
       class="reel-action-rail__button"
       :to="{ name: 'folder', params: { slug: item.folderSlug } }"
@@ -57,13 +31,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 
-import { useAuthStore } from '../stores/auth';
-import { useLikesStore } from '../stores/likes';
 import type { FeedItem } from '../types/api';
-import { getOriginalMediaDownloadUrl } from '../utils/original-media';
 
 const props = defineProps<{
   item: FeedItem;
@@ -73,19 +43,6 @@ const props = defineProps<{
 defineEmits<{
   'toggle-info': [];
 }>();
-
-const authStore = useAuthStore();
-const likesStore = useLikesStore();
-const isLiked = computed(() => likesStore.isLiked(props.item.id));
-const downloadOriginalMediaUrl = computed(() => getOriginalMediaDownloadUrl(props.item.id));
-
-async function handleLike() {
-  if (!authStore.canUseSavedItems) {
-    return;
-  }
-
-  await likesStore.toggleLike(props.item);
-}
 </script>
 
 <style scoped>
@@ -134,10 +91,6 @@ async function handleLike() {
 .reel-action-rail__button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
-}
-
-.reel-action-rail__button--liked {
-  color: #ff6b81;
 }
 
 .reel-action-rail__icon {

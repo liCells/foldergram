@@ -344,7 +344,6 @@
   import { useAppStore } from "../stores/app"
   import { useAuthStore } from "../stores/auth"
   import { useFeedStore } from "../stores/feed"
-  import { useLikesStore } from "../stores/likes"
   import { useFoldersStore } from "../stores/folders"
   import { useMomentsStore } from "../stores/moments"
   import type { FolderSummary } from "../types/api"
@@ -359,7 +358,6 @@
   const appStore = useAppStore()
   const authStore = useAuthStore()
   const feedStore = useFeedStore()
-  const likesStore = useLikesStore()
   const foldersStore = useFoldersStore()
   const momentsStore = useMomentsStore()
   const router = useRouter()
@@ -523,7 +521,6 @@
       await Promise.all([
         foldersStore.fetchFolders(true),
         feedStore.loadInitial(true),
-        likesStore.initialize(true),
         momentsStore.fetchMoments(true),
         appStore.fetchStats({ background: true }),
       ])

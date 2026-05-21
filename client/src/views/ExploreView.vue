@@ -342,10 +342,8 @@ import InfiniteLoader from '../components/InfiniteLoader.vue';
 import { useAppStore } from '../stores/app';
 import { useExploreStore } from '../stores/explore';
 import { useFoldersStore } from '../stores/folders';
-import { useLikesStore } from '../stores/likes';
 import type { FolderSummary } from '../types/api';
 import { searchFolders, rankExploreItems } from '../utils/explore';
-import { buildLikedCountByFolder } from '../utils/home-recommendations';
 
 type SearchTab = 'media' | 'folders';
 
@@ -354,7 +352,6 @@ const SEARCH_DEBOUNCE_MS = 180;
 const appStore = useAppStore();
 const exploreStore = useExploreStore();
 const foldersStore = useFoldersStore();
-const likesStore = useLikesStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -367,9 +364,6 @@ const activeSearchTab = ref<SearchTab>(
 
 let searchDebounceTimer: number | null = null;
 
-const likedCountByFolder = computed(() =>
-  buildLikedCountByFolder(likesStore.items)
-);
 const trimmedSearchQuery = computed(() => searchQuery.value.trim());
 const hasActiveQuery = computed(() => trimmedSearchQuery.value.length > 0);
 const recentSearchQueries = computed(() => exploreStore.recentSearchQueries);
@@ -389,7 +383,7 @@ const rankedItems = computed(() =>
   rankExploreItems(
     exploreStore.items,
     foldersStore.items,
-    likedCountByFolder.value,
+    new Map(),
     appStore.recentOpenedFolderSlugs,
     appStore.lastOpenedFolderSlug
   )

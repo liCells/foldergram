@@ -334,7 +334,6 @@ describe('FeedCard', () => {
     await flushPromises();
 
     expect(wrapper.get('button[aria-label="More options"]').attributes('title')).toBe('More options');
-    expect(wrapper.get('button[aria-label="Like post"]').attributes('title')).toBe('Like post');
     expect(wrapper.get('a[aria-label="Open post"]').attributes('title')).toBe('Open post');
     const postRouteLink = wrapper
       .findAll('a[data-to]')
@@ -343,16 +342,6 @@ describe('FeedCard', () => {
     expect(postRouteLink?.attributes('data-to')).toContain('"name":"image"');
     expect(postRouteLink?.attributes('data-to')).toContain('"id":"807"');
     expect(wrapper.get('a[aria-label="Open folder"]').attributes('title')).toBe('Open folder');
-
-    const downloadLink = wrapper.get('a[aria-label="Download original file"]');
-
-    expect(downloadLink.attributes('href')).toBe('/api/originals/807?download=1');
-    expect(downloadLink.attributes('title')).toBe('Download original file');
-
-    const originalLink = wrapper.get('a[aria-label="Open original file"]');
-
-    expect(originalLink.attributes('href')).toBe('/api/originals/807');
-    expect(originalLink.attributes('title')).toBe('Open original file');
   });
 
   it('renders text posts as notes and routes them with content ids', async () => {

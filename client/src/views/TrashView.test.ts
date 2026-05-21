@@ -7,7 +7,6 @@ import type { TrashItem } from '../types/api';
 import { useAppStore } from '../stores/app';
 import { useFeedStore } from '../stores/feed';
 import { useFoldersStore } from '../stores/folders';
-import { useLikesStore } from '../stores/likes';
 import { useMomentsStore } from '../stores/moments';
 import { useTrashStore } from '../stores/trash';
 import TrashView from './TrashView.vue';
@@ -123,7 +122,6 @@ describe('TrashView', () => {
     const trashStore = useTrashStore();
     const foldersStore = useFoldersStore();
     const feedStore = useFeedStore();
-    const likesStore = useLikesStore();
     const momentsStore = useMomentsStore();
     const backgroundRefresh = createDeferred();
     const item = createTrashItem(41);
@@ -169,7 +167,6 @@ describe('TrashView', () => {
     vi.spyOn(trashStore, 'loadInitial').mockResolvedValue(undefined);
     vi.spyOn(foldersStore, 'fetchFolders').mockReturnValue(backgroundRefresh.promise);
     vi.spyOn(feedStore, 'loadInitial').mockReturnValue(backgroundRefresh.promise);
-    vi.spyOn(likesStore, 'initialize').mockReturnValue(backgroundRefresh.promise);
     vi.spyOn(momentsStore, 'fetchMoments').mockReturnValue(backgroundRefresh.promise);
     vi.spyOn(appStore, 'fetchStats').mockReturnValue(backgroundRefresh.promise);
     restoreImageMock.mockResolvedValue({

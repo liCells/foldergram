@@ -180,14 +180,12 @@ import ResilientImage from '../components/ResilientImage.vue';
 import { useAppStore } from '../stores/app';
 import { useFeedStore } from '../stores/feed';
 import { useFoldersStore } from '../stores/folders';
-import { useLikesStore } from '../stores/likes';
 import { useMomentsStore } from '../stores/moments';
 import { useTrashStore } from '../stores/trash';
 
 const appStore = useAppStore();
 const feedStore = useFeedStore();
 const foldersStore = useFoldersStore();
-const likesStore = useLikesStore();
 const momentsStore = useMomentsStore();
 const trashStore = useTrashStore();
 const selectedIds = ref<number[]>([]);
@@ -237,7 +235,6 @@ async function refreshVisibleData() {
   await Promise.all([
     foldersStore.fetchFolders(true),
     feedStore.loadInitial(true),
-    likesStore.initialize(true),
     momentsStore.fetchMoments(true),
     appStore.fetchStats({ background: true })
   ]);

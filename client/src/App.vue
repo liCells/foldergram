@@ -31,9 +31,7 @@ import { canAccessRoute } from './router';
 import PostView from './views/PostView.vue';
 import { useAppStore } from './stores/app';
 import { useAuthStore } from './stores/auth';
-import { useCollectionsStore } from './stores/collections';
 import { useExploreStore } from './stores/explore';
-import { useLikesStore } from './stores/likes';
 import { useFoldersStore } from './stores/folders';
 import { useFeedStore } from './stores/feed';
 import { useMomentsStore } from './stores/moments';
@@ -43,10 +41,8 @@ import { useViewerStore } from './stores/viewer';
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
-const collectionsStore = useCollectionsStore();
 const exploreStore = useExploreStore();
 const feedStore = useFeedStore();
-const likesStore = useLikesStore();
 const foldersStore = useFoldersStore();
 const momentsStore = useMomentsStore();
 const reelsStore = useReelsStore();
@@ -101,8 +97,6 @@ function resetProtectedState() {
   appStore.resetProtectedState();
   feedStore.resetForRebuild();
   foldersStore.resetForRebuild();
-  likesStore.resetForRebuild();
-  collectionsStore.resetForRebuild();
   momentsStore.resetForRebuild();
   reelsStore.reset();
   exploreStore.reset();
@@ -112,14 +106,6 @@ function resetProtectedState() {
 
 async function loadProtectedState(force = false) {
   const tasks: Array<Promise<unknown>> = [appStore.fetchStats(force ? { background: true } : {}), foldersStore.fetchFolders(force)];
-
-  if (authStore.canUseSavedItems) {
-    tasks.push(likesStore.initialize(force));
-    tasks.push(collectionsStore.initialize(force));
-  } else {
-    likesStore.resetForRebuild();
-    collectionsStore.resetForRebuild();
-  }
 
   await Promise.all(tasks);
 }
@@ -190,17 +176,16 @@ watch(
 );
 
 watch(
-  () => [authStore.accessGranted, authStore.likesMode] as const,
-  async ([accessGranted, likesMode], previous) => {
-    const hadAccess = previous?.[0] ?? false;
-    const previousLikesMode = previous?.[1] ?? null;
+  () => authStore.accessGranted,
+  async (accessGranted, previousAccessGranted) => {
+    const hadAccess = previousAccessGranted ?? false;
 
     if (!accessGranted) {
       resetProtectedState();
       return;
     }
 
-    if (!hadAccess || !appStore.stats || likesMode !== previousLikesMode) {
+    if (!hadAccess || !appStore.stats) {
       await loadProtectedState(Boolean(hadAccess));
     }
   },
@@ -215,11 +200,7 @@ watch(
       route.fullPath,
       authStore.ready,
       authStore.capabilities.canAccessSettings,
-      authStore.capabilities.canDeleteMedia,
-      authStore.capabilities.canUseSharedLikes,
-      authStore.capabilities.canUseLocalFavorites,
-      authStore.capabilities.canUseSharedCollections,
-      authStore.capabilities.canUseLocalCollections
+      authStore.capabilities.canDeleteMedia
     ] as const,
   async () => {
     if (!authStore.ready) {

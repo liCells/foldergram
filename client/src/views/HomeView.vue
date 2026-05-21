@@ -237,7 +237,6 @@
 
       <div class="flex items-center justify-between gap-4 text-text text-[0.96rem] font-bold">
         <span>Suggested folders</span>
-        <RouterLink class="text-muted text-[0.76rem] font-bold" :to="{ name: 'likes' }">View {{ likesStore.collectionLabel.toLowerCase() }}</RouterLink>
       </div>
 
       <div class="grid gap-[0.95rem]">
@@ -286,23 +285,20 @@ import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { useFeedStore } from '../stores/feed';
 import { useFolderStoriesStore } from '../stores/folder-stories';
-import { useLikesStore } from '../stores/likes';
 import { useFoldersStore } from '../stores/folders';
 import { useMomentsStore } from '../stores/moments';
 import type { FeedMode } from '../types/api';
-import { buildLikedCountByFolder, selectHomeRecommendations } from '../utils/home-recommendations';
+import { selectHomeRecommendations } from '../utils/home-recommendations';
 import { getInitialScanStats, getScanActionLine, getScanPhaseLabel, getScanSummary } from '../utils/scan-progress';
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const feedStore = useFeedStore();
 const folderStoriesStore = useFolderStoriesStore();
-const likesStore = useLikesStore();
 const foldersStore = useFoldersStore();
 const momentsStore = useMomentsStore();
-const likedCountByFolder = computed(() => buildLikedCountByFolder(likesStore.items));
 const homeRecommendations = computed(() =>
-  selectHomeRecommendations(foldersStore.items, likedCountByFolder.value, appStore.lastOpenedFolderSlug)
+  selectHomeRecommendations(foldersStore.items, new Map(), appStore.lastOpenedFolderSlug)
 );
 const homeSummaryFolder = computed(() => homeRecommendations.value.homeSummaryFolder);
 const recommendedFolders = computed(() => homeRecommendations.value.recommendedFolders);

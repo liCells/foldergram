@@ -3,9 +3,6 @@ import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vu
 import HomeView from '../views/HomeView.vue';
 import PostView from '../views/PostView.vue';
 import LibraryView from '../views/LibraryView.vue';
-import LikesView from '../views/LikesView.vue';
-import CollectionsView from '../views/CollectionsView.vue';
-import CollectionView from '../views/CollectionView.vue';
 import ExploreView from '../views/ExploreView.vue';
 import FolderView from '../views/FolderView.vue';
 import MomentView from '../views/MomentView.vue';
@@ -70,31 +67,6 @@ export const router = createRouter({
       component: ReelsView,
       meta: {
         shell: 'reels'
-      }
-    },
-    {
-      path: '/likes/posts',
-      name: 'likes',
-      component: LikesView,
-      meta: {
-        requiresSavedItems: true
-      }
-    },
-    {
-      path: '/collections',
-      name: 'collections',
-      component: CollectionsView,
-      meta: {
-        requiresSavedItems: true
-      }
-    },
-    {
-      path: '/collections/:slug',
-      name: 'collection',
-      component: CollectionView,
-      props: true,
-      meta: {
-        requiresSavedItems: true
       }
     },
     {

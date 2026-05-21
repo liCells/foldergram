@@ -368,7 +368,7 @@
                     <input v-model="viewerAccessMode" class="mt-[0.2rem]" type="radio" value="password" :disabled="authStore.loading" />
                     <span class="grid gap-[0.15rem]">
                       <span class="text-[0.92rem] font-semibold text-text">Viewer password</span>
-                      <span class="text-[0.84rem] text-muted">Allow a separate viewer login that can browse and use shared likes without seeing admin controls.</span>
+                      <span class="text-[0.84rem] text-muted">Allow a separate viewer login that can browse without seeing admin controls.</span>
                     </span>
                   </label>
                   <label class="flex items-start gap-3 rounded-[0.9rem] border border-border px-4 py-3 cursor-pointer">
@@ -1120,7 +1120,7 @@
     <ConfirmDialog
       v-if="confirmRebuildOpen"
       title="Rebuild the current library index?"
-      message="This will clear the indexed database tables for folders, posts, likes, and scan history, then rescan the active gallery root. Existing thumbnails and previews from the previous index will be reused when they still match the current files, and only missing or changed derivatives will be generated. Original files in the gallery will not be deleted."
+      message="This will clear the indexed database tables for folders, posts, and scan history, then rescan the active gallery root. Existing thumbnails and previews from the previous index will be reused when they still match the current files, and only missing or changed derivatives will be generated. Original files in the gallery will not be deleted."
       confirm-label="Rebuild Library Index"
       loading-label="Rebuilding..."
       :loading="rebuilding"
@@ -1130,7 +1130,7 @@
     <ConfirmDialog
       v-if="confirmThumbnailRebuildOpen"
       title="Regenerate thumbnails only?"
-      message="This will remove generated feed and profile thumbnails plus video poster images, then rebuild them from the current indexed library using each item's current thumbnail path. Previews, likes, scan history, and indexed library records will not be changed. Original files in the gallery will not be deleted."
+      message="This will remove generated feed and profile thumbnails plus video poster images, then rebuild them from the current indexed library using each item's current thumbnail path. Previews, scan history, and indexed library records will not be changed. Original files in the gallery will not be deleted."
       confirm-label="Regenerate Thumbnails"
       loading-label="Regenerating..."
       :loading="rebuildingThumbnails"
@@ -1159,7 +1159,6 @@ import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { useFeedStore } from '../stores/feed';
 import { useFoldersStore } from '../stores/folders';
-import { useLikesStore } from '../stores/likes';
 import { useMomentsStore } from '../stores/moments';
 import { usePlacesStore } from '../stores/places';
 import { useViewerStore } from '../stores/viewer';
@@ -1169,7 +1168,6 @@ const appStore = useAppStore();
 const authStore = useAuthStore();
 const feedStore = useFeedStore();
 const foldersStore = useFoldersStore();
-const likesStore = useLikesStore();
 const momentsStore = useMomentsStore();
 const placesStore = usePlacesStore();
 const viewerStore = useViewerStore();
@@ -1875,7 +1873,7 @@ const viewerAccessSummary = computed(() => {
   }
 
   if (authStore.accessMode === 'password') {
-    return 'Viewers can sign in with the separate viewer password, use shared likes, and browse without admin controls. To replace that password, enter a new one below. The current viewer password is not required.';
+    return 'Viewers can sign in with the separate viewer password and browse without admin controls. To replace that password, enter a new one below. The current viewer password is not required.';
   }
 
   if (authStore.accessMode === 'public') {
@@ -1888,7 +1886,7 @@ const viewerAccessDescription = computed(() => {
   if (viewerAccessMode.value === 'password') {
     return viewerAccessEnabled.value
       ? 'Enter a new viewer password below to rotate it. You do not need the current viewer password.'
-      : 'Viewer logins get shared likes but cannot reach Settings, Trash, or any destructive action.';
+      : 'Viewer logins can browse but cannot reach Settings, Trash, or any destructive action.';
   }
 
   if (viewerAccessMode.value === 'public') {
@@ -2499,7 +2497,6 @@ async function runLibraryRebuild() {
   appStore.markLibraryRebuildStarted();
   feedStore.resetForRebuild();
   foldersStore.resetForRebuild();
-  likesStore.resetForRebuild();
   momentsStore.resetForRebuild();
   viewerStore.reset();
 
@@ -2512,7 +2509,6 @@ async function runLibraryRebuild() {
     await Promise.all([
       foldersStore.fetchFolders(true),
       feedStore.loadInitial(true),
-      likesStore.initialize(true),
       momentsStore.fetchMoments(true)
     ]);
   } catch (error) {
@@ -2542,7 +2538,6 @@ async function runThumbnailRebuild() {
     await Promise.all([
       foldersStore.fetchFolders(true),
       feedStore.loadInitial(true),
-      likesStore.initialize(true),
       momentsStore.fetchMoments(true)
     ]);
   } catch (error) {

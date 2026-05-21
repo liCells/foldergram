@@ -174,81 +174,6 @@
         </a>
       </RouterLink>
 
-      <RouterLink
-        v-if="authStore.canUseSavedItems"
-        custom
-        :to="{ name: 'likes' }"
-        v-slot="{ href, navigate, isActive }"
-      >
-        <a
-          :href="href"
-          class="sidebar__link sidebar-item"
-          :class="isActive ? sidebarActiveClass : ''"
-          @click="navigate"
-        >
-          <span
-            class="sidebar__icon flex-shrink-0 w-[1.58rem] h-[1.58rem]"
-            :class="
-              isActive
-                ? 'i-fluent-heart-20-filled'
-                : 'i-fluent-heart-20-regular'
-            "
-            aria-hidden="true"
-          />
-          <span
-            class="sidebar__label max-w-0 overflow-hidden whitespace-nowrap text-[0.9rem] opacity-0 group-hover:max-w-[12rem] group-hover:opacity-100"
-            style="
-              transition:
-                opacity 0.18s ease,
-                max-width 0.22s ease;
-            "
-            >{{ likesStore.collectionLabel }}</span
-          >
-          <small
-            class="sidebar__badge sidebar__meta ml-auto max-w-0 min-w-[1.5rem] overflow-hidden whitespace-nowrap rounded-full bg-white/12 px-[0.45rem] py-[0.1rem] text-center text-[0.72rem] font-bold text-white/86 opacity-0 group-hover:max-w-[12rem] group-hover:opacity-100"
-            style="
-              transition:
-                opacity 0.18s ease,
-                max-width 0.22s ease;
-            "
-            >{{ likesStore.items.length }}</small
-          >
-        </a>
-      </RouterLink>
-
-      <RouterLink
-        v-if="authStore.canUseSharedCollections || authStore.canUseLocalCollections"
-        custom
-        :to="{ name: 'collections' }"
-        v-slot="{ href, navigate, isActive }"
-      >
-        <a
-          :href="href"
-          class="sidebar__link sidebar-item"
-          :class="isActive || isCollectionsRoute ? sidebarActiveClass : ''"
-          @click="navigate"
-        >
-          <span
-            class="sidebar__icon flex-shrink-0 w-[1.52rem] h-[1.52rem]"
-            :class="
-              isActive || isCollectionsRoute
-                ? 'i-fluent-bookmark-20-filled'
-                : 'i-fluent-bookmark-20-regular'
-            "
-            aria-hidden="true"
-          />
-          <span
-            class="sidebar__label max-w-0 overflow-hidden whitespace-nowrap text-[0.9rem] opacity-0 group-hover:max-w-[12rem] group-hover:opacity-100"
-            style="
-              transition:
-                opacity 0.18s ease,
-                max-width 0.22s ease;
-            "
-            >Collections</span
-          >
-        </a>
-      </RouterLink>
-
       <span
         class="sidebar__section-label sidebar__meta inline-flex min-h-[1rem] items-center self-start mt-7 max-w-0 overflow-hidden whitespace-nowrap px-[0.75rem] text-[0.68rem] leading-[1.2] font-semibold uppercase tracking-[0.12em] text-muted opacity-0 group-hover:max-w-[12rem] group-hover:opacity-100"
         style="
@@ -421,10 +346,8 @@
 
   import { useAppStore } from "../stores/app"
   import { useAuthStore } from "../stores/auth"
-  import { useLikesStore } from "../stores/likes"
   import { useFoldersStore } from "../stores/folders"
   import { usePlacesStore } from "../stores/places"
-  import { buildLikedCountByFolder } from "../utils/home-recommendations"
   import { selectSidebarFolders } from "../utils/sidebar-folders"
   import Avatar from "./Avatar.vue"
   import BrandMark from "./BrandMark.vue"
@@ -432,19 +355,15 @@
   const appVersion = __APP_VERSION__
   const appStore = useAppStore()
   const authStore = useAuthStore()
-  const likesStore = useLikesStore()
   const foldersStore = useFoldersStore()
   const placesStore = usePlacesStore()
   const route = useRoute()
   const moreMenuOpen = ref(false)
 
-  const likedCountByFolder = computed(() =>
-    buildLikedCountByFolder(likesStore.items),
-  )
   const featuredFolders = computed(() =>
     selectSidebarFolders(
       foldersStore.items,
-      likedCountByFolder.value,
+      new Map(),
       appStore.recentOpenedFolderSlugs,
     ),
   )
@@ -456,9 +375,6 @@
   )
   const isPlacesRoute = computed(() =>
     route.name === "places" || route.name === "place",
-  )
-  const isCollectionsRoute = computed(() =>
-    route.name === "collections" || route.name === "collection",
   )
   const signOutLabel = computed(() =>
     authStore.accessMode === "public" ? "Return to public view" : "Sign out",

@@ -55,6 +55,15 @@
       </button>
     </div>
 
+    <div
+      v-if="item.mediaType !== 'text' && sharedDescriptionSummary"
+      class="px-4 pb-[0.8rem]"
+    >
+      <p class="m-0 line-clamp-4 whitespace-pre-wrap text-[0.92rem] leading-6 text-text [text-wrap:pretty]">
+        {{ sharedDescriptionSummary }}
+      </p>
+    </div>
+
     <RouterLink v-if="!isHomeContext" custom :to="imageRoute" v-slot="{ href, navigate }">
       <a
         :href="href"
@@ -226,23 +235,6 @@
     <div class="grid gap-[0.6rem] px-4 pt-[0.7rem] pb-[0.15rem]">
       <div class="flex items-center justify-between gap-[0.65rem]">
         <div class="flex items-center gap-[0.65rem]">
-          <button
-            v-if="authStore.canUseSavedItems && item.mediaType !== 'text'"
-            class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-50 disabled:cursor-wait disabled:transform-none"
-            :class="{ 'text-[#e5484d]': likesStore.isLiked(item.id) }"
-            type="button"
-            :aria-label="likeActionLabel"
-            :aria-pressed="likesStore.isLiked(item.id)"
-            :title="likeActionLabel"
-            :disabled="likesStore.isPending(item.id)"
-            @click="handleLike"
-          >
-            <span
-              class="w-[1.45rem] h-[1.45rem]"
-              :class="likesStore.isLiked(item.id) ? 'i-fluent-heart-20-filled' : 'i-fluent-heart-20-regular'"
-              aria-hidden="true"
-            />
-          </button>
           <RouterLink custom :to="imageRoute" v-slot="{ href, navigate }">
             <a
               :href="href"
@@ -273,62 +265,11 @@
             <span class="i-fluent-folder-16-regular w-[1.30rem] h-[1.30rem]" aria-hidden="true" />
           </RouterLink>
         </div>
-        <div class="flex items-center gap-[0.65rem]">
-          <a
-            v-if="isHomeContext && item.mediaType !== 'text'"
-            class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer color-inherit transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
-            :href="downloadOriginalMediaUrl"
-            download
-            aria-label="Download original file"
-            title="Download original file"
-          >
-            <svg class="w-[1.45rem] h-[1.45rem]" viewBox="0 0 24 24" role="presentation">
-              <path
-                d="M12 4.75v9.5m0 0 3.5-3.5M12 14.25l-3.5-3.5M5.75 16.75v1.5A1.75 1.75 0 0 0 7.5 20h9a1.75 1.75 0 0 0 1.75-1.75v-1.5"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.8"
-              />
-            </svg>
-          </a>
-          <a
-            class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer color-inherit transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
-            :href="originalMediaUrl"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Open original file"
-            title="Open original file"
-          >
-            <svg class="w-[1.45rem] h-[1.45rem]" viewBox="0 0 24 24" role="presentation">
-              <path
-                d="M14 5h5v5m0-5-7.5 7.5M10 7H7.5A2.5 2.5 0 0 0 5 9.5v7A2.5 2.5 0 0 0 7.5 19h7a2.5 2.5 0 0 0 2.5-2.5V14"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.8"
-              />
-            </svg>
-          </a>
-          <CollectionBookmark
-            v-if="item.mediaType !== 'text'"
-            :item="item"
-            placement="feed"
-          />
-        </div>
       </div>
 
       <p v-if="item.mediaType !== 'text'" class="m-0 text-[0.88rem]">
         <strong class="mr-[0.35rem]">{{ item.folderName }}</strong>
         {{ caption }}
-      </p>
-      <p
-        v-if="item.mediaType !== 'text' && sharedDescriptionSummary"
-        class="m-0 text-[0.88rem] leading-6 text-muted whitespace-pre-wrap [text-wrap:pretty]"
-      >
-        {{ sharedDescriptionSummary }}
       </p>
       <p class="m-0 text-muted text-[0.72rem] uppercase tracking-[0.05em]">
         {{ formattedDate }}
@@ -337,23 +278,6 @@
 
     <div v-if="menuOpen" class="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/48" @click.self="menuOpen = false">
       <div class="w-[min(100%,22rem)] overflow-hidden bg-surface border border-border rounded-[1rem] shadow-[var(--shadow)]">
-        <button
-          class="flex items-center gap-[0.8rem] w-full px-4 py-[0.95rem] border-0 border-b border-border text-text bg-transparent cursor-pointer text-left"
-          type="button"
-          @click="openOriginal"
-        >
-          <svg class="w-[1.15rem] h-[1.15rem] shrink-0" viewBox="0 0 24 24" role="presentation">
-            <path
-              d="M14 5h5v5m0-5-7.5 7.5M10 7H7.5A2.5 2.5 0 0 0 5 9.5v7A2.5 2.5 0 0 0 7.5 19h7a2.5 2.5 0 0 0 2.5-2.5V14"
-              fill="none"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.8"
-            />
-          </svg>
-          <span>Open original</span>
-        </button>
         <button
           v-if="authStore.canDeleteMedia && item.mediaType !== 'text'"
           class="flex items-center gap-[0.8rem] w-full px-4 py-[0.95rem] border-0 border-b border-border text-[#d93025] bg-transparent cursor-pointer text-left disabled:opacity-70 disabled:cursor-wait"
@@ -444,14 +368,11 @@ import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { useFeedStore } from '../stores/feed';
 import { useFoldersStore } from '../stores/folders';
-import { useLikesStore } from '../stores/likes';
 import { useMomentsStore } from '../stores/moments';
 import type { FeedItem } from '../types/api';
 import { formatMediaDuration, formatVideoTimestamp } from '../utils/media';
 import { resolveFeedAspectRatio } from '../utils/media-layout';
-import { getOriginalMediaDownloadUrl, getOriginalMediaUrl } from '../utils/original-media';
 import Avatar from './Avatar.vue';
-import CollectionBookmark from './CollectionBookmark.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ResilientImage from './ResilientImage.vue';
 import VideoProgressFooter from './VideoProgressFooter.vue';
@@ -488,7 +409,6 @@ const emit = defineEmits<{
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const feedStore = useFeedStore();
-const likesStore = useLikesStore();
 const foldersStore = useFoldersStore();
 const momentsStore = useMomentsStore();
 const route = useRoute();
@@ -523,7 +443,6 @@ const showHomeStoryAvatar = computed(() => isHomeContext.value && props.hasAvata
 const shouldOpenPostInModal = computed(() => props.context !== 'home');
 const folderStoriesLabel = computed(() => `Open ${props.item.folderName} stories`);
 const folderAvatarLabel = computed(() => `Open ${props.item.folderName}`);
-const likeActionLabel = computed(() => likesStore.toggleAriaLabel(likesStore.isLiked(props.item.id)));
 const openMediaLabel = computed(() => {
   if (props.item.mediaType === 'video') {
     return 'Open reel';
@@ -559,8 +478,6 @@ const formattedDuration = computed(() => formatMediaDuration(props.item.duration
 const mediaAspectRatio = computed(() => resolveFeedAspectRatio(props.item.width, props.item.height));
 const homeVideoAspectRatio = computed(() => loadedHomeVideoAspectRatio.value ?? mediaAspectRatio.value);
 const homeImageSrc = computed(() => (props.item.isAnimated ? props.item.previewUrl : props.item.thumbnailUrl));
-const originalMediaUrl = computed(() => getOriginalMediaUrl(props.item.contentId ?? props.item.id));
-const downloadOriginalMediaUrl = computed(() => getOriginalMediaDownloadUrl(props.item.contentId ?? props.item.id));
 const homeVideoSource = computed<PlayerSrc>(() => ({
   src: props.item.previewUrl,
   type: 'video/mp4'
@@ -608,14 +525,6 @@ function queueHomeImageTapReset() {
   }, HOME_IMAGE_DOUBLE_TAP_WINDOW_MS);
 }
 
-async function likeFromMedia() {
-  if (!authStore.canUseSavedItems || likesStore.isLiked(props.item.id) || likesStore.isPending(props.item.id)) {
-    return;
-  }
-
-  await likesStore.toggleLike(props.item);
-}
-
 function triggerHeartBurst() {
   const el = heartBurstEl.value;
   if (!el) return;
@@ -649,8 +558,6 @@ function handleHomeImageClick(event: MouseEvent) {
   if (lastHomeImageTapAt.value > 0 && now - lastHomeImageTapAt.value <= HOME_IMAGE_DOUBLE_TAP_WINDOW_MS) {
     lastHomeImageTapAt.value = 0;
     clearHomeImageTapResetTimer();
-    triggerHeartBurst();
-    void likeFromMedia();
     return;
   }
 
@@ -962,11 +869,6 @@ function bindHomePlayerEventListeners(player: MediaPlayerElement | null) {
   }
 }
 
-function openOriginal() {
-  menuOpen.value = false;
-  window.open(getOriginalMediaUrl(props.item.id), '_blank', 'noopener,noreferrer');
-}
-
 function handleDelete() {
   if (!authStore.canDeleteMedia) {
     return;
@@ -976,14 +878,6 @@ function handleDelete() {
   deleteOriginalFromDisk.value = false;
   deleteError.value = null;
   confirmDeleteOpen.value = true;
-}
-
-async function handleLike() {
-  if (!authStore.canUseSavedItems) {
-    return;
-  }
-
-  await likesStore.toggleLike(props.item);
 }
 
 async function confirmDelete() {
@@ -997,7 +891,6 @@ async function confirmDelete() {
   try {
     const deleted = deleteOriginalFromDisk.value ? await deleteImage(props.item.id) : await trashImage(props.item.id);
     feedStore.removeImage(deleted.id);
-    likesStore.removeImage(deleted.id);
     const mediaType = props.item.mediaType === 'video' ? 'video' : 'image';
     const removedFolder = foldersStore.removeImage(deleted.id, deleted.folderSlug, mediaType);
     momentsStore.removeImage(deleted.id);

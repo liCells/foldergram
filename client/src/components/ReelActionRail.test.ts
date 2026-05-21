@@ -3,8 +3,6 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 
-import { useAuthStore } from '../stores/auth';
-import { useLikesStore } from '../stores/likes';
 import type { FeedItem } from '../types/api';
 import ReelActionRail from './ReelActionRail.vue';
 
@@ -31,24 +29,9 @@ function createFeedItem(id: number): FeedItem {
 describe('ReelActionRail', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-
-    const authStore = useAuthStore();
-    authStore.$patch({
-      likesMode: 'local',
-      capabilities: {
-        canManageLibrary: false,
-        canDeleteMedia: false,
-        canAccessSettings: false,
-        canUseSharedLikes: false,
-        canUseLocalFavorites: true
-      }
-    });
-
-    window.localStorage.clear();
   });
 
-  it('does not bubble like clicks to a parent container', async () => {
-    const likesStore = useLikesStore();
+  it('does not bubble the info toggle click to a parent container', async () => {
     const item = createFeedItem(15);
 
     const TestHost = defineComponent({
@@ -81,14 +64,13 @@ describe('ReelActionRail', () => {
       }
     });
 
-    await wrapper.get('button[aria-label="Like post"]').trigger('click');
+    await wrapper.get('button[aria-label="Show reel details"]').trigger('click');
     await flushPromises();
 
     expect(wrapper.get('[data-test="parent-count"]').text()).toBe('0');
-    expect(likesStore.isLiked(item.id)).toBe(true);
   });
 
-  it('renders the download control between the info toggle and folder link', () => {
+  it('renders the info toggle beside the folder link', () => {
     const item = createFeedItem(22);
 
     const wrapper = mount(ReelActionRail, {
@@ -107,14 +89,8 @@ describe('ReelActionRail', () => {
 
     const controls = wrapper.findAll('.reel-action-rail > *');
 
-    expect(controls).toHaveLength(4);
-    expect(controls[1]?.find('button[aria-label="Show reel details"]').exists()).toBe(true);
-
-    const downloadLink = controls[2];
-
-    expect(downloadLink?.attributes('aria-label')).toBe('Download original file');
-    expect(downloadLink?.attributes('href')).toBe('/api/originals/22?download=1');
-    expect(downloadLink?.attributes('title')).toBe('Download original file');
-    expect(controls[3]?.attributes('data-test')).toBe('folder-link');
+    expect(controls).toHaveLength(2);
+    expect(controls[0]?.find('button[aria-label="Show reel details"]').exists()).toBe(true);
+    expect(controls[1]?.attributes('data-test')).toBe('folder-link');
   });
 });

@@ -368,7 +368,10 @@
           <div
             v-if="summaryHtml"
             class="viewer__sidebar-copy"
-            :class="{ 'viewer__sidebar-copy--collapsed': !summaryExpanded }"
+            :class="{
+              'viewer__sidebar-copy--collapsed': !summaryExpanded,
+              'viewer__sidebar-copy--expanded': summaryExpanded
+            }"
             v-html="summaryHtml"
           />
           <button
@@ -463,37 +466,8 @@
 
         <!-- Actions -->
         <div
-          class="viewer__sidebar-actions flex items-center justify-between gap-3 px-5 pt-[0.7rem] pb-5 mt-auto"
+          class="viewer__sidebar-actions flex items-center justify-end gap-3 px-5 pt-[0.7rem] pb-5 mt-auto"
         >
-          <div class="viewer__sidebar-actions-group flex items-center gap-[0.55rem]">
-            <!-- Like -->
-            <button
-              v-if="authStore.canUseSavedItems && image.mediaType !== 'text'"
-              class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer transition-[opacity,transform,color] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
-              :class="{ 'text-[#e5484d]': likesStore.isLiked(image.id) }"
-              type="button"
-              :aria-label="likesStore.toggleAriaLabel(likesStore.isLiked(image.id))"
-              :aria-pressed="likesStore.isLiked(image.id)"
-              :disabled="likesStore.isPending(image.id)"
-              @click="likesStore.toggleLike(image)"
-            >
-              <span
-                class="w-[1.55rem] h-[1.55rem]"
-                :class="
-                  likesStore.isLiked(image.id)
-                    ? 'i-fluent-heart-20-filled'
-                    : 'i-fluent-heart-20-regular'
-                "
-                aria-hidden="true"
-              />
-            </button>
-            <CollectionBookmark
-              v-if="image.mediaType !== 'text'"
-              :item="image"
-              placement="viewer"
-            />
-          </div>
-
           <div class="viewer__sidebar-actions-group flex items-center gap-[0.55rem]">
             <!-- Set as cover -->
             <button
@@ -507,69 +481,6 @@
             >
               <span :class="[isCurrentCover ? 'i-fluent-folder-add-20-filled text-accent' : 'i-fluent-folder-add-20-regular', 'w-[1.5rem] h-[1.5rem]']" aria-hidden="true" />
             </button>
-            <!-- Download original -->
-            <a
-              class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-text transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
-              :href="downloadOriginalMediaUrl"
-              download
-              aria-label="Download original file"
-              title="Download original file"
-            >
-              <svg
-                class="w-[1.55rem] h-[1.55rem]"
-                viewBox="0 0 24 24"
-                role="presentation"
-              >
-                <path
-                  d="M12 4.75v9.5m0 0 3.5-3.5M12 14.25l-3.5-3.5M5.75 16.75v1.5A1.75 1.75 0 0 0 7.5 20h9a1.75 1.75 0 0 0 1.75-1.75v-1.5"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1.4"
-                />
-              </svg>
-            </a>
-            <!-- Open original -->
-            <a
-              class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-text transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
-              :href="originalMediaUrl"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Open original file"
-              title="Open original file"
-            >
-              <svg
-                class="w-[1.55rem] h-[1.55rem]"
-                viewBox="0 0 24 24"
-                role="presentation"
-              >
-                <path
-                  d="M11 7H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-5"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1"
-                />
-                <path
-                  d="M10 14L20 4"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1"
-                />
-                <path
-                  d="M15 4h5v5"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1"
-                />
-              </svg>
-            </a>
             <!-- Delete -->
             <button
               v-if="authStore.canDeleteMedia && image.mediaType !== 'text'"
@@ -613,11 +524,8 @@
   import type { ImageDetail, FolderSummary } from "../types/api"
   import { useAppStore } from "../stores/app"
   import { useAuthStore } from "../stores/auth"
-  import { useLikesStore } from "../stores/likes"
   import { useFoldersStore } from "../stores/folders"
-  import { getOriginalMediaDownloadUrl, getOriginalMediaUrl } from "../utils/original-media"
   import Avatar from "./Avatar.vue"
-  import CollectionBookmark from "./CollectionBookmark.vue"
   import ResilientImage from "./ResilientImage.vue"
   import VideoProgressFooter from "./VideoProgressFooter.vue"
   import { formatMediaDuration, formatVideoTimestamp, videoPreviewWouldDownscale } from "../utils/media"
@@ -634,7 +542,6 @@
     delete: []
   }>()
 
-  const likesStore = useLikesStore()
   const appStore = useAppStore()
   const authStore = useAuthStore()
   const foldersStore = useFoldersStore()
@@ -660,8 +567,6 @@
 
   const WHEEL_NAVIGATION_THRESHOLD = 72
   const NAVIGATION_COOLDOWN_MS = 320
-  const originalMediaUrl = computed(() => (props.image ? getOriginalMediaUrl(props.image.contentId ?? props.image.id) : ""))
-  const downloadOriginalMediaUrl = computed(() => (props.image ? getOriginalMediaDownloadUrl(props.image.contentId ?? props.image.id) : ""))
   const MODAL_SIDEBAR_COLLAPSE_BREAKPOINT = 960
   const SHEET_SWIPE_MIN_DISTANCE = 56
   const SHEET_SWIPE_MAX_HORIZONTAL_DISTANCE = 96
@@ -914,35 +819,11 @@
   const isModalSidebarCollapsible = computed(
     () => props.isModal === true && isSidebarCollapsible.value,
   )
-  const isLikesNavigationContext = computed(() => {
-    if (props.isModal !== true || !appStore.imageModalBackgroundPath) {
-      return false
-    }
-
-    return router.resolve(appStore.imageModalBackgroundPath).name === "likes"
-  })
-  const likesNavigationIds = computed(() => {
-    if (!props.image || !isLikesNavigationContext.value) {
-      return null
-    }
-
-    const currentIndex = likesStore.items.findIndex(
-      item => item.id === props.image?.id,
-    )
-    if (currentIndex === -1) {
-      return null
-    }
-
-    return {
-      previousImageId: likesStore.items[currentIndex - 1]?.id ?? null,
-      nextImageId: likesStore.items[currentIndex + 1]?.id ?? null,
-    }
-  })
   const previousNavigationImageId = computed(
-    () => likesNavigationIds.value?.previousImageId ?? props.image?.previousImageId ?? null,
+    () => props.image?.previousImageId ?? null,
   )
   const nextNavigationImageId = computed(
-    () => likesNavigationIds.value?.nextImageId ?? props.image?.nextImageId ?? null,
+    () => props.image?.nextImageId ?? null,
   )
   const isModalSidebarOverlayVisible = computed(
     () => isModalSidebarCollapsible.value && isSidebarExpanded.value,
@@ -1834,6 +1715,8 @@
 
 .viewer__sidebar-copy {
   font-size: 0.92rem;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .viewer__text-content--collapsed,
@@ -1849,6 +1732,13 @@
 
 .viewer__sidebar-copy--collapsed {
   -webkit-line-clamp: 6;
+}
+
+.viewer__sidebar-copy--expanded {
+  max-height: min(20rem, 42vh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.35rem;
 }
 
 .viewer__text-toggle {

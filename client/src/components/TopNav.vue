@@ -65,35 +65,6 @@
           </a>
         </RouterLink>
 
-        <RouterLink v-if="authStore.canUseSavedItems" custom :to="{ name: 'likes' }" v-slot="{ href, navigate, isActive }">
-          <a
-            :href="href"
-            class="mobile-nav__item mobile-nav__item--likes"
-            :class="isActive ? mobileNavActiveClass : ''"
-            :aria-label="`${likesStore.collectionLabel} (${likesStore.items.length})`"
-            @click="handleNavNavigate($event, navigate)"
-          >
-            <span class="mobile-nav__icon" :class="isActive ? 'i-fluent-heart-20-filled' : 'i-fluent-heart-20-regular'" aria-hidden="true" />
-          </a>
-        </RouterLink>
-
-        <RouterLink
-          v-if="authStore.canUseSharedCollections || authStore.canUseLocalCollections"
-          custom
-          :to="{ name: 'collections' }"
-          v-slot="{ href, navigate, isActive }"
-        >
-          <a
-            :href="href"
-            class="mobile-nav__item mobile-nav__item--collections"
-            :class="isActive || isCollectionsRoute ? mobileNavActiveClass : ''"
-            aria-label="Collections"
-            @click="handleNavNavigate($event, navigate)"
-          >
-            <span class="mobile-nav__icon" :class="isActive || isCollectionsRoute ? 'i-fluent-bookmark-20-filled' : 'i-fluent-bookmark-20-regular'" aria-hidden="true" />
-          </a>
-        </RouterLink>
-
         <div class="mobile-nav__more">
           <button
             class="mobile-nav__item mobile-nav__more-button"
@@ -109,37 +80,6 @@
           </button>
 
           <div v-if="moreMenuOpen" class="mobile-nav__menu">
-            <RouterLink v-if="authStore.canUseSavedItems" custom :to="{ name: 'likes' }" v-slot="{ href, navigate, isActive }">
-              <a
-                :href="href"
-                class="mobile-nav__menu-item mobile-nav__menu-item--likes"
-                :class="isActive ? menuItemActiveClass : ''"
-                @click="handleNavNavigate($event, navigate)"
-              >
-                <span class="mobile-nav__menu-icon" :class="isActive ? 'i-fluent-heart-20-filled' : 'i-fluent-heart-20-regular'" aria-hidden="true" />
-                <span>{{ likesStore.collectionLabel }}</span>
-                <small class="mobile-nav__menu-badge">{{ likesStore.items.length }}</small>
-              </a>
-            </RouterLink>
-
-            <RouterLink
-              v-if="authStore.canUseSharedCollections || authStore.canUseLocalCollections"
-              custom
-              :to="{ name: 'collections' }"
-              v-slot="{ href, navigate, isActive }"
-            >
-              <a
-                :href="href"
-                class="mobile-nav__menu-item mobile-nav__menu-item--collections"
-                :class="isActive || isCollectionsRoute ? menuItemActiveClass : ''"
-                @click="handleNavNavigate($event, navigate)"
-              >
-                <span class="mobile-nav__menu-icon" :class="isActive || isCollectionsRoute ? 'i-fluent-bookmark-20-filled' : 'i-fluent-bookmark-20-regular'" aria-hidden="true" />
-                <span>Collections</span>
-                <small class="mobile-nav__menu-badge">{{ collectionsStore.defaultCollection?.itemCount ?? 0 }}</small>
-              </a>
-            </RouterLink>
-
             <RouterLink
               v-if="authStore.canDeleteMedia"
               class="mobile-nav__menu-item"
@@ -219,15 +159,11 @@ import { RouterLink, useRoute } from 'vue-router';
 
 import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
-import { useCollectionsStore } from '../stores/collections';
-import { useLikesStore } from '../stores/likes';
 import { usePlacesStore } from '../stores/places';
 import BrandMark from './BrandMark.vue';
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
-const collectionsStore = useCollectionsStore();
-const likesStore = useLikesStore();
 const placesStore = usePlacesStore();
 const route = useRoute();
 const moreMenuOpen = ref(false);
@@ -235,15 +171,11 @@ const themeLabel = computed(() => (appStore.theme === 'light' ? 'Switch to dark 
 const signOutLabel = computed(() => (authStore.accessMode === 'public' ? 'Return to public view' : 'Sign out'));
 const showPlacesNav = computed(() => placesStore.items.length > 0 && placesStore.listError === null);
 const isPlacesRoute = computed(() => route.name === 'places' || route.name === 'place');
-const isLikesRoute = computed(() => route.name === 'likes');
-const isCollectionsRoute = computed(() => route.name === 'collections' || route.name === 'collection');
-const isStaticMoreRoute = computed(() => route.name === 'trash' || route.name === 'settings' || isCollectionsRoute.value);
+const isStaticMoreRoute = computed(() => route.name === 'trash' || route.name === 'settings');
 const mobileNavActiveClass = 'mobile-nav__item--active';
 const menuItemActiveClass = 'mobile-nav__menu-item--active';
 const moreButtonClasses = computed(() => ({
-  [mobileNavActiveClass]: moreMenuOpen.value || isStaticMoreRoute.value || isLikesRoute.value,
-  'mobile-nav__more-button--likes-active': isLikesRoute.value,
-  'mobile-nav__more-button--collections-active': isCollectionsRoute.value
+  [mobileNavActiveClass]: moreMenuOpen.value || isStaticMoreRoute.value
 }));
 
 function closeMoreMenu() {
