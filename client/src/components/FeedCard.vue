@@ -324,6 +324,12 @@
         <strong class="mr-[0.35rem]">{{ item.folderName }}</strong>
         {{ caption }}
       </p>
+      <p
+        v-if="item.mediaType !== 'text' && sharedDescriptionSummary"
+        class="m-0 text-[0.88rem] leading-6 text-muted whitespace-pre-wrap [text-wrap:pretty]"
+      >
+        {{ sharedDescriptionSummary }}
+      </p>
       <p class="m-0 text-muted text-[0.72rem] uppercase tracking-[0.05em]">
         {{ formattedDate }}
       </p>
@@ -533,6 +539,14 @@ const caption = computed(() =>
       .replace(/[_-]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
+);
+const sharedDescriptionSummary = computed(() =>
+  props.item.mediaType === 'text'
+    ? ''
+    : (props.item.sharedDescription ?? '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 180)
 );
 const formattedDate = computed(() =>
   new Date(props.item.takenAt ?? props.item.sortTimestamp).toLocaleDateString(undefined, {

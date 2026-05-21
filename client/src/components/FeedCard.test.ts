@@ -378,4 +378,25 @@ describe('FeedCard', () => {
     expect(wrapper.text()).toContain('Observed red pandas before sunrise');
     expect(wrapper.text()).not.toContain('note-901.md');
   });
+
+  it('renders shared descriptions for media posts when present', async () => {
+    const wrapper = mount(FeedCard, {
+      props: {
+        item: {
+          ...createImageItem(902),
+          sharedDescription: 'A longer shared description for the media in this folder.'
+        },
+        avatarUrl: null,
+        context: 'default',
+        isActiveVideo: false
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('A longer shared description for the media in this folder.');
+  });
 });

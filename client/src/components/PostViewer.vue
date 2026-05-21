@@ -1823,6 +1823,8 @@
   color: var(--text);
   white-space: normal;
   line-height: 1.7;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .viewer__text-content {
@@ -1864,8 +1866,12 @@
 }
 
 .viewer__text-content :deep(p),
-.viewer__sidebar-copy :deep(p) {
+.viewer__text-content :deep(li),
+.viewer__sidebar-copy :deep(p),
+.viewer__sidebar-copy :deep(li) {
   margin: 0 0 0.95rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .viewer__text-content :deep(p:last-child),
@@ -1883,6 +1889,8 @@
   color: var(--text);
   line-height: 1.25;
   letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .viewer__text-content :deep(code),
@@ -1891,13 +1899,18 @@
   border-radius: 0.35rem;
   background: rgba(88, 68, 39, 0.08);
   font-size: 0.9em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .viewer__text-content :deep(pre),
 .viewer__sidebar-copy :deep(pre) {
+  max-width: 100%;
   overflow: auto;
   padding: 0.95rem;
   border-radius: 0.85rem;
   background: rgba(88, 68, 39, 0.08);
+  box-sizing: border-box;
 }
 </style>
