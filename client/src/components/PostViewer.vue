@@ -119,6 +119,7 @@
     >
       <!-- Media -->
       <div
+        v-if="image.mediaType === 'text'"
         :class="[
           'viewer__media',
           {
@@ -132,142 +133,7 @@
         @pointermove="handleMediaPointermove"
         @pointerup="handleMediaPointerup"
       >
-        <template v-if="image.mediaType === 'video'">
-          <div
-            class="viewer__media-shell viewer__media-shell--video viewer__media-shell--video-interactive"
-            :style="mediaShellStyle"
-            aria-label="Toggle playback"
-            role="button"
-            tabindex="0"
-            @click="handleVideoSurfaceClick"
-            @keydown="handleVideoSurfaceKeydown"
-          >
-            <media-player
-              ref="playerElement"
-              class="viewer__player"
-              :src.prop="videoSource"
-              :title.prop="image.filename"
-              :fullscreenOrientation.prop="'none'"
-              :playsInline.prop="true"
-              :muted.prop="appStore.videoMuted"
-              :loop.prop="true"
-              load="eager"
-              preload="metadata"
-              >
-                <media-provider />
-              <media-poster
-                class="viewer__player-poster"
-                :src.prop="image.thumbnailUrl"
-                :alt.prop="image.filename"
-              />
-              <VideoProgressFooter
-                variant="viewer"
-                :time-label="videoTimeLabel"
-                data-swipe-ignore="true"
-              >
-                <template #leading>
-                  <div class="viewer__player-controls-group">
-                    <media-play-button
-                      class="viewer__player-control"
-                      aria-label="Toggle playback"
-                    >
-                      <span
-                        class="viewer__player-control-icon viewer__player-play-icon viewer__player-play-icon--play i-fluent-play-16-filled"
-                        aria-hidden="true"
-                      />
-                      <span
-                        class="viewer__player-control-icon viewer__player-play-icon viewer__player-play-icon--pause i-fluent-pause-16-filled"
-                        aria-hidden="true"
-                      />
-                    </media-play-button>
-                  </div>
-                </template>
-                <template #trailing>
-                  <div class="viewer__player-controls-group">
-                    <media-mute-button
-                      class="viewer__player-control"
-                      aria-label="Toggle sound"
-                    >
-                      <span
-                        class="viewer__player-control-icon viewer__player-mute-icon viewer__player-mute-icon--on i-fluent-speaker-2-16-regular"
-                        aria-hidden="true"
-                      />
-                      <span
-                        class="viewer__player-control-icon viewer__player-mute-icon viewer__player-mute-icon--off i-fluent-speaker-mute-16-regular"
-                        aria-hidden="true"
-                      />
-                    </media-mute-button>
-                    <button
-                      v-if="showHdButton"
-                      class="viewer__player-control"
-                      :class="{ 'viewer__player-control--active': isPlayingHd }"
-                      type="button"
-                      :aria-label="
-                        isPlayingHd
-                          ? 'Switch to preview quality'
-                          : 'Switch to HD original'
-                      "
-                      :aria-pressed="isPlayingHd"
-                      :title="isPlayingHd ? 'Preview quality' : 'HD original'"
-                      @click.stop="toggleHdSource"
-                    >
-                      <span
-                        class="viewer__player-control-icon"
-                        :class="
-                          isPlayingHd
-                            ? 'i-fluent-hd-16-filled'
-                            : 'i-fluent-hd-16-regular'
-                        "
-                        aria-hidden="true"
-                      />
-                    </button>
-                    <media-fullscreen-button
-                      class="viewer__player-control"
-                      aria-label="Toggle fullscreen"
-                      target="media"
-                    >
-                      <span
-                        class="viewer__player-control-icon viewer__player-fullscreen-icon viewer__player-fullscreen-icon--enter i-fluent-full-screen-maximize-16-regular"
-                        aria-hidden="true"
-                      />
-                      <span
-                        class="viewer__player-control-icon viewer__player-fullscreen-icon viewer__player-fullscreen-icon--exit i-fluent-full-screen-minimize-16-regular"
-                        aria-hidden="true"
-                      />
-                    </media-fullscreen-button>
-                  </div>
-                </template>
-              </VideoProgressFooter>
-            </media-player>
-            <div
-              v-if="showVideoPausedIndicator"
-              class="viewer__pause-indicator"
-              aria-hidden="true"
-            >
-              <span class="viewer__pause-icon i-fluent-play-20-filled" />
-            </div>
-          </div>
-        </template>
-        <div
-          v-else-if="image.mediaType === 'image'"
-          class="viewer__media-shell viewer__media-shell--image"
-          :style="mediaShellStyle"
-        >
-          <ResilientImage
-            class="viewer__media-image"
-            :src="image.previewUrl"
-            :fallback-src="image.originalUrl"
-            :alt="image.filename"
-            :width="image.width"
-            :height="image.height"
-            loading="eager"
-            :retry-while="appStore.isScanning"
-          />
-        </div>
-        <div
-          v-else
-          class="viewer__media-shell viewer__media-shell--text"
-        >
+        <div class="viewer__media-shell viewer__media-shell--text">
           <article class="viewer__text-card">
             <div
               class="viewer__text-content prose"
@@ -321,189 +187,289 @@
           aria-hidden="true"
         />
 
-        <!-- Header -->
-        <div
-          class="viewer__sidebar-header flex items-center justify-between gap-4 border-b border-border px-5 pt-[1.1rem] pb-4"
-        >
-          <RouterLink
-            class="viewer__sidebar-folder-link flex items-center gap-[0.85rem] min-w-0"
-            :to="{ name: 'folder', params: { slug: image.folderSlug } }"
-            aria-label="Open folder"
+        <div class="viewer__sidebar-flow">
+          <!-- Header -->
+          <div
+            class="viewer__sidebar-header flex items-center justify-between gap-4 border-b border-border px-5 pt-[1.1rem] pb-4"
           >
-            <Avatar
-              class="h-[2.65rem] w-[2.65rem]"
-              :name="image.folderName"
-              :src="folderAvatar"
-            />
-            <div class="viewer__sidebar-folder-meta min-w-0">
-              <h2 class="viewer__sidebar-title m-0 text-[0.9rem] font-semibold truncate">
-                {{ image.folderName }}
-              </h2>
-              <p class="viewer__sidebar-breadcrumb m-0 text-muted truncate">
-                {{
-                  folder?.breadcrumb ??
-                  image.folderBreadcrumb ??
-                  "Top-level source folder"
-                }}
+            <RouterLink
+              class="viewer__sidebar-folder-link flex items-center gap-[0.85rem] min-w-0"
+              :to="{ name: 'folder', params: { slug: image.folderSlug } }"
+              aria-label="Open folder"
+            >
+              <Avatar
+                class="h-[2.65rem] w-[2.65rem]"
+                :name="image.folderName"
+                :src="folderAvatar"
+              />
+              <div class="viewer__sidebar-folder-meta min-w-0">
+                <h2 class="viewer__sidebar-title m-0 text-[0.9rem] font-semibold truncate">
+                  {{ image.folderName }}
+                </h2>
+                <p class="viewer__sidebar-breadcrumb m-0 text-muted truncate">
+                  {{
+                    folder?.breadcrumb ??
+                    image.folderBreadcrumb ??
+                    "Top-level source folder"
+                  }}
+                </p>
+              </div>
+            </RouterLink>
+            <span class="viewer__sidebar-date text-muted text-[0.78rem] whitespace-nowrap">{{
+              formattedDate
+            }}</span>
+          </div>
+
+          <!-- Description -->
+          <div class="viewer__sidebar-summary grid gap-[1.15rem] px-6 pt-[1.6rem]">
+            <div
+              v-if="summaryHtml"
+              class="viewer__sidebar-lead"
+            >
+              <div
+                class="viewer__sidebar-copy viewer__sidebar-copy--lead"
+                :class="{
+                  'viewer__sidebar-copy--collapsed': !summaryExpanded
+                }"
+                v-html="summaryHtml"
+              />
+              <button
+                v-if="shouldShowSummaryToggle"
+                class="viewer__text-toggle viewer__text-toggle--sidebar"
+                type="button"
+                @click="summaryExpanded = !summaryExpanded"
+              >
+                {{ summaryExpanded ? 'Show less' : 'Show more' }}
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="image.mediaType !== 'text'"
+            class="viewer__sidebar-inline-media px-6"
+            @pointercancel="handleMediaPointercancel"
+            @pointerdown="handleMediaPointerdown"
+            @pointermove="handleMediaPointermove"
+            @pointerup="handleMediaPointerup"
+          >
+            <template v-if="image.mediaType === 'video'">
+              <div
+                class="viewer__media-shell viewer__media-shell--video viewer__media-shell--video-interactive"
+                :style="mediaShellStyle"
+                aria-label="Toggle playback"
+                role="button"
+                tabindex="0"
+                @click="handleVideoSurfaceClick"
+                @keydown="handleVideoSurfaceKeydown"
+              >
+                <media-player
+                  ref="playerElement"
+                  class="viewer__player"
+                  :src.prop="videoSource"
+                  :title.prop="image.filename"
+                  :fullscreenOrientation.prop="'none'"
+                  :playsInline.prop="true"
+                  :muted.prop="appStore.videoMuted"
+                  :loop.prop="true"
+                  load="eager"
+                  preload="metadata"
+                  >
+                    <media-provider />
+                  <media-poster
+                    class="viewer__player-poster"
+                    :src.prop="image.thumbnailUrl"
+                    :alt.prop="image.filename"
+                  />
+                  <VideoProgressFooter
+                    variant="viewer"
+                    :time-label="videoTimeLabel"
+                    data-swipe-ignore="true"
+                  >
+                    <template #leading>
+                      <div class="viewer__player-controls-group">
+                        <media-play-button
+                          class="viewer__player-control"
+                          aria-label="Toggle playback"
+                        >
+                          <span
+                            class="viewer__player-control-icon viewer__player-play-icon viewer__player-play-icon--play i-fluent-play-16-filled"
+                            aria-hidden="true"
+                          />
+                          <span
+                            class="viewer__player-control-icon viewer__player-play-icon viewer__player-play-icon--pause i-fluent-pause-16-filled"
+                            aria-hidden="true"
+                          />
+                        </media-play-button>
+                      </div>
+                    </template>
+                    <template #trailing>
+                      <div class="viewer__player-controls-group">
+                        <media-mute-button
+                          class="viewer__player-control"
+                          aria-label="Toggle sound"
+                        >
+                          <span
+                            class="viewer__player-control-icon viewer__player-mute-icon viewer__player-mute-icon--on i-fluent-speaker-2-16-regular"
+                            aria-hidden="true"
+                          />
+                          <span
+                            class="viewer__player-control-icon viewer__player-mute-icon viewer__player-mute-icon--off i-fluent-speaker-mute-16-regular"
+                            aria-hidden="true"
+                          />
+                        </media-mute-button>
+                        <button
+                          v-if="showHdButton"
+                          class="viewer__player-control"
+                          :class="{ 'viewer__player-control--active': isPlayingHd }"
+                          type="button"
+                          :aria-label="
+                            isPlayingHd
+                              ? 'Switch to preview quality'
+                              : 'Switch to HD original'
+                          "
+                          :aria-pressed="isPlayingHd"
+                          :title="isPlayingHd ? 'Preview quality' : 'HD original'"
+                          @click.stop="toggleHdSource"
+                        >
+                          <span
+                            class="viewer__player-control-icon"
+                            :class="
+                              isPlayingHd
+                                ? 'i-fluent-hd-16-filled'
+                                : 'i-fluent-hd-16-regular'
+                            "
+                            aria-hidden="true"
+                          />
+                        </button>
+                        <media-fullscreen-button
+                          class="viewer__player-control"
+                          aria-label="Toggle fullscreen"
+                          target="media"
+                        >
+                          <span
+                            class="viewer__player-control-icon viewer__player-fullscreen-icon viewer__player-fullscreen-icon--enter i-fluent-full-screen-maximize-16-regular"
+                            aria-hidden="true"
+                          />
+                          <span
+                            class="viewer__player-control-icon viewer__player-fullscreen-icon viewer__player-fullscreen-icon--exit i-fluent-full-screen-minimize-16-regular"
+                            aria-hidden="true"
+                          />
+                        </media-fullscreen-button>
+                      </div>
+                    </template>
+                  </VideoProgressFooter>
+                </media-player>
+                <div
+                  v-if="showVideoPausedIndicator"
+                  class="viewer__pause-indicator"
+                  aria-hidden="true"
+                >
+                  <span class="viewer__pause-icon i-fluent-play-20-filled" />
+                </div>
+              </div>
+            </template>
+            <div
+              v-else
+              class="viewer__media-shell viewer__media-shell--image"
+              :style="mediaShellStyle"
+            >
+              <ResilientImage
+                class="viewer__media-image"
+                :src="image.previewUrl"
+                :fallback-src="image.originalUrl"
+                :alt="image.filename"
+                :width="image.width"
+                :height="image.height"
+                loading="eager"
+                :retry-while="appStore.isScanning"
+              />
+            </div>
+          </div>
+
+          <!-- Metadata -->
+          <dl
+            v-if="image.mediaType !== 'text' && exifDetails.length > 0"
+            class="viewer__sidebar-metadata m-0 px-6 pt-[1rem]"
+          >
+            <div
+              v-for="detail in exifDetails"
+              :key="detail.label"
+              class="viewer__sidebar-metadata-item"
+            >
+              <dt class="viewer__sidebar-metadata-label">
+                {{ detail.label }}
+              </dt>
+              <dd class="viewer__sidebar-metadata-value m-0 text-[0.96rem] font-semibold break-words">
+                {{ detail.value }}
+              </dd>
+            </div>
+          </dl>
+
+          <div class="viewer__sidebar-footer px-6 pb-5 mt-auto">
+            <div class="viewer__sidebar-meta">
+              <p class="viewer__sidebar-caption m-0 text-muted">
+                {{ readableFilename }}
+              </p>
+              <p
+                v-if="image.place"
+                class="viewer__sidebar-place m-0 text-muted"
+              >
+                <span class="viewer__sidebar-path-label">Place</span>
+                <RouterLink
+                  class="text-inherit no-underline hover:text-muted"
+                  :to="{ name: 'place', params: { slug: image.place.slug } }"
+                >
+                  {{ image.place.name }}
+                </RouterLink>
+              </p>
+              <p class="viewer__sidebar-path m-0 text-muted">
+                <span class="viewer__sidebar-path-label">Folder path</span>
+                <span class="viewer__sidebar-path-value">{{ image.relativePath }}</span>
               </p>
             </div>
-          </RouterLink>
-          <span class="viewer__sidebar-date text-muted text-[0.78rem] whitespace-nowrap">{{
-            formattedDate
-          }}</span>
-        </div>
 
-        <!-- Description -->
-        <div class="viewer__sidebar-summary grid gap-[0.3rem] px-5 pt-[1.1rem]">
-          <p class="viewer__sidebar-caption m-0 text-text">
-            <strong class="mr-[0.35rem]">{{ image.folderName }}</strong>
-            {{ readableFilename }}
-          </p>
-          <p
-            v-if="primaryTextContent.trim()"
-            class="m-0 text-[0.74rem] font-semibold uppercase tracking-[0.08em] text-muted"
-          >
-            {{ image.mediaType === 'text' ? 'Post body' : 'Shared description' }}
-          </p>
-          <div
-            v-if="summaryHtml"
-            class="viewer__sidebar-copy"
-            :class="{
-              'viewer__sidebar-copy--collapsed': !summaryExpanded,
-              'viewer__sidebar-copy--expanded': summaryExpanded
-            }"
-            v-html="summaryHtml"
-          />
-          <button
-            v-if="shouldShowSummaryToggle"
-            class="viewer__text-toggle viewer__text-toggle--sidebar"
-            type="button"
-            @click="summaryExpanded = !summaryExpanded"
-          >
-            {{ summaryExpanded ? 'Show less' : 'Read more' }}
-          </button>
-          <p class="viewer__sidebar-path mt-3 text-muted">
-            <span class="viewer__sidebar-path-label">Folder Path</span>
-            <span class="viewer__sidebar-path-value">{{ image.relativePath }}</span>
-          </p>
-        </div>
-
-        <!-- Quick stats -->
-        <dl class="viewer__sidebar-stats m-0 px-5 pt-[0.9rem]">
-          <div v-if="image.mediaType !== 'text'" class="viewer__sidebar-stat">
-            <dt class="viewer__sidebar-stat-label">
-              Dimensions
-            </dt>
-            <dd class="viewer__sidebar-stat-value m-0 text-[0.96rem] font-semibold">
-              {{ image.width }} × {{ image.height }}
-            </dd>
-          </div>
-          <div class="viewer__sidebar-stat">
-            <dt class="viewer__sidebar-stat-label">
-              Type
-            </dt>
-            <dd class="viewer__sidebar-stat-value m-0 text-[0.96rem] font-semibold">
-              {{
-                image.mediaType === "video"
-                  ? `Video (${image.mimeType})`
-                  : image.mimeType
-              }}
-            </dd>
-          </div>
-          <div
-            v-if="image.mediaType === 'video' && image.durationMs"
-            class="viewer__sidebar-stat"
-          >
-            <dt class="viewer__sidebar-stat-label">
-              Duration
-            </dt>
-            <dd class="viewer__sidebar-stat-value m-0 text-[0.96rem] font-semibold">
-              {{ formattedDuration }}
-            </dd>
-          </div>
-          <div class="viewer__sidebar-stat">
-            <dt class="viewer__sidebar-stat-label">
-              Size
-            </dt>
-            <dd class="viewer__sidebar-stat-value m-0 text-[0.96rem] font-semibold">{{ fileSize }}</dd>
-          </div>
-          <div
-            v-if="image.place"
-            class="viewer__sidebar-stat"
-          >
-            <dt class="viewer__sidebar-stat-label">
-              Place
-            </dt>
-            <dd class="viewer__sidebar-stat-value m-0 text-[0.96rem] font-semibold">
-              <RouterLink
-                class="text-inherit no-underline hover:text-muted"
-                :to="{ name: 'place', params: { slug: image.place.slug } }"
-              >
-                {{ image.place.name }}
-              </RouterLink>
-            </dd>
-          </div>
-        </dl>
-
-        <!-- Metadata -->
-        <dl
-          v-if="image.mediaType !== 'text' && exifDetails.length > 0"
-          class="viewer__sidebar-metadata m-0 px-5 pt-[0.75rem]"
-        >
-          <div
-            v-for="detail in exifDetails"
-            :key="detail.label"
-            class="viewer__sidebar-metadata-item"
-          >
-            <dt class="viewer__sidebar-metadata-label">
-              {{ detail.label }}
-            </dt>
-            <dd class="viewer__sidebar-metadata-value m-0 text-[0.96rem] font-semibold break-words">
-              {{ detail.value }}
-            </dd>
-          </div>
-        </dl>
-
-        <!-- Actions -->
-        <div
-          class="viewer__sidebar-actions flex items-center justify-end gap-3 px-5 pt-[0.7rem] pb-5 mt-auto"
-        >
-          <div class="viewer__sidebar-actions-group flex items-center gap-[0.55rem]">
-            <!-- Set as cover -->
-            <button
-              v-if="authStore.canManageLibrary && image.mediaType !== 'text'"
-              class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-text transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
-              type="button"
-              aria-label="Set as folder cover"
-              title="Set as folder cover"
-              :disabled="settingCover || isCurrentCover"
-              @click="handleSetCover"
+            <!-- Actions -->
+            <div
+              class="viewer__sidebar-actions flex items-center justify-end gap-3 pt-[0.9rem]"
             >
-              <span :class="[isCurrentCover ? 'i-fluent-folder-add-20-filled text-accent' : 'i-fluent-folder-add-20-regular', 'w-[1.5rem] h-[1.5rem]']" aria-hidden="true" />
-            </button>
-            <!-- Delete -->
-            <button
-              v-if="authStore.canDeleteMedia && image.mediaType !== 'text'"
-              class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-[#d93025] transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
-              type="button"
-              aria-label="Delete post"
-              :disabled="deleting"
-              @click="$emit('delete')"
-            >
-              <svg
-                class="w-[1.38rem] h-[1.38rem]"
-                viewBox="0 0 32 32"
-                role="presentation"
-              >
-                <path d="M12 12h2v12h-2z" fill="currentColor" />
-                <path d="M18 12h2v12h-2z" fill="currentColor" />
-                <path
-                  d="M4 6v2h2v20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8h2V6zm4 22V8h16v20z"
-                  fill="currentColor"
-                />
-                <path d="M12 2h8v2h-8z" fill="currentColor" />
-              </svg>
-            </button>
+              <div class="viewer__sidebar-actions-group flex items-center gap-[0.55rem]">
+                <!-- Set as cover -->
+                <button
+                  v-if="authStore.canManageLibrary && image.mediaType !== 'text'"
+                  class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-text transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
+                  type="button"
+                  aria-label="Set as folder cover"
+                  title="Set as folder cover"
+                  :disabled="settingCover || isCurrentCover"
+                  @click="handleSetCover"
+                >
+                  <span :class="[isCurrentCover ? 'i-fluent-folder-add-20-filled text-accent' : 'i-fluent-folder-add-20-regular', 'w-[1.5rem] h-[1.5rem]']" aria-hidden="true" />
+                </button>
+                <!-- Delete -->
+                <button
+                  v-if="authStore.canDeleteMedia && image.mediaType !== 'text'"
+                  class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-[#d93025] transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
+                  type="button"
+                  aria-label="Delete post"
+                  :disabled="deleting"
+                  @click="$emit('delete')"
+                >
+                  <svg
+                    class="w-[1.38rem] h-[1.38rem]"
+                    viewBox="0 0 32 32"
+                    role="presentation"
+                  >
+                    <path d="M12 12h2v12h-2z" fill="currentColor" />
+                    <path d="M18 12h2v12h-2z" fill="currentColor" />
+                    <path
+                      d="M4 6v2h2v20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8h2V6zm4 22V8h16v20z"
+                      fill="currentColor"
+                    />
+                    <path d="M12 2h8v2h-8z" fill="currentColor" />
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </aside>
@@ -528,7 +494,7 @@
   import Avatar from "./Avatar.vue"
   import ResilientImage from "./ResilientImage.vue"
   import VideoProgressFooter from "./VideoProgressFooter.vue"
-  import { formatMediaDuration, formatVideoTimestamp, videoPreviewWouldDownscale } from "../utils/media"
+  import { formatVideoTimestamp, videoPreviewWouldDownscale } from "../utils/media"
 
   const props = defineProps<{
     image: ImageDetail | null
@@ -604,15 +570,6 @@
   let mediaSheetRevealCapturedElement: Element | null = null
   let mediaSheetRevealStartX = 0
   let mediaSheetRevealStartY = 0
-
-  const fileSize = computed(() => {
-    if (!props.image) {
-      return ""
-    }
-
-    const megabytes = props.image.fileSize / (1024 * 1024)
-    return `${megabytes.toFixed(2)} MB`
-  })
 
   const showHdButton = computed(
     () =>
@@ -708,9 +665,6 @@
           year: "numeric",
         })
       : "",
-  )
-  const formattedDuration = computed(() =>
-    formatMediaDuration(props.image?.durationMs),
   )
   const primaryTextContent = computed(() => {
     if (!props.image) {
@@ -1704,6 +1658,7 @@
   color: var(--text);
   white-space: normal;
   line-height: 1.7;
+  min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -1719,6 +1674,12 @@
   box-sizing: border-box;
 }
 
+.viewer__sidebar-copy--lead {
+  font-size: 1.48rem;
+  line-height: 1.62;
+  letter-spacing: -0.02em;
+}
+
 .viewer__text-content--collapsed,
 .viewer__sidebar-copy--collapsed {
   display: -webkit-box;
@@ -1731,14 +1692,103 @@
 }
 
 .viewer__sidebar-copy--collapsed {
-  -webkit-line-clamp: 6;
+  -webkit-line-clamp: 5;
 }
 
-.viewer__sidebar-copy--expanded {
-  max-height: min(20rem, 42vh);
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 0.35rem;
+.viewer__card-wrapper {
+  width: min(100%, 58rem);
+}
+
+.viewer__sidebar {
+  width: 100%;
+  border-left: 0;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--surface) 98%, white 2%) 0%,
+      color-mix(in srgb, var(--surface) 96%, var(--surface-alt) 4%) 100%);
+}
+
+.viewer__sidebar--modal {
+  height: auto;
+  max-height: 100%;
+}
+
+.viewer__sidebar-header,
+.viewer__sidebar-actions {
+  position: static;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.viewer__sidebar-flow {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.viewer__sidebar-lead {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.viewer__sidebar-inline-media {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.viewer__sidebar-inline-media .viewer__media-shell {
+  width: 100%;
+}
+
+.viewer__sidebar-footer {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+}
+
+.viewer__sidebar-meta {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.viewer__sidebar-meta-line {
+  font-size: 0.82rem;
+}
+
+.viewer__sidebar-caption {
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.45;
+  min-width: 0;
+  opacity: 0.92;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.viewer__sidebar-path {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.viewer__sidebar-place {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.viewer__sidebar-path-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.viewer__sidebar-path-value {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .viewer__text-toggle {
@@ -1746,13 +1796,59 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--text);
+  color: #1d9bf0;
   font-weight: 700;
   cursor: pointer;
 }
 
 .viewer__text-toggle--sidebar {
   margin: 0;
+  font-size: 0.98rem;
+  justify-self: start;
+}
+
+@media (min-width: 961px) {
+  .viewer__card-wrapper--modal {
+    width: min(100%, 64rem);
+    height: auto;
+    max-height: min(100dvh - 2.5rem, 60rem);
+    margin: auto;
+    border-radius: 1.6rem;
+  }
+
+  .viewer__sidebar {
+    border-radius: inherit;
+    overflow-y: auto;
+  }
+
+  .viewer__sidebar-header {
+    padding: 1.35rem 1.5rem 1rem;
+  }
+
+  .viewer__sidebar-summary {
+    padding: 1.35rem 1.5rem 0;
+  }
+
+  .viewer__sidebar-inline-media {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .viewer__sidebar-copy--lead {
+    font-size: 1.18rem;
+    line-height: 1.72;
+  }
+
+  .viewer__sidebar-metadata {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .viewer__sidebar-footer {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    padding-bottom: 1.35rem;
+  }
 }
 
 .viewer__text-content :deep(p),
@@ -1783,6 +1879,19 @@
   word-break: break-word;
 }
 
+.viewer__sidebar-copy--lead :deep(h1),
+.viewer__sidebar-copy--lead :deep(h2),
+.viewer__sidebar-copy--lead :deep(h3),
+.viewer__sidebar-copy--lead :deep(p),
+.viewer__sidebar-copy--lead :deep(li) {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.viewer__sidebar-copy--lead :deep(strong) {
+  font-weight: 800;
+}
+
 .viewer__text-content :deep(code),
 .viewer__sidebar-copy :deep(code) {
   padding: 0.08rem 0.3rem;
@@ -1797,7 +1906,8 @@
 .viewer__text-content :deep(pre),
 .viewer__sidebar-copy :deep(pre) {
   max-width: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  white-space: pre-wrap;
   padding: 0.95rem;
   border-radius: 0.85rem;
   background: rgba(88, 68, 39, 0.08);

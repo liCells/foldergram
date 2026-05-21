@@ -55,35 +55,52 @@
       </button>
     </div>
 
-    <div
+    <RouterLink
       v-if="item.mediaType !== 'text' && sharedDescriptionSummary"
-      class="px-4 pb-[0.8rem]"
+      custom
+      :to="imageRoute"
+      v-slot="{ href, navigate }"
     >
-      <p class="m-0 line-clamp-4 whitespace-pre-wrap text-[0.92rem] leading-6 text-text [text-wrap:pretty]">
-        {{ sharedDescriptionSummary }}
-      </p>
-    </div>
+      <a
+        :href="href"
+        class="feed-card__summary-link block px-4 pb-[0.8rem] text-inherit no-underline"
+        :aria-label="summaryLinkLabel"
+        :title="openMediaLabel"
+        @click="handleImageNavigation($event, navigate)"
+      >
+        <p class="m-0 line-clamp-4 whitespace-pre-wrap text-[0.98rem] leading-7 text-text [text-wrap:pretty]">
+          {{ sharedDescriptionSummary }}
+        </p>
+      </a>
+    </RouterLink>
 
-    <RouterLink v-if="!isHomeContext" custom :to="imageRoute" v-slot="{ href, navigate }">
+    <RouterLink
+      v-if="!isHomeContext && item.mediaType === 'text'"
+      custom
+      :to="imageRoute"
+      v-slot="{ href, navigate }"
+    >
+      <a
+        :href="href"
+        class="feed-card__text-post block px-4 pb-[0.15rem] no-underline text-inherit"
+        @click="handleImageNavigation($event, navigate)"
+      >
+        <div class="feed-card__text-post-body">
+          <p class="feed-card__text-post-copy feed-card__text-post-copy--clamped m-0 whitespace-pre-wrap">
+            {{ item.textContent || item.filename }}
+          </p>
+        </div>
+      </a>
+    </RouterLink>
+
+    <RouterLink v-else-if="!isHomeContext" custom :to="imageRoute" v-slot="{ href, navigate }">
       <a
         :href="href"
         class="relative block overflow-hidden rounded-[0.5rem] border border-border bg-surface-alt"
         :style="{ aspectRatio: mediaAspectRatio }"
         @click="handleImageNavigation($event, navigate)"
       >
-        <div
-          v-if="item.mediaType === 'text'"
-          class="relative flex h-full w-full flex-col overflow-hidden bg-[linear-gradient(180deg,var(--surface)_0%,var(--surface-alt)_100%)] px-5 py-5 text-text"
-        >
-          <div class="mb-4 flex items-center justify-between gap-3 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted">
-            <span>{{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}</span>
-          </div>
-          <p class="m-0 line-clamp-9 whitespace-pre-wrap text-[0.98rem] leading-7 [text-wrap:pretty]">
-            {{ item.textContent || item.filename }}
-          </p>
-        </div>
         <ResilientImage
-          v-else
           :src="item.thumbnailUrl"
           :alt="item.filename"
           loading="lazy"
@@ -217,15 +234,11 @@
     <RouterLink v-else custom :to="imageRoute" v-slot="{ href, navigate }">
       <a
         :href="href"
-        class="block overflow-hidden rounded-[0.5rem] border border-border bg-surface-alt no-underline"
-        :style="{ aspectRatio: mediaAspectRatio }"
+        class="feed-card__text-post block px-4 pb-[0.15rem] no-underline text-inherit"
         @click="handleImageNavigation($event, navigate)"
       >
-        <div class="relative flex h-full w-full flex-col overflow-hidden bg-[linear-gradient(180deg,var(--surface)_0%,var(--surface-alt)_100%)] px-5 py-5 text-text">
-          <div class="mb-4 flex items-center justify-between gap-3 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted">
-            <span>{{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}</span>
-          </div>
-          <p class="m-0 line-clamp-9 whitespace-pre-wrap text-[0.98rem] leading-7 [text-wrap:pretty]">
+        <div class="feed-card__text-post-body">
+          <p class="feed-card__text-post-copy feed-card__text-post-copy--clamped m-0 whitespace-pre-wrap">
             {{ item.textContent || item.filename }}
           </p>
         </div>
@@ -450,6 +463,7 @@ const openMediaLabel = computed(() => {
 
   return props.item.mediaType === 'text' ? 'Open note' : 'Open post';
 });
+const summaryLinkLabel = computed(() => `${openMediaLabel.value} summary`);
 const caption = computed(() =>
   props.item.mediaType === 'text'
     ? (props.item.textContent ?? props.item.filename).replace(/\s+/g, ' ').trim().slice(0, 160)
@@ -1038,5 +1052,25 @@ onBeforeUnmount(() => {
 
   /* Phase 4 — rocket upward and fade, clipped by overflow:hidden */
   100% { opacity: 0;   transform: translateY(-350%) scale(0.82) rotate(0deg); }
+}
+
+.feed-card__text-post-body {
+  padding: 0.15rem 0 0.05rem;
+}
+
+.feed-card__text-post-copy {
+  color: var(--text);
+  font-size: 0.98rem;
+  line-height: 1.72;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-wrap: pretty;
+}
+
+.feed-card__text-post-copy--clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
 }
 </style>

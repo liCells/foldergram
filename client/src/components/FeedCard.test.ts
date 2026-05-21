@@ -344,7 +344,7 @@ describe('FeedCard', () => {
     expect(wrapper.get('a[aria-label="Open folder"]').attributes('title')).toBe('Open folder');
   });
 
-  it('renders text posts as notes and routes them with content ids', async () => {
+  it('renders text posts with content-height styling and routes them with content ids', async () => {
     const wrapper = mount(FeedCard, {
       props: {
         item: createTextItem(901),
@@ -359,13 +359,19 @@ describe('FeedCard', () => {
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Markdown note');
+    const textCard = wrapper.get('.feed-card__text-post');
+    expect(textCard.attributes('style') ?? '').not.toContain('aspect-ratio');
+    expect(textCard.classes()).not.toContain('bg-surface');
+    expect(textCard.classes()).toContain('px-4');
+    expect(wrapper.get('.feed-card__text-post-copy').classes()).toContain('feed-card__text-post-copy--clamped');
     const postRouteLink = wrapper
       .findAll('a[data-to]')
       .find((candidate) => candidate.attributes('data-to')?.includes('"name":"image"'));
     expect(postRouteLink?.attributes('data-to')).toContain('"id":"text:901"');
     expect(wrapper.text()).toContain('Observed red pandas before sunrise');
     expect(wrapper.text()).not.toContain('note-901.md');
+    expect(wrapper.text()).not.toContain('Markdown note');
+    expect(wrapper.text()).not.toContain('Text note');
   });
 
   it('renders shared descriptions for media posts when present', async () => {
@@ -387,5 +393,29 @@ describe('FeedCard', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('A longer shared description for the media in this folder.');
+  });
+
+  it('makes shared descriptions open the post directly from the card body', async () => {
+    const wrapper = mount(FeedCard, {
+      props: {
+        item: {
+          ...createVideoItem(903),
+          sharedDescription: 'Broadcast interrupted midway through the segment with a false royal bulletin.'
+        },
+        avatarUrl: null,
+        context: 'home',
+        isActiveVideo: false
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    const summaryLink = wrapper.get('.feed-card__summary-link');
+    expect(summaryLink.attributes('aria-label')).toBe('Open reel summary');
+    expect(summaryLink.attributes('title')).toBe('Open reel');
+    expect(summaryLink.text()).toContain('Broadcast interrupted midway through the segment');
   });
 });

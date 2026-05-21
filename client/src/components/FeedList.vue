@@ -1,9 +1,10 @@
 <template>
-  <section class="flex flex-col gap-[1.2rem]">
-    <SkeletonCard v-if="showSkeleton" v-for="index in 4" :key="index" />
+  <section :class="['feed-list flex flex-col', context === 'home' ? 'feed-list--home gap-0' : 'gap-[1.2rem]']">
+    <SkeletonCard v-if="showSkeleton" v-for="index in 4" :key="index" class="feed-list__item" />
     <FeedCard
       v-for="item in items"
       :key="item.id"
+      class="feed-list__item"
       :item="item"
       :context="context"
       :has-avatar-story="folderLookup.get(item.folderSlug)?.hasAvatarStory ?? false"
@@ -110,3 +111,11 @@ watch(
   }
 );
 </script>
+
+<style scoped>
+.feed-list--home > .feed-list__item + .feed-list__item {
+  margin-top: 0.35rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 78%, transparent 22%);
+}
+</style>

@@ -155,7 +155,9 @@ function createVideoDetail(id: number): ImageDetail {
     originalUrl: `/api/originals/${id}`,
     playbackStrategy: 'preview',
     previousImageId: null,
-    nextImageId: null
+    nextImageId: null,
+    sharedDescription: null,
+    sharedDescriptionFormat: 'plain'
   };
 }
 
@@ -238,7 +240,7 @@ describe('PostViewer', () => {
 
     expect(wrapper.get('a[aria-label="Previous post"]').attributes('data-to')).toContain('"id":"11"');
     expect(wrapper.get('a[aria-label="Next post"]').attributes('data-to')).toContain('"id":"13"');
-    expect(wrapper.text()).toContain('Folder Path');
+    expect(wrapper.text()).toContain('Folder path');
     expect(wrapper.text()).toContain('animal-planet/post-12.jpg');
   });
 
@@ -398,9 +400,80 @@ describe('PostViewer', () => {
       }
     });
 
-    expect(wrapper.text()).toContain('Post body');
-    expect(wrapper.text()).toContain('Read more');
+    expect(wrapper.text()).toContain('Show more');
     expect(wrapper.find('.viewer__text-card').exists()).toBe(true);
     expect(wrapper.find('.viewer__text-card').text()).not.toContain('field-note-31.md');
+  });
+
+  it('renders shared descriptions as the lead reading block for media posts', async () => {
+    const wrapper = mount(PostViewer, {
+      props: {
+        image: {
+          ...createVideoDetail(32),
+          sharedDescription: 'Broadcast interrupted midway through the segment with a false royal bulletin. '.repeat(12)
+        },
+        isModal: true
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    expect(wrapper.find('.viewer__sidebar-lead').exists()).toBe(true);
+    expect(wrapper.find('.viewer__sidebar-lead').text()).toContain('Broadcast interrupted midway through the segment');
+    expect(wrapper.text()).toContain('Show more');
+    expect(wrapper.text()).not.toContain('Shared description');
+  });
+
+  it('uses a content-first detail layout without technical stats', async () => {
+    const wrapper = mount(PostViewer, {
+      props: {
+        image: {
+          ...createVideoDetail(33),
+          sharedDescription: 'A breaking bulletin appears before the video block.'
+        },
+        isModal: true
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    const sidebar = wrapper.get('.viewer__sidebar');
+    const flow = sidebar.get('.viewer__sidebar-flow');
+    const summary = flow.get('.viewer__sidebar-summary');
+    const media = flow.get('.viewer__sidebar-inline-media');
+    const footer = flow.get('.viewer__sidebar-footer');
+
+    expect(summary.element.compareDocumentPosition(media.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(media.element.compareDocumentPosition(footer.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sidebar.text()).not.toContain('Dimensions');
+    expect(sidebar.text()).not.toContain('Type');
+    expect(sidebar.text()).not.toContain('Duration');
+    expect(sidebar.text()).not.toContain('Size');
+    expect(footer.text()).toContain('Folder path');
+  });
+
+  it('expands shared descriptions without enabling inner scrolling', async () => {
+    const wrapper = mount(PostViewer, {
+      props: {
+        image: {
+          ...createVideoDetail(34),
+          sharedDescription: 'Long bulletin copy. '.repeat(80)
+        },
+        isModal: true
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    const copy = wrapper.get('.viewer__sidebar-copy');
+    expect(copy.classes()).toContain('viewer__sidebar-copy--collapsed');
+
+    await wrapper.get('.viewer__text-toggle--sidebar').trigger('click');
+
+    expect(copy.classes()).not.toContain('viewer__sidebar-copy--collapsed');
+    expect(copy.classes()).not.toContain('viewer__sidebar-copy--expanded');
   });
 });
