@@ -7,6 +7,9 @@ import type { ImageDetail } from '../types/api';
 import { useViewerStore } from '../stores/viewer';
 import PostView from './PostView.vue';
 
+const mockRouterBack = vi.fn();
+const mockRouterReplace = vi.fn();
+
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router');
 
@@ -16,7 +19,8 @@ vi.mock('vue-router', async () => {
       query: {}
     }),
     useRouter: () => ({
-      replace: vi.fn()
+      back: mockRouterBack,
+      replace: mockRouterReplace
     })
   };
 });
@@ -97,6 +101,8 @@ function createImageDetail(id: number): ImageDetail {
 describe('PostView', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    mockRouterBack.mockReset();
+    mockRouterReplace.mockReset();
   });
 
   it('does not render the previously loaded post while a new modal image is loading', async () => {
@@ -140,5 +146,34 @@ describe('PostView', () => {
     await flushPromises();
 
     expect(wrapper.get('[data-test="post-viewer"]').text()).toBe('2');
+  });
+
+  it('renders a page back button and uses router back on Escape', async () => {
+    const viewerStore = useViewerStore();
+    viewerStore.$patch({
+      image: createImageDetail(4),
+      loading: false,
+      deleting: false,
+      error: null
+    });
+
+    const wrapper = mount(PostView, {
+      props: {
+        id: '4',
+        modal: false
+      }
+    });
+
+    expect(wrapper.get('button[aria-label="Back"]').text()).toContain('Back');
+
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 2
+    });
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+
+    expect(mockRouterBack).toHaveBeenCalledTimes(1);
   });
 });

@@ -8,16 +8,16 @@
         @click="handleImageNavigation($event, navigate)"
       >
         <template v-if="item.mediaType === 'text'">
-          <div class="flex h-full w-full flex-col justify-between bg-[linear-gradient(145deg,#f8f2df_0%,#efe4c8_100%)] px-4 py-3 text-[#4b3f2a]">
-            <div class="grid gap-[0.15rem]">
-              <span class="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[#7f6d50]">
+          <div class="flex h-full w-full flex-col justify-between bg-[linear-gradient(180deg,var(--surface)_0%,var(--surface-alt)_100%)] px-4 py-3 text-text">
+            <div class="grid gap-[0.35rem]">
+              <span class="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted">
                 {{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}
               </span>
-              <strong class="line-clamp-2 text-[0.86rem] leading-5">
+              <strong class="line-clamp-2 text-[0.9rem] leading-5">
                 {{ item.filename }}
               </strong>
             </div>
-            <p class="line-clamp-6 whitespace-pre-wrap text-[0.85rem] leading-6">
+            <p class="line-clamp-6 whitespace-pre-wrap text-[0.88rem] leading-6 text-muted [text-wrap:pretty]">
               {{ item.textContent || item.filename }}
             </p>
           </div>

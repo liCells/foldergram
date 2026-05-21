@@ -431,5 +431,6 @@ describe('PostViewer', () => {
     expect(wrapper.text()).toContain('Post body');
     expect(wrapper.text()).toContain('Read more');
     expect(wrapper.find('.viewer__text-card').exists()).toBe(true);
+    expect(wrapper.find('.viewer__text-card').text()).not.toContain('field-note-31.md');
   });
 });

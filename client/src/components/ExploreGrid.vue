@@ -9,13 +9,12 @@
       >
         <template v-if="item.mediaType === 'text'">
           <div class="explore-grid__text-tile">
-            <div class="explore-grid__text-wash" aria-hidden="true" />
             <div class="explore-grid__text-meta">
               <span>{{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}</span>
-              <strong>{{ item.folderName }}</strong>
+              <strong>{{ item.filename }}</strong>
             </div>
             <p>{{ item.textContent || item.filename }}</p>
-            <small>{{ item.filename }}</small>
+            <small>{{ item.folderName }}</small>
           </div>
         </template>
         <ResilientImage v-else :src="item.thumbnailUrl" :alt="item.filename" loading="lazy" :retry-while="appStore.isScanning" />
@@ -92,35 +91,14 @@ function handleImageNavigation(event: MouseEvent, item: FeedItem, navigate: () =
 }
 
 .explore-grid__text-tile {
-  position: relative;
   display: flex;
   height: 100%;
   flex-direction: column;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.95rem;
   padding: 0.95rem;
-  background: linear-gradient(160deg, #f6efdc 0%, #eadcbc 100%);
-  color: #4d402b;
-  isolation: isolate;
-}
-
-.explore-grid__text-wash {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.45), transparent 28%),
-    radial-gradient(circle at top right, rgba(167, 125, 57, 0.16), transparent 26%);
-  pointer-events: none;
-  z-index: -1;
-}
-
-.explore-grid__text-tile::after {
-  content: "";
-  position: absolute;
-  inset: 0.75rem;
-  border: 1px solid rgba(120, 95, 58, 0.14);
-  border-radius: 0.9rem;
-  pointer-events: none;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-alt) 100%);
+  color: var(--text);
 }
 
 .explore-grid__text-meta {
@@ -133,12 +111,12 @@ function handleImageNavigation(event: MouseEvent, item: FeedItem, navigate: () =
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #7a6848;
+  color: var(--muted);
 }
 
 .explore-grid__text-meta strong {
-  font-size: 0.86rem;
-  line-height: 1.2;
+  font-size: 0.92rem;
+  line-height: 1.25;
 }
 
 .explore-grid__text-tile p {
@@ -149,7 +127,8 @@ function handleImageNavigation(event: MouseEvent, item: FeedItem, navigate: () =
   -webkit-line-clamp: 7;
   white-space: pre-wrap;
   line-height: 1.55;
-  font-size: 0.84rem;
+  font-size: 0.88rem;
+  color: var(--muted);
   text-wrap: pretty;
 }
 
@@ -159,7 +138,7 @@ function handleImageNavigation(event: MouseEvent, item: FeedItem, navigate: () =
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.73rem;
-  color: #846f4f;
+  color: var(--muted);
 }
 
 .explore-grid__item :deep(img) {

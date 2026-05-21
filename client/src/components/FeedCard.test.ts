@@ -371,11 +371,11 @@ describe('FeedCard', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Markdown note');
-    expect(wrapper.text()).toContain('Field Notes');
     const postRouteLink = wrapper
       .findAll('a[data-to]')
       .find((candidate) => candidate.attributes('data-to')?.includes('"name":"image"'));
     expect(postRouteLink?.attributes('data-to')).toContain('"id":"text:901"');
     expect(wrapper.text()).toContain('Observed red pandas before sunrise');
+    expect(wrapper.text()).not.toContain('note-901.md');
   });
 });

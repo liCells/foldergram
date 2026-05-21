@@ -269,15 +269,6 @@
           class="viewer__media-shell viewer__media-shell--text"
         >
           <article class="viewer__text-card">
-            <header class="viewer__text-header">
-              <div class="viewer__text-kicker">
-                {{ image.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}
-              </div>
-              <h1 class="viewer__text-title">{{ image.filename }}</h1>
-              <p class="viewer__text-subtitle">
-                {{ image.folderName }} · {{ formattedDate }}
-              </p>
-            </header>
             <div
               class="viewer__text-content prose"
               :class="{ 'viewer__text-content--collapsed': !textExpanded }"
@@ -1814,60 +1805,29 @@
   justify-content: center;
   padding: 1.2rem;
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.6), transparent 30%),
-    linear-gradient(160deg, #f4ecd8 0%, #e7d7b1 100%);
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.52), transparent 30%),
+    linear-gradient(180deg, var(--surface) 0%, var(--surface-alt) 100%);
 }
 
 .viewer__text-card {
   width: min(100%, 46rem);
   overflow: hidden;
-  border: 1px solid rgba(109, 88, 55, 0.14);
+  border: 1px solid var(--border);
   border-radius: 1.35rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.62), transparent 20%),
-    rgba(255, 251, 242, 0.92);
-  box-shadow: 0 20px 60px rgba(78, 59, 28, 0.12);
-}
-
-.viewer__text-header {
-  display: grid;
-  gap: 0.45rem;
-  padding: 1.45rem 1.5rem 1.1rem;
-  border-bottom: 1px solid rgba(109, 88, 55, 0.12);
-}
-
-.viewer__text-kicker {
-  font-size: 0.73rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #89683a;
-}
-
-.viewer__text-title {
-  margin: 0;
-  font-size: clamp(1.2rem, 2vw, 1.55rem);
-  line-height: 1.18;
-  letter-spacing: -0.03em;
-  color: #2f2619;
-}
-
-.viewer__text-subtitle {
-  margin: 0;
-  color: #7c6a4f;
-  font-size: 0.88rem;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
 }
 
 .viewer__text-content,
 .viewer__sidebar-copy {
-  color: #463a27;
+  color: var(--text);
   white-space: normal;
   line-height: 1.7;
 }
 
 .viewer__text-content {
-  padding: 1.35rem 1.5rem 1.5rem;
-  font-size: 1rem;
+  padding: 1.45rem 1.55rem 1.5rem;
+  font-size: 1.02rem;
 }
 
 .viewer__sidebar-copy {
@@ -1894,7 +1854,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: #8d5f25;
+  color: var(--text);
   font-weight: 700;
   cursor: pointer;
 }
@@ -1920,7 +1880,7 @@
 .viewer__sidebar-copy :deep(h2),
 .viewer__sidebar-copy :deep(h3) {
   margin: 0 0 0.8rem;
-  color: #2f2619;
+  color: var(--text);
   line-height: 1.25;
   letter-spacing: -0.03em;
 }

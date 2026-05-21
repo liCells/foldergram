@@ -64,20 +64,14 @@
       >
         <div
           v-if="item.mediaType === 'text'"
-          class="relative flex h-full w-full flex-col justify-between overflow-hidden bg-[linear-gradient(160deg,#f7f0df_0%,#eadbb7_100%)] px-5 py-4 text-[#4d402b]"
+          class="relative flex h-full w-full flex-col overflow-hidden bg-[linear-gradient(180deg,var(--surface)_0%,var(--surface-alt)_100%)] px-5 py-5 text-text"
         >
-          <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(173,133,67,0.18),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.5),transparent_32%)]" aria-hidden="true" />
-          <div class="absolute inset-[0.8rem] rounded-[1rem] border border-[rgba(121,95,58,0.14)]" aria-hidden="true" />
-          <div class="grid gap-[0.15rem]">
-            <span class="relative z-1 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[#7b6847]">
-              {{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}
-            </span>
-            <strong class="relative z-1 line-clamp-2 text-[0.92rem] leading-5">{{ item.filename }}</strong>
+          <div class="mb-4 flex items-center justify-between gap-3 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted">
+            <span>{{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}</span>
           </div>
-          <p class="relative z-1 line-clamp-8 whitespace-pre-wrap text-[0.92rem] leading-6 [text-wrap:pretty]">
+          <p class="m-0 line-clamp-9 whitespace-pre-wrap text-[0.98rem] leading-7 [text-wrap:pretty]">
             {{ item.textContent || item.filename }}
           </p>
-          <span class="relative z-1 text-[0.72rem] text-[#7b6847]">{{ item.folderName }}</span>
         </div>
         <ResilientImage
           v-else
@@ -218,19 +212,13 @@
         :style="{ aspectRatio: mediaAspectRatio }"
         @click="handleImageNavigation($event, navigate)"
       >
-        <div class="relative flex h-full w-full flex-col justify-between overflow-hidden bg-[linear-gradient(160deg,#f7f0df_0%,#eadbb7_100%)] px-5 py-4 text-[#4d402b]">
-          <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(173,133,67,0.18),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.5),transparent_32%)]" aria-hidden="true" />
-          <div class="absolute inset-[0.8rem] rounded-[1rem] border border-[rgba(121,95,58,0.14)]" aria-hidden="true" />
-          <div class="grid gap-[0.15rem]">
-            <span class="relative z-1 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[#7b6847]">
-              {{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}
-            </span>
-            <strong class="relative z-1 line-clamp-2 text-[0.92rem] leading-5">{{ item.filename }}</strong>
+        <div class="relative flex h-full w-full flex-col overflow-hidden bg-[linear-gradient(180deg,var(--surface)_0%,var(--surface-alt)_100%)] px-5 py-5 text-text">
+          <div class="mb-4 flex items-center justify-between gap-3 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted">
+            <span>{{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}</span>
           </div>
-          <p class="relative z-1 line-clamp-8 whitespace-pre-wrap text-[0.92rem] leading-6 [text-wrap:pretty]">
+          <p class="m-0 line-clamp-9 whitespace-pre-wrap text-[0.98rem] leading-7 [text-wrap:pretty]">
             {{ item.textContent || item.filename }}
           </p>
-          <span class="relative z-1 text-[0.72rem] text-[#7b6847]">{{ item.folderName }}</span>
         </div>
       </a>
     </RouterLink>
@@ -335,9 +323,6 @@
       <p v-if="item.mediaType !== 'text'" class="m-0 text-[0.88rem]">
         <strong class="mr-[0.35rem]">{{ item.folderName }}</strong>
         {{ caption }}
-      </p>
-      <p v-else class="m-0 text-[0.88rem] text-muted">
-        {{ textSummary }}
       </p>
       <p class="m-0 text-muted text-[0.72rem] uppercase tracking-[0.05em]">
         {{ formattedDate }}
@@ -548,12 +533,6 @@ const caption = computed(() =>
       .replace(/[_-]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
-);
-const textSummary = computed(() =>
-  (props.item.textContent ?? props.item.filename)
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 180)
 );
 const formattedDate = computed(() =>
   new Date(props.item.takenAt ?? props.item.sortTimestamp).toLocaleDateString(undefined, {

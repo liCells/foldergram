@@ -1,5 +1,25 @@
 <template>
   <div :class="modal ? 'image-view image-view--modal' : 'image-view image-view--page'" @click.stop>
+    <div v-if="!modal && activeImage" class="image-view__toolbar">
+      <button
+        class="image-view__back-button"
+        type="button"
+        aria-label="Back"
+        @click="handleBack"
+      >
+        <svg class="image-view__back-icon" viewBox="0 0 24 24" role="presentation">
+          <path
+            d="m15 5-7 7 7 7"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.9"
+          />
+        </svg>
+        <span>Back</span>
+      </button>
+    </div>
     <ErrorState v-if="viewerStore.error" title="Could not load post" :message="viewerStore.error" />
     <PostViewer
       v-else-if="activeImage"
@@ -53,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import ConfirmDialog from '../components/ConfirmDialog.vue';
@@ -115,6 +135,37 @@ async function loadImage() {
 
 watch(() => [contentId.value, activeMediaType.value] as const, loadImage, { immediate: true });
 
+function navigateBack() {
+  if (typeof window !== 'undefined' && window.history.length > 1) {
+    router.back();
+    return;
+  }
+
+  if (activeImage.value) {
+    void router.replace({ name: 'folder', params: { slug: activeImage.value.folderSlug } });
+    return;
+  }
+
+  void router.replace({ name: 'library' });
+}
+
+function handleBack() {
+  navigateBack();
+}
+
+function handleWindowKeydown(event: KeyboardEvent) {
+  if (props.modal || event.defaultPrevented) {
+    return;
+  }
+
+  if (event.key !== 'Escape' || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return;
+  }
+
+  event.preventDefault();
+  navigateBack();
+}
+
 function openDeleteDialog() {
   deleteOriginalFromDisk.value = false;
   deleteError.value = null;
@@ -158,6 +209,14 @@ async function handleDelete() {
     deleteError.value = error instanceof Error ? error.message : 'Unable to delete post';
   }
 }
+
+onMounted(() => {
+  window.addEventListener('keydown', handleWindowKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleWindowKeydown);
+});
 </script>
 
 <style scoped>
@@ -175,5 +234,31 @@ async function handleDelete() {
 
 .image-view--page {
   margin: 0 auto;
+}
+
+.image-view__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 0.9rem;
+}
+
+.image-view__back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.95rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.image-view__back-icon {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 </style>
