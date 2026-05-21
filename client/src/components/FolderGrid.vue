@@ -1,13 +1,29 @@
 <template>
   <section class="grid gap-[1px]" :class="columns === 'three' ? 'grid-cols-3' : 'grid-cols-3 md:grid-cols-4'">
-    <RouterLink v-for="item in items" :key="item.id" custom :to="buildImageRoute(item.id)" v-slot="{ href, navigate }">
+    <RouterLink v-for="item in items" :key="item.contentId ?? item.id" custom :to="buildImageRoute(item.contentId ?? item.id)" v-slot="{ href, navigate }">
       <a
         :href="href"
         class="group relative overflow-hidden bg-surface-alt"
         :class="variant === 'reels' ? 'aspect-[9/14]' : variant === 'posts' ? 'aspect-[3/4]' : 'aspect-square'"
         @click="handleImageNavigation($event, navigate)"
       >
+        <template v-if="item.mediaType === 'text'">
+          <div class="flex h-full w-full flex-col justify-between bg-[linear-gradient(145deg,#f8f2df_0%,#efe4c8_100%)] px-4 py-3 text-[#4b3f2a]">
+            <div class="grid gap-[0.15rem]">
+              <span class="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[#7f6d50]">
+                {{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}
+              </span>
+              <strong class="line-clamp-2 text-[0.86rem] leading-5">
+                {{ item.filename }}
+              </strong>
+            </div>
+            <p class="line-clamp-6 whitespace-pre-wrap text-[0.85rem] leading-6">
+              {{ item.textContent || item.filename }}
+            </p>
+          </div>
+        </template>
         <ResilientImage
+          v-else
           :src="item.thumbnailUrl"
           :alt="item.filename"
           loading="lazy"
@@ -49,7 +65,7 @@ withDefaults(
 const appStore = useAppStore();
 const route = useRoute();
 
-function buildImageRoute(id: number) {
+function buildImageRoute(id: string | number) {
   return {
     name: 'image',
     params: { id: String(id) },

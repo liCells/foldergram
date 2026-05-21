@@ -87,9 +87,16 @@ const confirmDeleteOpen = ref(false);
 const deleteOriginalFromDisk = ref(false);
 const deleteError = ref<string | null>(null);
 
-const imageId = computed(() => Number(props.id));
+const contentId = computed(() => props.id.trim());
 const activeMediaType = computed(() => (route.query.tab === 'reels' ? 'video' : undefined));
-const activeImage = computed(() => (viewerStore.image?.id === imageId.value ? viewerStore.image : null));
+const activeImage = computed(() => {
+  if (!viewerStore.image) {
+    return null;
+  }
+
+  const viewerContentId = viewerStore.image.contentId ?? String(viewerStore.image.id);
+  return viewerContentId === contentId.value ? viewerStore.image : null;
+});
 const folder = computed(() =>
   activeImage.value ? foldersStore.items.find((entry) => entry.slug === activeImage.value?.folderSlug) ?? null : null
 );
@@ -101,12 +108,12 @@ const deleteDialogMessage = computed(() =>
 const deleteDialogConfirmLabel = computed(() => (deleteOriginalFromDisk.value ? 'Permanently Delete' : 'Delete'));
 
 async function loadImage() {
-  if (Number.isFinite(imageId.value)) {
-    await viewerStore.loadImage(imageId.value, activeMediaType.value);
+  if (contentId.value.length > 0) {
+    await viewerStore.loadImage(contentId.value, activeMediaType.value);
   }
 }
 
-watch(() => [imageId.value, activeMediaType.value] as const, loadImage, { immediate: true });
+watch(() => [contentId.value, activeMediaType.value] as const, loadImage, { immediate: true });
 
 function openDeleteDialog() {
   deleteOriginalFromDisk.value = false;
@@ -131,9 +138,10 @@ async function handleDelete() {
 
     feedStore.removeImage(deleted.id);
     likesStore.removeImage(deleted.id);
-    const removedFolder = foldersStore.removeImage(deleted.id, deleted.folderSlug, currentImage.mediaType);
+    const mediaType = currentImage.mediaType === 'video' ? 'video' : 'image';
+    const removedFolder = foldersStore.removeImage(deleted.id, deleted.folderSlug, mediaType);
     momentsStore.removeImage(deleted.id);
-    appStore.removeIndexedImage(removedFolder ? 1 : 0, currentImage.mediaType);
+    appStore.removeIndexedImage(removedFolder ? 1 : 0, mediaType);
 
     if (props.modal) {
       emit('close');

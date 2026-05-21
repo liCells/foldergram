@@ -5,6 +5,8 @@ import { normalizePath } from './path-utils.js';
 
 export const SUPPORTED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 export const SUPPORTED_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.m4v', '.webm', '.mkv']);
+export const SUPPORTED_TEXT_EXTENSIONS = new Set(['.txt', '.md']);
+export const RESERVED_DESCRIPTION_FILENAMES = new Set(['desc.txt', 'desc.md', 'description.txt', 'description.md']);
 
 export const THUMBNAIL_SIZE = 640;
 export const PREVIEW_MAX_WIDTH = 1500;
@@ -21,6 +23,14 @@ export function isSupportedMediaFile(filename: string): boolean {
   return isSupportedImageFile(filename) || isSupportedVideoFile(filename);
 }
 
+export function isSupportedTextFile(filename: string): boolean {
+  return SUPPORTED_TEXT_EXTENSIONS.has(path.extname(filename).toLowerCase());
+}
+
+export function isReservedDescriptionFilename(filename: string): boolean {
+  return RESERVED_DESCRIPTION_FILENAMES.has(path.basename(filename).toLowerCase());
+}
+
 export function createFingerprint(relativePath: string, fileSize: number, mtimeMs: number): string {
   return `${normalizePath(relativePath)}:${fileSize}:${Math.round(mtimeMs)}`;
 }
@@ -32,7 +42,12 @@ function replaceExtension(relativePath: string, nextExtension: string): string {
 }
 
 export function getMediaTypeFromExtension(extension: string): MediaType {
-  return SUPPORTED_VIDEO_EXTENSIONS.has(extension.toLowerCase()) ? 'video' : 'image';
+  const normalizedExtension = extension.toLowerCase();
+  if (SUPPORTED_TEXT_EXTENSIONS.has(normalizedExtension)) {
+    return 'text';
+  }
+
+  return SUPPORTED_VIDEO_EXTENSIONS.has(normalizedExtension) ? 'video' : 'image';
 }
 
 export function getThumbnailRelativePath(relativePath: string): string {
@@ -68,6 +83,10 @@ export function getMimeTypeFromExtension(extension: string): string {
       return 'video/webm';
     case '.mkv':
       return 'video/x-matroska';
+    case '.txt':
+      return 'text/plain';
+    case '.md':
+      return 'text/markdown';
     default:
       return 'application/octet-stream';
   }

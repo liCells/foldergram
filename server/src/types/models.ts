@@ -1,10 +1,11 @@
-export type MediaType = 'image' | 'video';
+export type MediaType = 'image' | 'video' | 'text';
 export type FolderImageOrder = 'newest' | 'oldest';
 export type TakenAtSource = 'exif' | 'mtime' | 'first_seen' | 'sort_timestamp';
 export type PlaybackStrategy = 'preview' | 'original';
 export type FolderAvatarSource = 'auto' | 'manual' | 'cover';
 export type FolderRole = 'normal' | 'story_root' | 'story_capsule';
 export type PlaceKind = 'city' | 'approximate_spot' | 'manual';
+export type TextFormat = 'plain' | 'markdown';
 
 export interface ImageExifData {
   cameraMake?: string;
@@ -101,6 +102,40 @@ export interface ImageRecord {
   updated_at: string;
 }
 
+export interface TextPostRecord {
+  id: number;
+  folder_id: number;
+  filename: string;
+  extension: string;
+  relative_path: string;
+  absolute_path: string;
+  file_size: number;
+  checksum_or_fingerprint: string;
+  mtime_ms: number;
+  first_seen_at: string;
+  sort_timestamp: number;
+  text_content: string;
+  text_format: TextFormat;
+  is_deleted: number;
+  deleted_at: string | null;
+  is_trashed: number;
+  trashed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FolderSharedDescriptionRecord {
+  folder_id: number;
+  source_relative_path: string;
+  source_absolute_path: string;
+  source_extension: string;
+  source_file_size: number;
+  source_mtime_ms: number;
+  text_content: string;
+  text_format: TextFormat;
+  updated_at: string;
+}
+
 export interface PlaceSummary {
   id: number;
   slug: string;
@@ -162,6 +197,7 @@ export interface CollectionMembershipRecord extends CollectionSummaryRecord {
 
 export interface FeedImage {
   id: number;
+  contentId?: string;
   folderId: number;
   folderSlug: string;
   folderName: string;
@@ -179,6 +215,10 @@ export interface FeedImage {
   takenAt: number | null;
   isSaved: boolean;
   place?: PlaceSummary | null;
+  textContent?: string | null;
+  textFormat?: TextFormat | null;
+  sharedDescription?: string | null;
+  sharedDescriptionFormat?: TextFormat | null;
 }
 
 export interface ReelCandidate extends FeedImage {

@@ -249,7 +249,7 @@
           </div>
         </template>
         <div
-          v-else
+          v-else-if="image.mediaType === 'image'"
           class="viewer__media-shell viewer__media-shell--image"
           :style="mediaShellStyle"
         >
@@ -263,6 +263,35 @@
             loading="eager"
             :retry-while="appStore.isScanning"
           />
+        </div>
+        <div
+          v-else
+          class="viewer__media-shell viewer__media-shell--text"
+        >
+          <article class="viewer__text-card">
+            <header class="viewer__text-header">
+              <div class="viewer__text-kicker">
+                {{ image.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}
+              </div>
+              <h1 class="viewer__text-title">{{ image.filename }}</h1>
+              <p class="viewer__text-subtitle">
+                {{ image.folderName }} · {{ formattedDate }}
+              </p>
+            </header>
+            <div
+              class="viewer__text-content prose"
+              :class="{ 'viewer__text-content--collapsed': !textExpanded }"
+              v-html="renderedTextContent"
+            />
+            <button
+              v-if="shouldShowTextToggle"
+              class="viewer__text-toggle"
+              type="button"
+              @click="textExpanded = !textExpanded"
+            >
+              {{ textExpanded ? 'Show less' : 'Read more' }}
+            </button>
+          </article>
         </div>
       </div>
 
@@ -339,6 +368,26 @@
             <strong class="mr-[0.35rem]">{{ image.folderName }}</strong>
             {{ readableFilename }}
           </p>
+          <p
+            v-if="primaryTextContent.trim()"
+            class="m-0 text-[0.74rem] font-semibold uppercase tracking-[0.08em] text-muted"
+          >
+            {{ image.mediaType === 'text' ? 'Post body' : 'Shared description' }}
+          </p>
+          <div
+            v-if="summaryHtml"
+            class="viewer__sidebar-copy"
+            :class="{ 'viewer__sidebar-copy--collapsed': !summaryExpanded }"
+            v-html="summaryHtml"
+          />
+          <button
+            v-if="shouldShowSummaryToggle"
+            class="viewer__text-toggle viewer__text-toggle--sidebar"
+            type="button"
+            @click="summaryExpanded = !summaryExpanded"
+          >
+            {{ summaryExpanded ? 'Show less' : 'Read more' }}
+          </button>
           <p class="viewer__sidebar-path mt-3 text-muted">
             <span class="viewer__sidebar-path-label">Folder Path</span>
             <span class="viewer__sidebar-path-value">{{ image.relativePath }}</span>
@@ -347,7 +396,7 @@
 
         <!-- Quick stats -->
         <dl class="viewer__sidebar-stats m-0 px-5 pt-[0.9rem]">
-          <div class="viewer__sidebar-stat">
+          <div v-if="image.mediaType !== 'text'" class="viewer__sidebar-stat">
             <dt class="viewer__sidebar-stat-label">
               Dimensions
             </dt>
@@ -368,7 +417,7 @@
             </dd>
           </div>
           <div
-            v-if="image.durationMs"
+            v-if="image.mediaType === 'video' && image.durationMs"
             class="viewer__sidebar-stat"
           >
             <dt class="viewer__sidebar-stat-label">
@@ -404,7 +453,7 @@
 
         <!-- Metadata -->
         <dl
-          v-if="exifDetails.length > 0"
+          v-if="image.mediaType !== 'text' && exifDetails.length > 0"
           class="viewer__sidebar-metadata m-0 px-5 pt-[0.75rem]"
         >
           <div
@@ -428,7 +477,7 @@
           <div class="viewer__sidebar-actions-group flex items-center gap-[0.55rem]">
             <!-- Like -->
             <button
-              v-if="authStore.canUseSavedItems"
+              v-if="authStore.canUseSavedItems && image.mediaType !== 'text'"
               class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer transition-[opacity,transform,color] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
               :class="{ 'text-[#e5484d]': likesStore.isLiked(image.id) }"
               type="button"
@@ -448,7 +497,7 @@
               />
             </button>
             <CollectionBookmark
-              v-if="image"
+              v-if="image.mediaType !== 'text'"
               :item="image"
               placement="viewer"
             />
@@ -457,7 +506,7 @@
           <div class="viewer__sidebar-actions-group flex items-center gap-[0.55rem]">
             <!-- Set as cover -->
             <button
-              v-if="authStore.canManageLibrary"
+              v-if="authStore.canManageLibrary && image.mediaType !== 'text'"
               class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-text transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
               type="button"
               aria-label="Set as folder cover"
@@ -532,7 +581,7 @@
             </a>
             <!-- Delete -->
             <button
-              v-if="authStore.canDeleteMedia"
+              v-if="authStore.canDeleteMedia && image.mediaType !== 'text'"
               class="viewer__sidebar-action inline-flex items-center justify-center p-0 border-0 bg-transparent cursor-pointer text-[#d93025] transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-45 disabled:cursor-wait disabled:transform-none"
               type="button"
               aria-label="Delete post"
@@ -563,6 +612,7 @@
 <script setup lang="ts">
   import "vidstack/bundle"
 
+  import { marked } from "marked"
   import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
   import { RouterLink, useRoute, useRouter } from "vue-router"
   import type { PlayerSrc } from "vidstack"
@@ -614,11 +664,13 @@
   const videoCurrentTimeMs = ref(0)
   const sidebarSheetDragOffset = ref(0)
   const settingCover = ref(false)
+  const textExpanded = ref(false)
+  const summaryExpanded = ref(false)
 
   const WHEEL_NAVIGATION_THRESHOLD = 72
   const NAVIGATION_COOLDOWN_MS = 320
-  const originalMediaUrl = computed(() => (props.image ? getOriginalMediaUrl(props.image.id) : ""))
-  const downloadOriginalMediaUrl = computed(() => (props.image ? getOriginalMediaDownloadUrl(props.image.id) : ""))
+  const originalMediaUrl = computed(() => (props.image ? getOriginalMediaUrl(props.image.contentId ?? props.image.id) : ""))
+  const downloadOriginalMediaUrl = computed(() => (props.image ? getOriginalMediaDownloadUrl(props.image.contentId ?? props.image.id) : ""))
   const MODAL_SIDEBAR_COLLAPSE_BREAKPOINT = 960
   const SHEET_SWIPE_MIN_DISTANCE = 56
   const SHEET_SWIPE_MAX_HORIZONTAL_DISTANCE = 96
@@ -628,6 +680,19 @@
   type MetadataDetail = {
     label: string
     value: string
+  }
+
+  function renderRichText(source: string, format: ImageDetail["textFormat"]) {
+    const rawHtml = format === "markdown" ? marked.parse(source) : source
+      .split(/\n{2,}/)
+      .map(block => `<p>${block.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br />")}</p>`)
+      .join("")
+
+    return String(rawHtml)
+      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+      .replace(/\son\w+="[^"]*"/gi, "")
+      .replace(/\son\w+='[^']*'/gi, "")
+      .replace(/javascript:/gi, "")
   }
 
   let videoMuteSyncToken = 0
@@ -695,6 +760,13 @@
       return undefined
     }
 
+    if (props.image.mediaType === "text") {
+      return {
+        "--viewer-media-aspect-ratio": "4 / 5",
+        "--viewer-media-intrinsic-width": "720px",
+      }
+    }
+
     return {
       "--viewer-media-aspect-ratio": `${props.image.width} / ${props.image.height}`,
       "--viewer-media-intrinsic-width": `${props.image.width}px`,
@@ -721,11 +793,13 @@
   const folderAvatar = computed(() => props.folder?.avatarUrl ?? null)
   const readableFilename = computed(() =>
     props.image
-      ? props.image.filename
+      ? (props.image.mediaType === "text"
+          ? props.image.filename
+          : props.image.filename
           .replace(/\.[^.]+$/, "")
           .replace(/[_-]+/g, " ")
           .replace(/\s+/g, " ")
-          .trim()
+          .trim())
       : "",
   )
   const formattedDate = computed(() =>
@@ -742,6 +816,32 @@
   const formattedDuration = computed(() =>
     formatMediaDuration(props.image?.durationMs),
   )
+  const primaryTextContent = computed(() => {
+    if (!props.image) {
+      return ""
+    }
+
+    if (props.image.mediaType === "text") {
+      return props.image.textContent ?? ""
+    }
+
+    return props.image.sharedDescription ?? ""
+  })
+  const primaryTextFormat = computed(() =>
+    props.image?.mediaType === "text"
+      ? props.image.textFormat ?? "plain"
+      : props.image?.sharedDescriptionFormat ?? "plain",
+  )
+  const renderedTextContent = computed(() => renderRichText(primaryTextContent.value, primaryTextFormat.value))
+  const shouldShowTextToggle = computed(() => primaryTextContent.value.trim().length > 520)
+  const summaryHtml = computed(() => {
+    if (!primaryTextContent.value.trim()) {
+      return ""
+    }
+
+    return renderRichText(primaryTextContent.value, primaryTextFormat.value)
+  })
+  const shouldShowSummaryToggle = computed(() => primaryTextContent.value.trim().length > 260)
   const exifDetails = computed<MetadataDetail[]>(() => {
     const exif = props.image?.exif
     if (!exif) {
@@ -1512,7 +1612,7 @@
   }
 
   watch(
-    () => props.image?.id ?? null,
+    () => props.image?.contentId ?? props.image?.id ?? null,
     () => {
       wheelDeltaAccumulator.value = 0
       navigationLockedUntil.value = 0
@@ -1520,6 +1620,8 @@
       resetMediaSheetRevealGesture()
       isPlayingHd.value = false
       isVideoPaused.value = false
+      textExpanded.value = false
+      summaryExpanded.value = false
       videoDurationMs.value = props.image?.durationMs ?? 0
       videoCurrentTimeMs.value = 0
       pendingVideoRestore = null
@@ -1704,3 +1806,138 @@
     void playerElement.value?.pause().catch(() => { /* ignore */ })
   })
 </script>
+
+<style scoped>
+.viewer__media-shell--text {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 1.2rem;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.6), transparent 30%),
+    linear-gradient(160deg, #f4ecd8 0%, #e7d7b1 100%);
+}
+
+.viewer__text-card {
+  width: min(100%, 46rem);
+  overflow: hidden;
+  border: 1px solid rgba(109, 88, 55, 0.14);
+  border-radius: 1.35rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), transparent 20%),
+    rgba(255, 251, 242, 0.92);
+  box-shadow: 0 20px 60px rgba(78, 59, 28, 0.12);
+}
+
+.viewer__text-header {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1.45rem 1.5rem 1.1rem;
+  border-bottom: 1px solid rgba(109, 88, 55, 0.12);
+}
+
+.viewer__text-kicker {
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #89683a;
+}
+
+.viewer__text-title {
+  margin: 0;
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+  color: #2f2619;
+}
+
+.viewer__text-subtitle {
+  margin: 0;
+  color: #7c6a4f;
+  font-size: 0.88rem;
+}
+
+.viewer__text-content,
+.viewer__sidebar-copy {
+  color: #463a27;
+  white-space: normal;
+  line-height: 1.7;
+}
+
+.viewer__text-content {
+  padding: 1.35rem 1.5rem 1.5rem;
+  font-size: 1rem;
+}
+
+.viewer__sidebar-copy {
+  font-size: 0.92rem;
+}
+
+.viewer__text-content--collapsed,
+.viewer__sidebar-copy--collapsed {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.viewer__text-content--collapsed {
+  -webkit-line-clamp: 12;
+}
+
+.viewer__sidebar-copy--collapsed {
+  -webkit-line-clamp: 6;
+}
+
+.viewer__text-toggle {
+  margin: 0 1.5rem 1.3rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8d5f25;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.viewer__text-toggle--sidebar {
+  margin: 0;
+}
+
+.viewer__text-content :deep(p),
+.viewer__sidebar-copy :deep(p) {
+  margin: 0 0 0.95rem;
+}
+
+.viewer__text-content :deep(p:last-child),
+.viewer__sidebar-copy :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.viewer__text-content :deep(h1),
+.viewer__text-content :deep(h2),
+.viewer__text-content :deep(h3),
+.viewer__sidebar-copy :deep(h1),
+.viewer__sidebar-copy :deep(h2),
+.viewer__sidebar-copy :deep(h3) {
+  margin: 0 0 0.8rem;
+  color: #2f2619;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+}
+
+.viewer__text-content :deep(code),
+.viewer__sidebar-copy :deep(code) {
+  padding: 0.08rem 0.3rem;
+  border-radius: 0.35rem;
+  background: rgba(88, 68, 39, 0.08);
+  font-size: 0.9em;
+}
+
+.viewer__text-content :deep(pre),
+.viewer__sidebar-copy :deep(pre) {
+  overflow: auto;
+  padding: 0.95rem;
+  border-radius: 0.85rem;
+  background: rgba(88, 68, 39, 0.08);
+}
+</style>

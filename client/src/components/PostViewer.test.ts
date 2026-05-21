@@ -167,6 +167,39 @@ function createHdVideoDetail(id: number): ImageDetail {
   };
 }
 
+function createTextDetail(id: number): ImageDetail {
+  return {
+    id,
+    contentId: `text:${id}`,
+    folderId: 7,
+    folderSlug: 'animal-planet',
+    folderName: 'AnimalPlanet',
+    folderPath: 'animal-planet',
+    folderBreadcrumb: null,
+    filename: `field-note-${id}.md`,
+    width: 0,
+    height: 0,
+    mediaType: 'text',
+    durationMs: null,
+    isAnimated: false,
+    thumbnailUrl: '',
+    previewUrl: '',
+    sortTimestamp: 1_777_000_000_000 + id,
+    takenAt: 1_777_000_000_000 + id,
+    folderAvatarImageId: null,
+    relativePath: `animal-planet/field-note-${id}.md`,
+    mimeType: 'text/markdown',
+    fileSize: 4_096,
+    exif: null,
+    originalUrl: `/api/originals/text%3A${id}`,
+    playbackStrategy: null,
+    previousImageId: null,
+    nextImageId: null,
+    textContent: '# Dawn Watch\n\nA very long note about red pandas near the canopy trail.'.repeat(8),
+    textFormat: 'markdown'
+  };
+}
+
 const globalStubs = {
   Avatar: {
     template: '<div data-test="avatar" />'
@@ -382,5 +415,21 @@ describe('PostViewer', () => {
     expect(player.playCallCount).toBeGreaterThanOrEqual(1);
     expect(player.paused).toBe(true);
     expect(wrapper.find('.viewer__pause-indicator').exists()).toBe(true);
+  });
+
+  it('renders text posts with markdown content and a read-more toggle', async () => {
+    const wrapper = mount(PostViewer, {
+      props: {
+        image: createTextDetail(31),
+        isModal: true
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    expect(wrapper.text()).toContain('Post body');
+    expect(wrapper.text()).toContain('Read more');
+    expect(wrapper.find('.viewer__text-card').exists()).toBe(true);
   });
 });

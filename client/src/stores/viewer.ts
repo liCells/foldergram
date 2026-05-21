@@ -28,7 +28,7 @@ export const useViewerStore = defineStore('viewer', {
       this.error = null;
     },
 
-    async loadImage(id: number, mediaType?: 'image' | 'video') {
+    async loadImage(id: string | number, mediaType?: 'image' | 'video') {
       const requestToken = ++viewerLoadToken;
       this.loading = true;
       this.error = null;

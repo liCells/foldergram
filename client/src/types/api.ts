@@ -44,6 +44,7 @@ export interface UpdateExcludedFoldersSettingResult extends ExcludedFoldersSetti
 
 export interface FeedItem {
   id: number;
+  contentId?: string;
   folderId: number;
   folderSlug: string;
   folderName: string;
@@ -52,7 +53,7 @@ export interface FeedItem {
   filename: string;
   width: number;
   height: number;
-  mediaType: 'image' | 'video';
+  mediaType: 'image' | 'video' | 'text';
   durationMs: number | null;
   isAnimated?: boolean | null;
   thumbnailUrl: string;
@@ -61,6 +62,10 @@ export interface FeedItem {
   takenAt: number | null;
   isSaved?: boolean;
   place?: PlaceSummary | null;
+  textContent?: string | null;
+  textFormat?: 'plain' | 'markdown' | null;
+  sharedDescription?: string | null;
+  sharedDescriptionFormat?: 'plain' | 'markdown' | null;
 }
 
 export type PlaceKind = 'city' | 'approximate_spot' | 'manual';

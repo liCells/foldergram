@@ -122,6 +122,29 @@ function createImageItem(id: number): FeedItem {
   };
 }
 
+function createTextItem(id: number): FeedItem {
+  return {
+    id,
+    contentId: `text:${id}`,
+    folderId: 15,
+    folderSlug: 'field-notes',
+    folderName: 'Field Notes',
+    folderPath: 'field-notes',
+    folderBreadcrumb: null,
+    filename: `note-${id}.md`,
+    width: 0,
+    height: 0,
+    mediaType: 'text',
+    durationMs: null,
+    thumbnailUrl: '',
+    previewUrl: '',
+    sortTimestamp: 1_777_000_000_000 + id,
+    takenAt: 1_777_000_000_000 + id,
+    textContent: 'Observed red pandas before sunrise near the cedar ridge.',
+    textFormat: 'markdown'
+  };
+}
+
 const globalStubs = {
   Avatar: {
     template: '<div data-test="avatar" />'
@@ -330,5 +353,29 @@ describe('FeedCard', () => {
 
     expect(originalLink.attributes('href')).toBe('/api/originals/807');
     expect(originalLink.attributes('title')).toBe('Open original file');
+  });
+
+  it('renders text posts as notes and routes them with content ids', async () => {
+    const wrapper = mount(FeedCard, {
+      props: {
+        item: createTextItem(901),
+        avatarUrl: null,
+        context: 'default',
+        isActiveVideo: false
+      },
+      global: {
+        stubs: globalStubs
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Markdown note');
+    expect(wrapper.text()).toContain('Field Notes');
+    const postRouteLink = wrapper
+      .findAll('a[data-to]')
+      .find((candidate) => candidate.attributes('data-to')?.includes('"name":"image"'));
+    expect(postRouteLink?.attributes('data-to')).toContain('"id":"text:901"');
+    expect(wrapper.text()).toContain('Observed red pandas before sunrise');
   });
 });

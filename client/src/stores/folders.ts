@@ -133,7 +133,7 @@ export const useFoldersStore = defineStore('folders', {
       }
     },
 
-    async loadFolder(slug: string, reset = true, mediaType?: FeedItem['mediaType']) {
+    async loadFolder(slug: string, reset = true, mediaType?: Extract<FeedItem['mediaType'], 'image' | 'video'>) {
       if (this.loadingFolder) {
         return;
       }

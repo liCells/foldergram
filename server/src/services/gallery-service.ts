@@ -20,10 +20,12 @@ import {
   collectionRepository,
   folderRepository,
   folderScanStateRepository,
+  folderSharedDescriptionRepository,
   imageRepository,
   likeRepository,
   placeRepository,
-  scanRunRepository
+  scanRunRepository,
+  textPostRepository
 } from '../db/repositories.js';
 import type {
   CollectionMembershipRecord,
@@ -36,6 +38,8 @@ import type {
   MediaType,
   PlaceKind,
   PlaybackStrategy,
+  TextFormat,
+  TextPostRecord,
   TrashImage
 } from '../types/models.js';
 import {
@@ -51,6 +55,7 @@ import { resolveOriginalPath } from '../utils/media-paths.js';
 import { getPathBreadcrumb } from '../utils/path-utils.js';
 import { buildReelQueue, shuffleReelCandidates, type ReelAffinitySignals } from '../utils/reels-utils.js';
 import { parseTreatStoriesAsFoldersSetting, serializeTreatStoriesAsFoldersSetting } from '../utils/stories-utils.js';
+import { encodeMediaContentId, encodeTextContentId, parseContentId } from '../utils/content-id.js';
 import { scannerService } from './scanner-service.js';
 import { storageService } from './storage-service.js';
 import { geodataService, placeResolutionService } from './place-service.js';
@@ -211,8 +216,8 @@ function toPublicMediaUrl(basePath: '/thumbnails' | '/previews', relativePath: s
   return `${basePath}/${encodedSegments}?v=${encodeURIComponent(version)}`;
 }
 
-function buildOriginalUrl(id: number): string {
-  return `/api/originals/${id}`;
+function buildOriginalUrl(id: number | string): string {
+  return `/api/originals/${encodeURIComponent(String(id))}`;
 }
 
 function buildPreviewUrl(
@@ -269,6 +274,32 @@ function resolveOriginalMediaFile(id: number): { path: string; filename: string 
   return {
     path: resolvedPath,
     filename: detail.filename
+  };
+}
+
+function resolveOriginalContentFile(contentId: string | number): { path: string; filename: string } | null {
+  const parsed = parseContentId(contentId);
+  if (!parsed || !storageService.getState().libraryAvailable || scannerService.isLibraryRebuildRequired()) {
+    return null;
+  }
+
+  if (parsed.kind === 'media') {
+    return resolveOriginalMediaFile(parsed.id);
+  }
+
+  const textPost = textPostRepository.getById(parsed.id);
+  if (!textPost || textPost.is_deleted || textPost.is_trashed) {
+    return null;
+  }
+
+  const resolvedPath = resolveIndexedOriginalPath(textPost.relative_path);
+  if (!resolvedPath || !fs.existsSync(resolvedPath)) {
+    return null;
+  }
+
+  return {
+    path: resolvedPath,
+    filename: textPost.filename
   };
 }
 
@@ -406,8 +437,10 @@ function isSameOrDescendantFolderPath(rootFolderPath: string, candidateFolderPat
 
 function mapFeedImage(image: IndexedFeedImage, derivativeVersion = getDerivativeAssetVersion()): FeedImage {
   const { playbackStrategy, placeId, placeSlug, placeName, placeKind, placeIsApproximate, isSaved, ...rest } = image;
+  const sharedDescription = folderSharedDescriptionRepository.getByFolderId(rest.folderId);
   return {
     ...rest,
+    contentId: encodeMediaContentId(rest.id),
     isAnimated: Boolean(rest.isAnimated),
     isSaved: Boolean(isSaved),
     folderBreadcrumb: getPathBreadcrumb(rest.folderPath),
@@ -417,15 +450,19 @@ function mapFeedImage(image: IndexedFeedImage, derivativeVersion = getDerivative
       mediaType: rest.mediaType,
       previewUrl: rest.previewUrl
     }, false, derivativeVersion),
-    place: mapPlaceSummaryFromRow({ placeId, placeSlug, placeName, placeKind, placeIsApproximate })
+    place: mapPlaceSummaryFromRow({ placeId, placeSlug, placeName, placeKind, placeIsApproximate }),
+    sharedDescription: sharedDescription?.text_content ?? null,
+    sharedDescriptionFormat: sharedDescription?.text_format ?? null
   };
 }
 
 function mapImageDetail(image: IndexedImageDetail, derivativeVersion = getDerivativeAssetVersion()): ImageDetail {
   const { playbackStrategy, exifJson, placeId, placeSlug, placeName, placeKind, placeIsApproximate, isSaved, ...rest } = image;
   const useOriginalForImages = appConfig.imageDetailSource === 'original';
+  const sharedDescription = folderSharedDescriptionRepository.getByFolderId(rest.folderId);
   return {
     ...rest,
+    contentId: encodeMediaContentId(rest.id),
     isAnimated: Boolean(rest.isAnimated),
     isSaved: Boolean(isSaved),
     exif: deserializeImageExifData(exifJson),
@@ -438,7 +475,9 @@ function mapImageDetail(image: IndexedImageDetail, derivativeVersion = getDeriva
     }, useOriginalForImages, derivativeVersion),
     originalUrl: buildOriginalUrl(rest.id),
     playbackStrategy,
-    place: mapPlaceSummaryFromRow({ placeId, placeSlug, placeName, placeKind, placeIsApproximate })
+    place: mapPlaceSummaryFromRow({ placeId, placeSlug, placeName, placeKind, placeIsApproximate }),
+    sharedDescription: sharedDescription?.text_content ?? null,
+    sharedDescriptionFormat: sharedDescription?.text_format ?? null
   };
 }
 
@@ -457,6 +496,208 @@ function mapTrashImage(image: IndexedTrashImage, derivativeVersion = getDerivati
     }, false, derivativeVersion),
     place: mapPlaceSummaryFromRow({ placeId, placeSlug, placeName, placeKind, placeIsApproximate })
   };
+}
+
+function mapTextPost(textPost: TextPostRecord): FeedImage & {
+  contentId: string;
+  textContent: string;
+  textFormat: TextFormat;
+  sharedDescription: null;
+  sharedDescriptionFormat: null;
+} {
+  const folder = folderRepository.getById(textPost.folder_id);
+  const folderPath = folder?.folder_path ?? '';
+  return {
+    id: textPost.id,
+    contentId: encodeTextContentId(textPost.id),
+    folderId: textPost.folder_id,
+    folderSlug: folder?.slug ?? '',
+    folderName: folder?.name ?? path.basename(folderPath || textPost.relative_path),
+    folderPath,
+    folderBreadcrumb: getPathBreadcrumb(folderPath),
+    filename: textPost.filename,
+    width: 0,
+    height: 0,
+    mediaType: 'text',
+    durationMs: null,
+    isAnimated: false,
+    thumbnailUrl: '',
+    previewUrl: '',
+    sortTimestamp: textPost.sort_timestamp,
+    takenAt: null,
+    isSaved: false,
+    place: null,
+    textContent: textPost.text_content,
+    textFormat: textPost.text_format,
+    sharedDescription: null,
+    sharedDescriptionFormat: null
+  };
+}
+
+function mapTextPostDetail(textPost: TextPostRecord) {
+  const feedItem = mapTextPost(textPost);
+  return {
+    ...feedItem,
+    folderAvatarImageId: null,
+    relativePath: textPost.relative_path,
+    mimeType: textPost.text_format === 'markdown' ? 'text/markdown' : 'text/plain',
+    fileSize: textPost.file_size,
+    exif: null,
+    originalUrl: buildOriginalUrl(feedItem.contentId),
+    playbackStrategy: null,
+    nextImageId: null,
+    previousImageId: null
+  };
+}
+
+function sortMixedFeedItems(items: FeedImage[]): FeedImage[] {
+  return [...items].sort((left, right) => {
+    const leftTime = left.takenAt ?? left.sortTimestamp;
+    const rightTime = right.takenAt ?? right.sortTimestamp;
+    if (leftTime !== rightTime) {
+      return rightTime - leftTime;
+    }
+
+    return String(right.contentId ?? right.id).localeCompare(String(left.contentId ?? left.id));
+  });
+}
+
+function sortFolderFeedItems(items: FeedImage[], order: FolderImageOrder): FeedImage[] {
+  return [...items].sort((left, right) => {
+    const leftTime = left.takenAt ?? left.sortTimestamp;
+    const rightTime = right.takenAt ?? right.sortTimestamp;
+    if (leftTime !== rightTime) {
+      return order === 'oldest' ? leftTime - rightTime : rightTime - leftTime;
+    }
+
+    return order === 'oldest'
+      ? String(left.contentId ?? left.id).localeCompare(String(right.contentId ?? right.id))
+      : String(right.contentId ?? right.id).localeCompare(String(left.contentId ?? left.id));
+  });
+}
+
+function shuffleMixedFeedItems(items: FeedImage[], seed: number): FeedImage[] {
+  return [...items].sort((left, right) => {
+    const leftValue = Math.abs((((left.id + 1) * 1103515245) + (seed * 1013904223)) % 2147483647);
+    const rightValue = Math.abs((((right.id + 1) * 1103515245) + (seed * 1013904223)) % 2147483647);
+    if (leftValue !== rightValue) {
+      return leftValue - rightValue;
+    }
+
+    return String(right.contentId ?? right.id).localeCompare(String(left.contentId ?? left.id));
+  });
+}
+
+function normalizeTextSearchQuery(query: string): string {
+  return query.trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+}
+
+function rankTextSearchResults(query: string): FeedImage[] {
+  const normalizedQuery = normalizeTextSearchQuery(query);
+  if (normalizedQuery.length === 0) {
+    return [];
+  }
+
+  const tokens = [...new Set(normalizedQuery.split(' ').filter(Boolean))];
+
+  const rankedMatches: Array<{ item: FeedImage; rank: number } | null> = textPostRepository
+    .listVisible()
+    .map((textPost) => mapTextPost(textPost))
+    .map((item): { item: FeedImage; rank: number } | null => {
+      const filename = item.filename.toLocaleLowerCase();
+      const folderName = item.folderName.toLocaleLowerCase();
+      const folderPath = item.folderPath.toLocaleLowerCase();
+      const textContent = (item.textContent ?? '').toLocaleLowerCase();
+      const searchFields = [filename, folderName, folderPath, textContent];
+      const joinedFields = searchFields.join(' ');
+
+      if (tokens.some((token) => !joinedFields.includes(token))) {
+        return null;
+      }
+
+      let rank = 0;
+      if (filename === normalizedQuery) {
+        rank += 240;
+      } else if (filename.startsWith(normalizedQuery)) {
+        rank += 180;
+      } else if (filename.includes(normalizedQuery)) {
+        rank += 140;
+      }
+
+      if (folderName === normalizedQuery) {
+        rank += 120;
+      } else if (folderName.startsWith(normalizedQuery)) {
+        rank += 84;
+      } else if (folderName.includes(normalizedQuery)) {
+        rank += 56;
+      }
+
+      if (textContent.includes(normalizedQuery)) {
+        rank += 96;
+      }
+
+      rank += tokens.reduce((score, token) => score + (textContent.includes(token) ? 18 : 0), 0);
+
+      return {
+        item,
+        rank
+      };
+    });
+
+  const matches = rankedMatches.filter((entry): entry is { item: FeedImage; rank: number } => entry !== null);
+
+  return matches
+    .sort((left, right) => {
+      if (left.rank !== right.rank) {
+        return right.rank - left.rank;
+      }
+
+      const leftTime = left.item.takenAt ?? left.item.sortTimestamp;
+      const rightTime = right.item.takenAt ?? right.item.sortTimestamp;
+      if (leftTime !== rightTime) {
+        return rightTime - leftTime;
+      }
+
+      return String(right.item.contentId ?? right.item.id).localeCompare(String(left.item.contentId ?? left.item.id));
+    })
+    .map((entry) => entry.item);
+}
+
+function listAllVisibleFeedItems() {
+  return sortMixedFeedItems([
+    ...mapFeedItems(imageRepository.listRecentCandidates(0, imageRepository.countFeed())),
+    ...textPostRepository.listVisible().map((textPost) => mapTextPost(textPost))
+  ]);
+}
+
+function listRediscoverFeedItems(cutoffTimestamp: number) {
+  const mediaItems = listDiversifiedModeItems(imageRepository.countRediscover(cutoffTimestamp), 1, imageRepository.countFeed(), (offset, batchLimit) =>
+    imageRepository.listRediscoverCandidates(offset, batchLimit, cutoffTimestamp)
+  );
+
+  return sortMixedFeedItems([
+    ...mapFeedItems(mediaItems),
+    ...textPostRepository.listOlderThan(cutoffTimestamp).map((textPost) => mapTextPost(textPost))
+  ]);
+}
+
+function listFolderFeedItems(folderId: number, mediaType?: MediaType, order: FolderImageOrder = 'newest') {
+  if (mediaType === 'text') {
+    return textPostRepository.listVisibleByFolder(folderId).map((textPost) => mapTextPost(textPost));
+  }
+
+  const mediaItems = imageRepository
+    .listFolderImages(folderId, 1, imageRepository.countVisibleByFolder(folderId, mediaType === 'image' || mediaType === 'video' ? mediaType : undefined), mediaType === 'image' || mediaType === 'video' ? mediaType : undefined, order)
+    .map((image) => mapFeedImage(image));
+
+  if (mediaType === 'image' || mediaType === 'video') {
+    return mediaItems;
+  }
+
+  return sortFolderFeedItems([
+    ...mediaItems,
+    ...textPostRepository.listVisibleByFolder(folderId).map((textPost) => mapTextPost(textPost))
+  ], order);
 }
 
 function buildFolderSummary(folder: FolderSummaryRecord) {
@@ -1029,37 +1270,35 @@ export const galleryService = {
     }
 
     if (mode === 'random') {
-      const total = imageRepository.countFeed();
+      const items = listAllVisibleFeedItems();
+      const total = items.length;
       const seed = Number.isFinite(randomSeed)
         ? Number(randomSeed)
         : Number(new Date().toISOString().slice(0, 10).replaceAll('-', ''));
 
       return {
         mode,
-        ...buildPaginatedPayload(mapFeedItems(imageRepository.listRandom(page, limit, seed)), page, limit, total)
+        ...buildPaginatedPayload(sliceItemsForPage(shuffleMixedFeedItems(items, seed), page, limit), page, limit, total)
       };
     }
 
     if (mode === 'rediscover') {
       const cutoffTimestamp = Date.now() - REDISCOVER_MIN_AGE_MS;
-      const total = imageRepository.countRediscover(cutoffTimestamp);
-      const items = listDiversifiedModeItems(total, page, limit, (offset, batchLimit) =>
-        imageRepository.listRediscoverCandidates(offset, batchLimit, cutoffTimestamp)
-      );
+      const items = listRediscoverFeedItems(cutoffTimestamp);
+      const total = items.length;
 
       return {
         mode,
-        ...buildPaginatedPayload(mapFeedItems(items), page, limit, total)
+        ...buildPaginatedPayload(sliceItemsForPage(items, page, limit), page, limit, total)
       };
     }
 
-    const total = imageRepository.countFeed();
-    const offset = (page - 1) * limit;
-    const items = imageRepository.listRecentCandidates(offset, limit);
+    const items = listAllVisibleFeedItems();
+    const total = items.length;
 
     return {
       mode,
-      ...buildPaginatedPayload(mapFeedItems(items), page, limit, total)
+      ...buildPaginatedPayload(sliceItemsForPage(items, page, limit), page, limit, total)
     };
   },
 
@@ -1133,10 +1372,11 @@ export const galleryService = {
       };
     }
 
-    const total = imageRepository.countVisibleSearch(normalizedQuery);
-    const items = total > 0 ? imageRepository.listVisibleSearch(normalizedQuery, page, limit) : [];
+    const mediaItems = mapFeedItems(imageRepository.listVisibleSearch(normalizedQuery, 1, imageRepository.countVisibleSearch(normalizedQuery)));
+    const textItems = rankTextSearchResults(normalizedQuery);
+    const items = sortMixedFeedItems([...mediaItems, ...textItems]);
 
-    return buildPaginatedPayload(mapFeedItems(items), page, limit, total);
+    return buildPaginatedPayload(sliceItemsForPage(items, page, limit), page, limit, items.length);
   },
 
   listMoments() {
@@ -1197,7 +1437,7 @@ export const galleryService = {
       return [];
     }
 
-    return folderRepository.getAllSummaries().map(buildFolderSummary);
+    return folderRepository.getAllSummaries().filter((folder) => folder.image_count > 0).map(buildFolderSummary);
   },
 
   listPlaces() {
@@ -1366,15 +1606,18 @@ export const galleryService = {
       return null;
     }
 
-    const total = mediaType ? imageRepository.countVisibleByFolder(folder.id, mediaType) : folder.image_count;
-    const derivativeVersion = getDerivativeAssetVersion();
+    const total =
+      mediaType === 'text'
+        ? textPostRepository.countVisibleByFolder(folder.id)
+        : mediaType
+          ? imageRepository.countVisibleByFolder(folder.id, mediaType)
+          : folder.image_count;
     const defaultFolderImageOrder = getDefaultFolderImageOrder();
+    const items = listFolderFeedItems(folder.id, mediaType, defaultFolderImageOrder);
 
     return {
       folder: buildFolderSummary(folder),
-      items: imageRepository
-        .listFolderImages(folder.id, page, limit, mediaType, defaultFolderImageOrder)
-        .map((image) => mapFeedImage(image, derivativeVersion)),
+      items: sliceItemsForPage(items, page, limit),
       page,
       limit,
       total,
@@ -1382,15 +1625,29 @@ export const galleryService = {
     };
   },
 
-  getImageDetail(id: number, mediaType?: MediaType) {
+  getImageDetail(id: string | number, mediaType?: MediaType) {
     if (!storageService.getState().libraryAvailable) {
       return null;
     }
 
+    const contentRef = parseContentId(id);
+    if (!contentRef) {
+      return null;
+    }
+
+    if (contentRef.kind === 'text') {
+      const textPost = textPostRepository.getById(contentRef.id);
+      if (!textPost || textPost.is_deleted || textPost.is_trashed) {
+        return null;
+      }
+
+      return mapTextPostDetail(textPost);
+    }
+
     const defaultFolderImageOrder = getDefaultFolderImageOrder();
-    let detail = imageRepository.getImageDetail(id, mediaType, false, defaultFolderImageOrder);
+    let detail = imageRepository.getImageDetail(contentRef.id, mediaType, false, defaultFolderImageOrder);
     if (!detail) {
-      const avatarDetail = imageRepository.getImageDetail(id, mediaType, true, defaultFolderImageOrder);
+      const avatarDetail = imageRepository.getImageDetail(contentRef.id, mediaType, true, defaultFolderImageOrder);
       if (avatarDetail && avatarDetail.folderAvatarImageId === avatarDetail.id) {
         detail = avatarDetail;
       }
@@ -1892,8 +2149,8 @@ export const galleryService = {
     };
   },
 
-  getOriginalMediaFile(id: number): { path: string; filename: string } | null {
-    return resolveOriginalMediaFile(id);
+  getOriginalMediaFile(id: string | number): { path: string; filename: string } | null {
+    return resolveOriginalContentFile(id);
   },
 
   getOriginalImagePath(id: number): string | null {

@@ -7,6 +7,7 @@ import type {
   CollectionRecord,
   CollectionSummaryRecord,
   FeedImage,
+  FolderSharedDescriptionRecord,
   FolderAvatarSource,
   FolderImageOrder,
   FolderRole,
@@ -22,6 +23,8 @@ import type {
   FolderRecord,
   FolderSummaryRecord,
   ScanRunRecord,
+  TextFormat,
+  TextPostRecord,
   TrashImage,
   TakenAtSource
 } from '../types/models.js';
@@ -40,6 +43,8 @@ const VISIBLE_IMAGE_WHERE_UNSCOPED_SQL =
   `is_deleted = 0 AND is_trashed = 0 AND LOWER(filename) NOT IN (${COVER_FILENAME_SQL}) AND folder_id IN (${NORMAL_FOLDER_ID_SUBQUERY_SQL})`;
 const STORY_IMAGE_WHERE_SQL = 'images.is_deleted = 0 AND images.is_trashed = 0';
 const STORY_IMAGE_WHERE_UNSCOPED_SQL = 'is_deleted = 0 AND is_trashed = 0';
+const VISIBLE_TEXT_POST_WHERE_SQL = 'text_posts.is_deleted = 0 AND text_posts.is_trashed = 0';
+const VISIBLE_TEXT_POST_WHERE_UNSCOPED_SQL = 'is_deleted = 0 AND is_trashed = 0';
 const HAS_AVATAR_STORY_SQL = `
   EXISTS (
     SELECT 1
@@ -171,14 +176,34 @@ const FEED_IMAGE_SELECT_SQL = `
 const FOLDER_SUMMARY_SELECT_SQL = `
   SELECT
     folders.*,
-    COUNT(images.id) AS image_count,
-    SUM(CASE WHEN images.media_type = 'video' THEN 1 ELSE 0 END) AS video_count,
-    MAX(images.mtime_ms) AS latest_image_mtime_ms,
+    (
+      SELECT COUNT(*)
+      FROM images
+      WHERE images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_UNSCOPED_SQL}
+    ) + (
+      SELECT COUNT(*)
+      FROM text_posts
+      WHERE text_posts.folder_id = folders.id AND ${VISIBLE_TEXT_POST_WHERE_UNSCOPED_SQL}
+    ) AS image_count,
+    (
+      SELECT COUNT(*)
+      FROM images
+      WHERE images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_UNSCOPED_SQL} AND images.media_type = 'video'
+    ) AS video_count,
+    MAX(
+      COALESCE(
+        (SELECT MAX(images.mtime_ms) FROM images WHERE images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_UNSCOPED_SQL}),
+        0
+      ),
+      COALESCE(
+        (SELECT MAX(text_posts.mtime_ms) FROM text_posts WHERE text_posts.folder_id = folders.id AND ${VISIBLE_TEXT_POST_WHERE_UNSCOPED_SQL}),
+        0
+      )
+    ) AS latest_image_mtime_ms,
     CASE WHEN ${HAS_AVATAR_STORY_SQL} THEN 1 ELSE 0 END AS has_avatar_story,
     ${FOLDER_SUMMARY_AVATAR_IMAGE_ID_SQL} AS summary_avatar_image_id,
     ${FOLDER_SUMMARY_AVATAR_THUMBNAIL_PATH_SQL} AS summary_avatar_thumbnail_path
   FROM folders
-  INNER JOIN images ON images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_SQL}
 `;
 
 interface MediaSearchSql {
@@ -388,6 +413,32 @@ export interface UpsertFolderScanStateInput {
   totalSize: number;
 }
 
+export interface UpsertTextPostInput {
+  folderId: number;
+  filename: string;
+  extension: string;
+  relativePath: string;
+  absolutePath: string;
+  fileSize: number;
+  fingerprint: string;
+  mtimeMs: number;
+  firstSeenAt: string;
+  sortTimestamp: number;
+  textContent: string;
+  textFormat: TextFormat;
+}
+
+export interface UpsertFolderSharedDescriptionInput {
+  folderId: number;
+  sourceRelativePath: string;
+  sourceAbsolutePath: string;
+  sourceExtension: string;
+  sourceFileSize: number;
+  sourceMtimeMs: number;
+  textContent: string;
+  textFormat: TextFormat;
+}
+
 export interface UpsertCityPlaceInput {
   geonamesId: number;
   displayName: string;
@@ -416,7 +467,6 @@ export const folderRepository = {
         `
         ${FOLDER_SUMMARY_SELECT_SQL}
         WHERE folders.role = 'normal'
-        GROUP BY folders.id
         ORDER BY latest_image_mtime_ms DESC, folders.name COLLATE NOCASE ASC, folders.folder_path COLLATE NOCASE ASC
         `
       )
@@ -443,7 +493,6 @@ export const folderRepository = {
         `
         ${FOLDER_SUMMARY_SELECT_SQL}
         WHERE folders.slug = ? AND folders.role = 'normal'
-        GROUP BY folders.id
         `
       )
       .get(slug) as FolderSummaryRecord | undefined;
@@ -520,6 +569,11 @@ export const folderRepository = {
                 SELECT 1
                 FROM images
                 WHERE images.folder_id = folders.id AND ${VISIBLE_IMAGE_WHERE_UNSCOPED_SQL}
+              )
+              OR EXISTS (
+                SELECT 1
+                FROM text_posts
+                WHERE text_posts.folder_id = folders.id AND ${VISIBLE_TEXT_POST_WHERE_UNSCOPED_SQL}
               )
             `
           )
@@ -1811,6 +1865,134 @@ export const imageRepository = {
 
   getByPreviewPath(previewPath: string): ImageRecord | undefined {
     return database.prepare('SELECT * FROM images WHERE preview_path = ? AND is_deleted = 0 LIMIT 1').get(previewPath) as ImageRecord | undefined;
+  }
+};
+
+export const textPostRepository = {
+  getById(id: number): TextPostRecord | undefined {
+    return database.prepare('SELECT * FROM text_posts WHERE id = ?').get(id) as TextPostRecord | undefined;
+  },
+
+  getByRelativePath(relativePath: string): TextPostRecord | undefined {
+    return database.prepare('SELECT * FROM text_posts WHERE relative_path = ?').get(relativePath) as TextPostRecord | undefined;
+  },
+
+  upsert(input: UpsertTextPostInput): TextPostRecord {
+    database.prepare(
+      `
+      INSERT INTO text_posts (
+        folder_id, filename, extension, relative_path, absolute_path, file_size,
+        checksum_or_fingerprint, mtime_ms, first_seen_at, sort_timestamp, text_content, text_format,
+        is_deleted, deleted_at, is_trashed, trashed_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 0, NULL, ?)
+      ON CONFLICT(relative_path) DO UPDATE SET
+        folder_id = excluded.folder_id,
+        filename = excluded.filename,
+        extension = excluded.extension,
+        absolute_path = excluded.absolute_path,
+        file_size = excluded.file_size,
+        checksum_or_fingerprint = excluded.checksum_or_fingerprint,
+        mtime_ms = excluded.mtime_ms,
+        sort_timestamp = excluded.sort_timestamp,
+        text_content = excluded.text_content,
+        text_format = excluded.text_format,
+        is_deleted = 0,
+        deleted_at = NULL,
+        updated_at = excluded.updated_at
+      `
+    ).run(
+      input.folderId,
+      input.filename,
+      input.extension,
+      input.relativePath,
+      input.absolutePath,
+      input.fileSize,
+      input.fingerprint,
+      input.mtimeMs,
+      input.firstSeenAt,
+      input.sortTimestamp,
+      input.textContent,
+      input.textFormat,
+      nowIso()
+    );
+
+    return this.getByRelativePath(input.relativePath) as TextPostRecord;
+  },
+
+  countVisibleByFolder(folderId: number): number {
+    return Number(
+      (
+        database
+          .prepare(`SELECT COUNT(*) AS count FROM text_posts WHERE folder_id = ? AND ${VISIBLE_TEXT_POST_WHERE_UNSCOPED_SQL}`)
+          .get(folderId) as { count: number }
+      ).count
+    );
+  },
+
+  listVisible(): TextPostRecord[] {
+    return database
+      .prepare(`SELECT * FROM text_posts WHERE ${VISIBLE_TEXT_POST_WHERE_UNSCOPED_SQL} ORDER BY sort_timestamp DESC, id DESC`)
+      .all() as unknown as TextPostRecord[];
+  },
+
+  listVisibleByFolder(folderId: number): TextPostRecord[] {
+    return database
+      .prepare(
+        `SELECT * FROM text_posts WHERE folder_id = ? AND ${VISIBLE_TEXT_POST_WHERE_UNSCOPED_SQL} ORDER BY sort_timestamp DESC, id DESC`
+      )
+      .all(folderId) as unknown as TextPostRecord[];
+  },
+
+  listOlderThan(cutoffTimestamp: number): TextPostRecord[] {
+    return database
+      .prepare(
+        `SELECT * FROM text_posts WHERE ${VISIBLE_TEXT_POST_WHERE_UNSCOPED_SQL} AND sort_timestamp <= ? ORDER BY sort_timestamp DESC, id DESC`
+      )
+      .all(cutoffTimestamp) as unknown as TextPostRecord[];
+  }
+};
+
+export const folderSharedDescriptionRepository = {
+  getByFolderId(folderId: number): FolderSharedDescriptionRecord | undefined {
+    return database.prepare('SELECT * FROM folder_shared_descriptions WHERE folder_id = ?').get(folderId) as FolderSharedDescriptionRecord | undefined;
+  },
+
+  upsert(input: UpsertFolderSharedDescriptionInput): FolderSharedDescriptionRecord {
+    database.prepare(
+      `
+      INSERT INTO folder_shared_descriptions (
+        folder_id, source_relative_path, source_absolute_path, source_extension,
+        source_file_size, source_mtime_ms, text_content, text_format, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(folder_id) DO UPDATE SET
+        source_relative_path = excluded.source_relative_path,
+        source_absolute_path = excluded.source_absolute_path,
+        source_extension = excluded.source_extension,
+        source_file_size = excluded.source_file_size,
+        source_mtime_ms = excluded.source_mtime_ms,
+        text_content = excluded.text_content,
+        text_format = excluded.text_format,
+        updated_at = excluded.updated_at
+      `
+    ).run(
+      input.folderId,
+      input.sourceRelativePath,
+      input.sourceAbsolutePath,
+      input.sourceExtension,
+      input.sourceFileSize,
+      input.sourceMtimeMs,
+      input.textContent,
+      input.textFormat,
+      nowIso()
+    );
+
+    return this.getByFolderId(input.folderId) as FolderSharedDescriptionRecord;
+  },
+
+  deleteByFolderId(folderId: number): void {
+    database.prepare('DELETE FROM folder_shared_descriptions WHERE folder_id = ?').run(folderId);
   }
 };
 

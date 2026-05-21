@@ -127,6 +127,42 @@ CREATE TABLE IF NOT EXISTS collection_items (
   FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS text_posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  folder_id INTEGER NOT NULL,
+  filename TEXT NOT NULL,
+  extension TEXT NOT NULL,
+  relative_path TEXT NOT NULL UNIQUE,
+  absolute_path TEXT NOT NULL,
+  file_size INTEGER NOT NULL,
+  checksum_or_fingerprint TEXT NOT NULL,
+  mtime_ms REAL NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  sort_timestamp INTEGER NOT NULL,
+  text_content TEXT NOT NULL,
+  text_format TEXT NOT NULL,
+  is_deleted INTEGER NOT NULL DEFAULT 0,
+  deleted_at TEXT NULL,
+  is_trashed INTEGER NOT NULL DEFAULT 0,
+  trashed_at TEXT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS folder_shared_descriptions (
+  folder_id INTEGER PRIMARY KEY,
+  source_relative_path TEXT NOT NULL,
+  source_absolute_path TEXT NOT NULL,
+  source_extension TEXT NOT NULL,
+  source_file_size INTEGER NOT NULL,
+  source_mtime_ms REAL NOT NULL,
+  text_content TEXT NOT NULL,
+  text_format TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_folders_slug ON folders(slug);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_folder_path ON folders(folder_path);
 CREATE INDEX IF NOT EXISTS idx_folders_role ON folders(role);
@@ -158,4 +194,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_single_default ON collections(
 CREATE INDEX IF NOT EXISTS idx_collections_updated_at ON collections(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_collection_items_image ON collection_items(image_id);
 CREATE INDEX IF NOT EXISTS idx_collection_items_created ON collection_items(collection_id, created_at DESC, image_id DESC);
+CREATE INDEX IF NOT EXISTS idx_text_posts_folder_id ON text_posts(folder_id);
+CREATE INDEX IF NOT EXISTS idx_text_posts_sort_timestamp ON text_posts(sort_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_text_posts_visibility ON text_posts(is_deleted, is_trashed);
+CREATE INDEX IF NOT EXISTS idx_text_posts_relative_path ON text_posts(relative_path);
 `;

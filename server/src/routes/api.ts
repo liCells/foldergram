@@ -97,6 +97,9 @@ const storyIdSchema = z.object({
 const imageIdSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const contentIdSchema = z.object({
+  id: z.string().trim().min(1).max(120)
+});
 
 export const patchFolderBodySchema = z.object({
   name: z.string().min(1).max(255),
@@ -664,7 +667,7 @@ router.get('/trash/images', requireCapability('canDeleteMedia', 'Admin access is
 });
 
 router.get('/images/:id', (request, response) => {
-  const params = imageIdSchema.parse(request.params);
+  const params = contentIdSchema.parse(request.params);
   const query = mediaTypeQuerySchema.parse(request.query);
   const image = galleryService.getImageDetail(params.id, query.mediaType);
 
@@ -794,7 +797,7 @@ router.delete('/images/:id', requireCapability('canDeleteMedia', 'Admin access i
 });
 
 router.get('/originals/:id', (request, response) => {
-  const params = imageIdSchema.parse(request.params);
+  const params = contentIdSchema.parse(request.params);
   const query = originalMediaQuerySchema.parse(request.query);
   const originalMedia = galleryService.getOriginalMediaFile(params.id);
 

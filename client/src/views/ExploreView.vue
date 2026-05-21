@@ -172,7 +172,7 @@
             :aria-selected="activeSearchTab === 'media'"
             @click="selectSearchTab('media')"
           >
-            Photos &amp; Videos
+            Posts
           </button>
           <button
             class="explore-view__tab"
@@ -218,10 +218,10 @@
             class="explore-view__message-card mx-auto"
           >
             <h1 class="m-0 text-[1.15rem] font-semibold text-text">
-              No matching photos or videos
+              No matching posts
             </h1>
             <p class="m-0 text-muted">
-              Try a different filename or folder keyword.
+              Try a different filename, folder name, or note text.
             </p>
           </section>
 

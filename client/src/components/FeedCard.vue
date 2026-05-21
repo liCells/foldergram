@@ -62,7 +62,25 @@
         :style="{ aspectRatio: mediaAspectRatio }"
         @click="handleImageNavigation($event, navigate)"
       >
+        <div
+          v-if="item.mediaType === 'text'"
+          class="relative flex h-full w-full flex-col justify-between overflow-hidden bg-[linear-gradient(160deg,#f7f0df_0%,#eadbb7_100%)] px-5 py-4 text-[#4d402b]"
+        >
+          <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(173,133,67,0.18),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.5),transparent_32%)]" aria-hidden="true" />
+          <div class="absolute inset-[0.8rem] rounded-[1rem] border border-[rgba(121,95,58,0.14)]" aria-hidden="true" />
+          <div class="grid gap-[0.15rem]">
+            <span class="relative z-1 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[#7b6847]">
+              {{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}
+            </span>
+            <strong class="relative z-1 line-clamp-2 text-[0.92rem] leading-5">{{ item.filename }}</strong>
+          </div>
+          <p class="relative z-1 line-clamp-8 whitespace-pre-wrap text-[0.92rem] leading-6 [text-wrap:pretty]">
+            {{ item.textContent || item.filename }}
+          </p>
+          <span class="relative z-1 text-[0.72rem] text-[#7b6847]">{{ item.folderName }}</span>
+        </div>
         <ResilientImage
+          v-else
           :src="item.thumbnailUrl"
           :alt="item.filename"
           loading="lazy"
@@ -101,7 +119,7 @@
     </div>
 
     <div
-      v-else
+      v-else-if="item.mediaType === 'video'"
       ref="homeVideoTarget"
       class="feed-card__video-shell relative block overflow-hidden rounded-[0.5rem] border border-border bg-surface-alt"
       :class="{ 'feed-card__video-shell--interactive': showHomeVideoSurfaceControls }"
@@ -193,11 +211,35 @@
       </div>
     </div>
 
+    <RouterLink v-else custom :to="imageRoute" v-slot="{ href, navigate }">
+      <a
+        :href="href"
+        class="block overflow-hidden rounded-[0.5rem] border border-border bg-surface-alt no-underline"
+        :style="{ aspectRatio: mediaAspectRatio }"
+        @click="handleImageNavigation($event, navigate)"
+      >
+        <div class="relative flex h-full w-full flex-col justify-between overflow-hidden bg-[linear-gradient(160deg,#f7f0df_0%,#eadbb7_100%)] px-5 py-4 text-[#4d402b]">
+          <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(173,133,67,0.18),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.5),transparent_32%)]" aria-hidden="true" />
+          <div class="absolute inset-[0.8rem] rounded-[1rem] border border-[rgba(121,95,58,0.14)]" aria-hidden="true" />
+          <div class="grid gap-[0.15rem]">
+            <span class="relative z-1 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[#7b6847]">
+              {{ item.textFormat === 'markdown' ? 'Markdown note' : 'Text note' }}
+            </span>
+            <strong class="relative z-1 line-clamp-2 text-[0.92rem] leading-5">{{ item.filename }}</strong>
+          </div>
+          <p class="relative z-1 line-clamp-8 whitespace-pre-wrap text-[0.92rem] leading-6 [text-wrap:pretty]">
+            {{ item.textContent || item.filename }}
+          </p>
+          <span class="relative z-1 text-[0.72rem] text-[#7b6847]">{{ item.folderName }}</span>
+        </div>
+      </a>
+    </RouterLink>
+
     <div class="grid gap-[0.6rem] px-4 pt-[0.7rem] pb-[0.15rem]">
       <div class="flex items-center justify-between gap-[0.65rem]">
         <div class="flex items-center gap-[0.65rem]">
           <button
-            v-if="authStore.canUseSavedItems"
+            v-if="authStore.canUseSavedItems && item.mediaType !== 'text'"
             class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px disabled:opacity-50 disabled:cursor-wait disabled:transform-none"
             :class="{ 'text-[#e5484d]': likesStore.isLiked(item.id) }"
             type="button"
@@ -245,7 +287,7 @@
         </div>
         <div class="flex items-center gap-[0.65rem]">
           <a
-            v-if="isHomeContext"
+            v-if="isHomeContext && item.mediaType !== 'text'"
             class="inline-flex items-center justify-center w-8 h-8 border-0 bg-transparent cursor-pointer color-inherit transition-[opacity,transform] duration-180 hover:opacity-72 hover:-translate-y-px"
             :href="downloadOriginalMediaUrl"
             download
@@ -283,15 +325,19 @@
             </svg>
           </a>
           <CollectionBookmark
+            v-if="item.mediaType !== 'text'"
             :item="item"
             placement="feed"
           />
         </div>
       </div>
 
-      <p class="m-0 text-[0.88rem]">
+      <p v-if="item.mediaType !== 'text'" class="m-0 text-[0.88rem]">
         <strong class="mr-[0.35rem]">{{ item.folderName }}</strong>
         {{ caption }}
+      </p>
+      <p v-else class="m-0 text-[0.88rem] text-muted">
+        {{ textSummary }}
       </p>
       <p class="m-0 text-muted text-[0.72rem] uppercase tracking-[0.05em]">
         {{ formattedDate }}
@@ -318,7 +364,7 @@
           <span>Open original</span>
         </button>
         <button
-          v-if="authStore.canDeleteMedia"
+          v-if="authStore.canDeleteMedia && item.mediaType !== 'text'"
           class="flex items-center gap-[0.8rem] w-full px-4 py-[0.95rem] border-0 border-b border-border text-[#d93025] bg-transparent cursor-pointer text-left disabled:opacity-70 disabled:cursor-wait"
           type="button"
           :disabled="deleting"
@@ -478,7 +524,7 @@ let removeHomePlayerEventListeners: (() => void) | null = null;
 
 const imageRoute = computed(() => ({
   name: 'image',
-  params: { id: String(props.item.id) },
+  params: { id: String(props.item.contentId ?? props.item.id) },
   query: route.query
 }));
 const isHomeContext = computed(() => props.context === 'home');
@@ -487,13 +533,27 @@ const shouldOpenPostInModal = computed(() => props.context !== 'home');
 const folderStoriesLabel = computed(() => `Open ${props.item.folderName} stories`);
 const folderAvatarLabel = computed(() => `Open ${props.item.folderName}`);
 const likeActionLabel = computed(() => likesStore.toggleAriaLabel(likesStore.isLiked(props.item.id)));
-const openMediaLabel = computed(() => (props.item.mediaType === 'video' ? 'Open reel' : 'Open post'));
+const openMediaLabel = computed(() => {
+  if (props.item.mediaType === 'video') {
+    return 'Open reel';
+  }
+
+  return props.item.mediaType === 'text' ? 'Open note' : 'Open post';
+});
 const caption = computed(() =>
-  props.item.filename
-    .replace(/\.[^.]+$/, '')
-    .replace(/[_-]+/g, ' ')
+  props.item.mediaType === 'text'
+    ? (props.item.textContent ?? props.item.filename).replace(/\s+/g, ' ').trim().slice(0, 160)
+    : props.item.filename
+      .replace(/\.[^.]+$/, '')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+);
+const textSummary = computed(() =>
+  (props.item.textContent ?? props.item.filename)
     .replace(/\s+/g, ' ')
     .trim()
+    .slice(0, 180)
 );
 const formattedDate = computed(() =>
   new Date(props.item.takenAt ?? props.item.sortTimestamp).toLocaleDateString(undefined, {
@@ -506,8 +566,8 @@ const formattedDuration = computed(() => formatMediaDuration(props.item.duration
 const mediaAspectRatio = computed(() => resolveFeedAspectRatio(props.item.width, props.item.height));
 const homeVideoAspectRatio = computed(() => loadedHomeVideoAspectRatio.value ?? mediaAspectRatio.value);
 const homeImageSrc = computed(() => (props.item.isAnimated ? props.item.previewUrl : props.item.thumbnailUrl));
-const originalMediaUrl = computed(() => getOriginalMediaUrl(props.item.id));
-const downloadOriginalMediaUrl = computed(() => getOriginalMediaDownloadUrl(props.item.id));
+const originalMediaUrl = computed(() => getOriginalMediaUrl(props.item.contentId ?? props.item.id));
+const downloadOriginalMediaUrl = computed(() => getOriginalMediaDownloadUrl(props.item.contentId ?? props.item.id));
 const homeVideoSource = computed<PlayerSrc>(() => ({
   src: props.item.previewUrl,
   type: 'video/mp4'
@@ -945,9 +1005,10 @@ async function confirmDelete() {
     const deleted = deleteOriginalFromDisk.value ? await deleteImage(props.item.id) : await trashImage(props.item.id);
     feedStore.removeImage(deleted.id);
     likesStore.removeImage(deleted.id);
-    const removedFolder = foldersStore.removeImage(deleted.id, deleted.folderSlug, props.item.mediaType);
+    const mediaType = props.item.mediaType === 'video' ? 'video' : 'image';
+    const removedFolder = foldersStore.removeImage(deleted.id, deleted.folderSlug, mediaType);
     momentsStore.removeImage(deleted.id);
-    appStore.removeIndexedImage(removedFolder ? 1 : 0, props.item.mediaType);
+    appStore.removeIndexedImage(removedFolder ? 1 : 0, mediaType);
     confirmDeleteOpen.value = false;
     deleteOriginalFromDisk.value = false;
   } catch (error) {

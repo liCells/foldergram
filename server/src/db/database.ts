@@ -162,6 +162,10 @@ class DatabaseManager {
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_collections_updated_at ON collections(updated_at DESC)');
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_collection_items_image ON collection_items(image_id)');
     this.database.exec('CREATE INDEX IF NOT EXISTS idx_collection_items_created ON collection_items(collection_id, created_at DESC, image_id DESC)');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_text_posts_folder_id ON text_posts(folder_id)');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_text_posts_sort_timestamp ON text_posts(sort_timestamp DESC)');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_text_posts_visibility ON text_posts(is_deleted, is_trashed)');
+    this.database.exec('CREATE INDEX IF NOT EXISTS idx_text_posts_relative_path ON text_posts(relative_path)');
   }
 }
 

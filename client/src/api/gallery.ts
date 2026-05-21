@@ -179,7 +179,7 @@ export function setFolderCover(slug: string, imageId: number) {
   });
 }
 
-export function fetchImage(id: number, mediaType?: 'image' | 'video') {
+export function fetchImage(id: string | number, mediaType?: 'image' | 'video') {
   const params = new URLSearchParams();
   if (mediaType) {
     params.set('mediaType', mediaType);

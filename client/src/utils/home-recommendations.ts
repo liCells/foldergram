@@ -38,6 +38,7 @@ export function selectHomeRecommendations(
     };
   }
 
+  const rankingNowMs = createStableDailyReference(now).getTime();
   const homeSummaryFolder =
     (lastOpenedFolderSlug ? folders.find((folder) => folder.slug === lastOpenedFolderSlug) ?? null : null) ??
     getFallbackTopFolder(folders, likedCountByFolder);
@@ -46,7 +47,7 @@ export function selectHomeRecommendations(
     .filter((folder) => folder.id !== homeSummaryFolder?.id && folder.imageCount > 0)
     .map((folder) => ({
       folder,
-      score: getRecommendationScore(folder, likedCountByFolder, now.getTime()),
+      score: getRecommendationScore(folder, likedCountByFolder, rankingNowMs),
       likedImageCount: likedCountByFolder.get(folder.slug) ?? 0
     }))
     .sort(compareRankedFolders);
@@ -149,11 +150,19 @@ function compareText(left: string, right: string): number {
 }
 
 function createDailySeed(now: Date): string {
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  const stableNow = createStableDailyReference(now);
+  const year = stableNow.getUTCFullYear();
+  const month = String(stableNow.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(stableNow.getUTCDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
+}
+
+function createStableDailyReference(now: Date): Date {
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const day = now.getUTCDate();
+  return new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
 }
 
 function shuffleWithSeed<T>(items: T[], seed: string): T[] {

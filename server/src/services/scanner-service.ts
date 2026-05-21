@@ -15,11 +15,13 @@ import {
 import { appConfig } from '../config/env.js';
 import {
   appSettingsRepository,
+  folderSharedDescriptionRepository,
   folderRepository,
   folderScanStateRepository,
   imageRepository,
   maintenanceRepository,
-  scanRunRepository
+  scanRunRepository,
+  textPostRepository
 } from '../db/repositories.js';
 import { generateDerivatives, generateThumbnailDerivative, readMediaMetadata } from './derivative-service.js';
 import {
@@ -37,7 +39,9 @@ import {
   getMediaTypeFromExtension,
   getMimeTypeFromExtension,
   getStableSortTimestamp,
-  isSupportedMediaFile
+  isReservedDescriptionFilename,
+  isSupportedMediaFile,
+  isSupportedTextFile
 } from '../utils/image-utils.js';
 import { generateAssetKey, getPreviewPathForAssetKey, getThumbnailPathForAssetKey } from '../utils/derivative-paths.js';
 import { resolveTakenAt, serializeImageExifData } from '../utils/exif-utils.js';
@@ -70,7 +74,7 @@ import {
   type IndexedFileStatus
 } from '../utils/scan-utils.js';
 import { resolveUniqueSlug, slugifyFolderPath } from '../utils/slug.js';
-import type { FolderRecord, FolderRole, FolderScanStateRecord, ImageRecord, ScanRunRecord } from '../types/models.js';
+import type { FolderRecord, FolderRole, FolderScanStateRecord, ImageRecord, ScanRunRecord, TextFormat } from '../types/models.js';
 
 interface ScanSummary {
   status: string;
@@ -139,6 +143,19 @@ interface IndexedFolderScanOptions {
 interface IndexedFileReference {
   absolutePath: string;
   relativePath: string;
+}
+
+interface TextFileCandidate {
+  absolutePath: string;
+  relativePath: string;
+  stats: Stats;
+}
+
+interface ReservedDescriptionResolution {
+  conflict: boolean;
+  textFile: TextFileCandidate | null;
+  format: TextFormat | null;
+  content: string | null;
 }
 
 interface StatIndexedFilesResult {
@@ -730,7 +747,7 @@ class ScannerService {
     }
 
     const childDirectories: Array<{ absolutePath: string; relativePath: string }> = [];
-    let hasDirectImages = false;
+    let hasDirectIndexableContent = false;
 
     for (const entry of entries) {
       const relativeEntryPath = currentRelativePath ? `${currentRelativePath}/${entry.name}` : entry.name;
@@ -750,12 +767,12 @@ class ScannerService {
         continue;
       }
 
-      if (currentRelativePath && entry.isFile() && isSupportedMediaFile(entry.name)) {
-        hasDirectImages = true;
+      if (currentRelativePath && entry.isFile() && (isSupportedMediaFile(entry.name) || isSupportedTextFile(entry.name))) {
+        hasDirectIndexableContent = true;
       }
     }
 
-    if (currentRelativePath && hasDirectImages) {
+    if (currentRelativePath && hasDirectIndexableContent) {
       const normalizedRelativePath = normalizePath(currentRelativePath);
       this.setProgress({
         discoveredFolders: this.progress.discoveredFolders + 1,
@@ -768,7 +785,7 @@ class ScannerService {
     }
 
     for (const childDirectory of childDirectories) {
-      if (!treatStoriesAsFolders && currentRelativePath && hasDirectImages && isStoriesFolderName(path.basename(childDirectory.relativePath))) {
+      if (!treatStoriesAsFolders && currentRelativePath && hasDirectIndexableContent && isStoriesFolderName(path.basename(childDirectory.relativePath))) {
         continue;
       }
 
@@ -837,33 +854,72 @@ class ScannerService {
       return this.clearIndexedFolder(sourceFolderPath, existingFolders);
     }
 
-    const imageFiles = entries.filter(
-      (entry) => entry.isFile() && isSupportedMediaFile(entry.name) && !entry.name.startsWith('.')
-    );
+    const fileEntries = entries.filter((entry) => entry.isFile() && !entry.name.startsWith('.'));
+    const mediaFiles = fileEntries.filter((entry) => isSupportedMediaFile(entry.name));
+    const textFileEntries = fileEntries.filter((entry) => isSupportedTextFile(entry.name));
+    const sourceFolderDepth = sourceFolderPath.split('/').length;
+    const isContentRoot = sourceFolderDepth === 1;
+    const reservedDescriptionEntries = isContentRoot ? [] : textFileEntries.filter((entry) => isReservedDescriptionFilename(entry.name));
+    const standaloneTextEntries = isContentRoot
+      ? textFileEntries
+      : textFileEntries.filter((entry) => !isReservedDescriptionFilename(entry.name));
 
-    if (imageFiles.length === 0) {
+    if (mediaFiles.length === 0 && textFileEntries.length === 0) {
       return this.clearIndexedFolder(sourceFolderPath, existingFolders);
     }
 
     this.setProgress({
       currentFolder: sourceFolderPath,
-      discoveredImages: this.progress.discoveredImages + imageFiles.length
+      discoveredImages: this.progress.discoveredImages + mediaFiles.length + textFileEntries.length
     });
 
-    const statResult = await this.statIndexedFiles(
-      imageFiles.map((entry) => {
-        const absolutePath = path.join(sourceFolder.absolutePath, entry.name);
-        return {
-          absolutePath,
-          relativePath: getRelativeGalleryPath(appConfig.galleryRoot, absolutePath)
-        };
-      }),
+    const reservedDescription = await this.resolveReservedDescription(
+      reservedDescriptionEntries.map((entry) => ({
+        absolutePath: path.join(sourceFolder.absolutePath, entry.name),
+        relativePath: getRelativeGalleryPath(appConfig.galleryRoot, path.join(sourceFolder.absolutePath, entry.name))
+      })),
       errors
     );
 
+    if (reservedDescription.conflict) {
+      return {
+        folder: null,
+        sourceFolderPath,
+        discoveredDirectImages: false,
+        wroteFolder: false,
+        scannedFiles: mediaFiles.length + textFileEntries.length,
+        newFiles: 0,
+        updatedFiles: 0,
+        removedFiles: 0,
+        unchangedFiles: 0,
+        refreshedUnchangedRows: 0,
+        skippedUnchangedRows: 0,
+        usedFolderShortcut: false
+      };
+    }
+
+    const statResult = mediaFiles.length > 0
+      ? await this.statIndexedFiles(
+        mediaFiles.map((entry) => {
+          const absolutePath = path.join(sourceFolder.absolutePath, entry.name);
+          return {
+            absolutePath,
+            relativePath: getRelativeGalleryPath(appConfig.galleryRoot, absolutePath)
+          };
+        }),
+        errors
+      )
+      : {
+        activeRelativePaths: textFileEntries.map((entry) =>
+          getRelativeGalleryPath(appConfig.galleryRoot, path.join(sourceFolder.absolutePath, entry.name))
+        ),
+        discoveredFiles: [],
+        folderHadErrors: false
+      };
+
     const result = await this.scanIndexedFolderFiles({
       folderPath: sourceFolderPath,
-      scannedFileCount: imageFiles.length,
+      scannedFileCount: mediaFiles.length + textFileEntries.length,
       activeRelativePaths: statResult.activeRelativePaths,
       discoveredFiles: statResult.discoveredFiles,
       existingFolders,
@@ -877,11 +933,42 @@ class ScannerService {
       folderHadErrors: statResult.folderHadErrors
     });
 
+    const folder = result.folder;
+    if (folder) {
+      if (reservedDescription.textFile && mediaFiles.length > 0 && reservedDescription.content !== null && reservedDescription.format !== null) {
+        folderSharedDescriptionRepository.upsert({
+          folderId: folder.id,
+          sourceRelativePath: reservedDescription.textFile.relativePath,
+          sourceAbsolutePath: reservedDescription.textFile.absolutePath,
+          sourceExtension: path.extname(reservedDescription.textFile.absolutePath).toLowerCase(),
+          sourceFileSize: reservedDescription.textFile.stats.size,
+          sourceMtimeMs: reservedDescription.textFile.stats.mtimeMs,
+          textContent: reservedDescription.content,
+          textFormat: reservedDescription.format
+        });
+      } else {
+        folderSharedDescriptionRepository.deleteByFolderId(folder.id);
+      }
+
+      const textEntriesToIndex = [...standaloneTextEntries];
+      if (reservedDescription.textFile && mediaFiles.length === 0) {
+        textEntriesToIndex.push({
+          name: path.basename(reservedDescription.textFile.relativePath),
+          isFile: () => true
+        } as typeof standaloneTextEntries[number]);
+      }
+
+      for (const entry of textEntriesToIndex) {
+        const absolutePath = path.join(sourceFolder.absolutePath, entry.name);
+        await this.indexTextPost(folder, absolutePath);
+      }
+    }
+
     log.info(
       joinLogParts([
         'App folder indexed',
         sourceFolderPath,
-        formatStep('scanned', imageFiles.length),
+        formatStep('scanned', mediaFiles.length + textFileEntries.length),
         formatStep('new', result.newFiles),
         formatStep('updated', result.updatedFiles),
         formatStep('removed', result.removedFiles),
@@ -891,6 +978,58 @@ class ScannerService {
     );
 
     return result;
+  }
+
+  private async resolveReservedDescription(files: IndexedFileReference[], errors: string[]): Promise<ReservedDescriptionResolution> {
+    if (files.length === 0) {
+      return { conflict: false, textFile: null, format: null, content: null };
+    }
+
+    if (files.length > 1) {
+      log.error(`Conflicting reserved descriptions | folder ${path.dirname(files[0]!.relativePath)}`);
+      return { conflict: true, textFile: null, format: null, content: null };
+    }
+
+    const file = files[0]!;
+    const stats = await fs.stat(file.absolutePath);
+    const content = await fs.readFile(file.absolutePath, 'utf8');
+
+    return {
+      conflict: false,
+      textFile: {
+        absolutePath: file.absolutePath,
+        relativePath: file.relativePath,
+        stats
+      },
+      format: path.extname(file.absolutePath).toLowerCase() === '.md' ? 'markdown' : 'plain',
+      content
+    };
+  }
+
+  private async indexTextPost(folder: FolderRecord, absolutePath: string): Promise<void> {
+    const relativePath = getRelativeGalleryPath(appConfig.galleryRoot, absolutePath);
+    const stats = await fs.stat(absolutePath);
+    const content = await fs.readFile(absolutePath, 'utf8');
+    const extension = path.extname(absolutePath).toLowerCase();
+    const existing = textPostRepository.getByRelativePath(relativePath);
+
+    textPostRepository.upsert({
+      folderId: folder.id,
+      filename: path.basename(absolutePath),
+      extension,
+      relativePath,
+      absolutePath,
+      fileSize: stats.size,
+      fingerprint: createFingerprint(relativePath, stats.size, stats.mtimeMs),
+      mtimeMs: stats.mtimeMs,
+      firstSeenAt: existing?.first_seen_at ?? new Date().toISOString(),
+      sortTimestamp: getStableSortTimestamp(existing ? {
+        sortTimestamp: existing.sort_timestamp,
+        firstSeenAt: existing.first_seen_at
+      } : null, stats.mtimeMs),
+      textContent: content,
+      textFormat: extension === '.md' ? 'markdown' : 'plain'
+    });
   }
 
   private async statIndexedFiles(files: IndexedFileReference[], errors: string[]): Promise<StatIndexedFilesResult> {
